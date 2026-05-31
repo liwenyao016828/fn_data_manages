@@ -1,0 +1,62 @@
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Build outputs
+*.exe
+*.exe~
+*.o
+*.a
+build/
+build_output*.txt
+diag_mysql.go
+test_mysql.go
+backend.go
+simple_server*
+data_manage.exe
+data_manage.exe~
+server.exe~
+
+# Data files (local configs and backups - do not commit)
+data/backups/
+data/databases.json
+data/remote_servers.json
+data/backups.json
+data/scheduled_backups.json
+data/metrics_history.json
+server/data/
+
+# Dependencies
+vendor/
+
+# Environment
+.env
+config.yaml
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+server/frontend/
+
+# FnOS packaging
+fpk/
+fnapp/
+data_manages_test/
+core/
+data_manages.fpk
+fnpack.exe
+build_fnapp.bat
+build_fnapp.sh
+
+# Trae internal
+.trae/

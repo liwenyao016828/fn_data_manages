@@ -1,0 +1,89 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main, master]
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          mkdir -p ../server/frontend/dist
+          cp -r dist/* ../server/frontend/dist/
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: go.sum
+
+      - name: Build Backend
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          cd server
+          CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o data_manages-${{ matrix.goos }}-${{ matrix.goarch }} .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: data_manages-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: server/data_manages-${{ matrix.goos }}-${{ matrix.goarch }}
+          retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'created'
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create release assets
+        run: |
+          cd dist
+          for dir in */; do
+            binary=$(find "$dir" -type f -executable -o -name "*.exe" | head -1)
+            if [ -n "$binary" ]; then
+              name=$(basename "$dir")
+              ext=""
+              if echo "$binary" | grep -q '\.exe$'; then ext=".exe"; fi
+              cp "$binary" "data_manages-${name}${ext}"
+            fi
+          done
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/data_manages-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
