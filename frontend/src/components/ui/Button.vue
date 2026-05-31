@@ -50,9 +50,9 @@ export const Button = defineComponent({
     loading: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false },
   },
-  setup(props, { slots }) {
+  setup(props, { slots, attrs }) {
     const delegatedProps = computed(() => {
-      const { class: _, loading: __, ...delegated } = props
+      const { class: _, loading: __, disabled: ___, ...delegated } = props
       return delegated
     })
     return () => {
@@ -69,11 +69,12 @@ export const Button = defineComponent({
       return h(
         Primitive,
         {
+          ...delegatedProps.value,
+          ...attrs,
           as: props.asChild ? 'template' : props.as,
           'as-child': props.asChild,
           class: cn(buttonVariants({ variant: props.variant, size: props.size }), props.class),
           disabled: isDisabled,
-          ...delegatedProps.value,
         },
         () => [spinner, contentWrapper]
       )

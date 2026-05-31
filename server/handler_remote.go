@@ -158,7 +158,7 @@ func createRemoteServer(w http.ResponseWriter, r *http.Request) {
 	mutex.Unlock()
 
 	go func() {
-		ver, dsk := fetchServerInfo(&newServer)
+		ver, dsk, _ := fetchServerInfo(&newServer)
 		if ver != "" || dsk != "" {
 			mutex.Lock()
 			for i := range remoteServers {

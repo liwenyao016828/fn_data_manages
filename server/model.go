@@ -3,22 +3,23 @@ package main
 import "sync"
 
 type Database struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
-	Type        string `json:"type"`
-	Version     string `json:"version"`
-	Host        string `json:"host"`
-	Port        int    `json:"port"`
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	Database    string `json:"database"`
-	SSL         bool   `json:"ssl"`
-	Description string `json:"description"`
-	Status      string `json:"status"`
-	Disk        string `json:"disk"`
-	Permission  string `json:"permission"`
-	Container   string `json:"container"`
-	CreatedAt   string `json:"createdAt"`
+	ID          uint     `json:"id"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Version     string   `json:"version"`
+	Host        string   `json:"host"`
+	Port        int      `json:"port"`
+	Username    string   `json:"username"`
+	Password    string   `json:"password"`
+	Database    string   `json:"database"`
+	SSL         bool     `json:"ssl"`
+	Description string   `json:"description"`
+	Status      string   `json:"status"`
+	Disk        string   `json:"disk"`
+	Permission  string   `json:"permission"`
+	Container   string   `json:"container"`
+	Databases   []string `json:"databases"`
+	CreatedAt   string   `json:"createdAt"`
 }
 
 type PageInfo struct {

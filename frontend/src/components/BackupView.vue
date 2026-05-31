@@ -139,8 +139,8 @@
                       <ArrowDown v-else class="h-3 w-3 text-foreground" />
                     </span>
                   </TableHead>
-                  <TableHead class="min-w-[200px] text-[12px] font-normal text-muted-foreground h-10">
-                    <span class="flex items-center gap-1">
+                  <TableHead class="text-center min-w-[200px] text-[12px] font-normal text-muted-foreground h-10">
+                    <span class="inline-flex items-center gap-1">
                       操作
                       <button
                         v-if="sortField"
@@ -169,17 +169,34 @@
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge v-if="row.status === 'success'" variant="secondary" class="text-[11px] py-0 bg-[#16a34a]/10 text-[#16a34a] border-[#16a34a]/20">成功</Badge>
-                    <Badge v-else variant="destructive" class="text-[11px] py-0">失败</Badge>
+                    <div class="inline-flex items-center gap-1">
+                      <span v-if="row.status === 'success'" class="inline-flex items-center gap-1 text-[11px] text-[#16a34a]">
+                        <span class="h-1.5 w-1.5 rounded-full bg-[#16a34a]"></span>
+                        成功
+                      </span>
+                      <span v-else class="inline-flex items-center gap-1 text-[11px] text-red-500">
+                        <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                        失败
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell><span class="text-[13px] text-foreground" v-if="row.database">{{ row.database }}</span><span class="text-[13px] text-muted-foreground" v-else>-</span></TableCell>
                   <TableCell><span class="text-[13px] font-mono-data text-foreground">{{ formatSize(row.fileSize) }}</span></TableCell>
-                  <TableCell><span class="text-[13px] text-muted-foreground">{{ row.createdAt }}</span></TableCell>
+                  <TableCell><span class="text-[13px] text-muted-foreground">{{ formatLogTime(row.createdAt) }}</span></TableCell>
                   <TableCell>
-                    <div class="flex items-center gap-0.5">
-                      <Button variant="ghost" size="xs" @click="handleRestore(row)">恢复</Button>
-                      <Button variant="ghost" size="xs" @click="handleDownload(row)">下载</Button>
-                      <Button variant="ghost" size="xs" class="text-destructive hover:bg-destructive/10" @click="confirmDeleteTarget = row; showDeleteDialog = true">删除</Button>
+                    <div class="flex items-center justify-center h-full">
+                      <div class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none" @click="handleRestore(row)">
+                          <RotateCcw class="h-3.5 w-3.5 shrink-0" />恢复
+                        </button>
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none" @click="handleDownload(row)">
+                          <Download class="h-3.5 w-3.5 shrink-0" />下载
+                        </button>
+                        <div class="w-px h-4 bg-border mx-0.5 shrink-0"></div>
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-500 hover:bg-white transition-all whitespace-nowrap leading-none" @click="confirmDeleteTarget = row; showDeleteDialog = true">
+                          <Trash2 class="h-3.5 w-3.5 shrink-0" />删除
+                        </button>
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -231,7 +248,7 @@
                   <TableHead class="w-[70px] text-[12px] font-normal text-muted-foreground">状态</TableHead>
                   <TableHead class="w-[70px] text-[12px] font-normal text-muted-foreground">保留</TableHead>
                   <TableHead class="min-w-[160px] text-[12px] font-normal text-muted-foreground">上次执行</TableHead>
-                  <TableHead class="min-w-[140px] text-[12px] font-normal text-muted-foreground">操作</TableHead>
+                  <TableHead class="text-center min-w-[140px] text-[12px] font-normal text-muted-foreground">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -261,9 +278,16 @@
                     <span v-else class="text-muted-foreground">尚未执行</span>
                   </TableCell>
                   <TableCell>
-                    <div class="flex items-center gap-1">
-                      <Button variant="ghost" size="xs" @click="openScheduleDialog(row)">编辑</Button>
-                      <Button variant="ghost" size="xs" class="text-destructive hover:bg-destructive/10" @click="confirmDeleteTarget = row; showDeleteScheduleDialog = true">删除</Button>
+                    <div class="flex items-center justify-center h-full">
+                      <div class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none" @click="openScheduleDialog(row)">
+                          <FileText class="h-3.5 w-3.5 shrink-0" />编辑
+                        </button>
+                        <div class="w-px h-4 bg-border mx-0.5 shrink-0"></div>
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-500 hover:bg-white transition-all whitespace-nowrap leading-none" @click="confirmDeleteTarget = row; showDeleteScheduleDialog = true">
+                          <Trash2 class="h-3.5 w-3.5 shrink-0" />删除
+                        </button>
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -415,8 +439,8 @@
             </div>
           </div>
           <div v-if="scheduleForm.backupLevel !== 'system'" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">目标数据库 <span class="text-red-500">*</span></label>
-            <Select v-model="scheduleForm.targetDb">
+            <label class="text-sm font-medium text-foreground">目标连接 <span class="text-red-500">*</span></label>
+            <Select v-model="scheduleForm.targetDb" @update:model-value="onScheduleDbChange">
               <SelectTrigger class="border-border shadow-none">
                 <template v-if="selectedScheduleDb">
                   <span class="flex items-center gap-1.5 truncate">
@@ -431,7 +455,7 @@
                     <span class="text-muted-foreground text-xs shrink-0">{{ selectedScheduleDb.host || '本地' }}</span>
                   </span>
                 </template>
-                <SelectValue v-else placeholder="选择数据库" />
+                <SelectValue v-else placeholder="选择数据库连接" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -455,6 +479,29 @@
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div v-if="scheduleForm.backupLevel === 'mysql' && scheduleForm.targetDb" class="flex flex-col gap-1.5">
+            <label class="text-sm font-medium text-foreground">目标数据库 <span class="text-red-500">*</span></label>
+            <Select v-model="scheduleForm.targetMysqlDbName">
+              <SelectTrigger class="border-border shadow-none">
+                <SelectValue placeholder="选择数据库" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="db in scheduleMysqlDatabaseOptions"
+                  :key="db"
+                  :value="db"
+                >
+                  {{ db === '__ALL__' ? '全部' : db }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p v-if="loadingScheduleMysqlDatabases" class="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <Loader2 class="h-3 w-3 animate-spin" /> 正在加载数据库列表...
+            </p>
+            <p v-else-if="scheduleForm.targetDb && scheduleMysqlDatabaseOptions.length === 0" class="text-xs text-amber-500 mt-1">
+              该连接下没有可用的数据库
+            </p>
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-sm font-medium text-foreground">执行周期 <span class="text-red-500">*</span></label>
@@ -565,11 +612,13 @@ import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { toast } from 'vue-sonner'
 import { sourceParam } from '@/lib/instance'
+import { formatLogTime } from '@/lib/utils'
 import {
   Upload, Clock, Plus, Settings, Database,
   HardDrive, Inbox, Loader2, Search, X,
   ArrowUpDown, ArrowUp, ArrowDown,
-  ChevronLeft, ChevronRight, RotateCcw, RefreshCw, FileText
+  ChevronLeft, ChevronRight, RotateCcw, RefreshCw, FileText,
+  Download, Trash2
 } from 'lucide-vue-next'
 import BackupDialog from './BackupDialog.vue'
 
@@ -668,9 +717,13 @@ const scheduleForm = ref({
   name: '',
   backupLevel: 'mysql',
   targetDb: '',
+  targetMysqlDbName: '',
   cron: 'daily',
   retainCount: 7
 })
+
+const scheduleMysqlDatabaseOptions = ref([])
+const loadingScheduleMysqlDatabases = ref(false)
 
 const pageItems = computed(() => {
   return backupList.value
@@ -1009,6 +1062,35 @@ watch(() => createForm.value.targetDb, (newVal) => {
   loadCreateMysqlDatabases(selectedDb)
 })
 
+const onScheduleDbChange = (newVal) => {
+  scheduleForm.value.targetMysqlDbName = ''
+  scheduleMysqlDatabaseOptions.value = []
+  if (!newVal) return
+  const selectedDb = findDbByUid(newVal)
+  if (!selectedDb || selectedDb.type === 'redis') return
+  loadingScheduleMysqlDatabases.value = true
+  const source = selectedDb.isRemote ? 'remote' : 'local'
+  fetch(`/api/mysql/databases?server_id=${selectedDb.id}&source=${source}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.code === 0 && data.data) {
+        const filtered = data.data.filter(n => !['information_schema', 'performance_schema', 'mysql', 'sys'].includes(n))
+        scheduleMysqlDatabaseOptions.value = ['__ALL__', ...filtered]
+        if (store.dbName && filtered.includes(store.dbName)) {
+          scheduleForm.value.targetMysqlDbName = store.dbName
+        } else if (filtered.length > 0) {
+          scheduleForm.value.targetMysqlDbName = filtered[0]
+        } else {
+          scheduleForm.value.targetMysqlDbName = '__ALL__'
+        }
+      }
+    })
+    .catch(() => {
+      scheduleMysqlDatabaseOptions.value = []
+    })
+    .finally(() => { loadingScheduleMysqlDatabases.value = false })
+}
+
 const cronLabel = (cron) => {
   const map = { daily: '每天', weekly: '每周', monthly: '每月' }
   if (map[cron]) return map[cron]
@@ -1286,7 +1368,7 @@ const doRestore = () => {
 
 const openScheduleDialog = (row) => {
   editScheduleData.value = row || null
-  loadInstanceDatabases()
+  scheduleMysqlDatabaseOptions.value = []
   
   const getTargetDbUid = (dbName, level) => {
     if (!dbName || level === 'system') return ''
@@ -1295,21 +1377,31 @@ const openScheduleDialog = (row) => {
   }
   
   if (row) {
+    const targetDbUid = getTargetDbUid(row.database, row.backupLevel)
     scheduleForm.value = {
       name: row.name,
       backupLevel: row.backupLevel || 'mysql',
-      targetDb: getTargetDbUid(row.database, row.backupLevel),
+      targetDb: targetDbUid,
+      targetMysqlDbName: row.backupLevel === 'mysql' ? (row.database || '__ALL__') : '',
       cron: row.cron || 'daily',
       retainCount: row.retainCount || 7
     }
+    if (targetDbUid && row.backupLevel === 'mysql') {
+      onScheduleDbChange(targetDbUid)
+    }
   } else {
     const dbName = database.value ? (store.dbName || '') : ''
+    const targetDbUid = getTargetDbUid(dbName, 'mysql')
     scheduleForm.value = {
       name: '',
       backupLevel: 'mysql',
-      targetDb: getTargetDbUid(dbName, 'mysql'),
+      targetDb: targetDbUid,
+      targetMysqlDbName: '',
       cron: 'daily',
       retainCount: 7
+    }
+    if (targetDbUid) {
+      onScheduleDbChange(targetDbUid)
     }
   }
   showScheduleDialog.value = true
@@ -1324,24 +1416,29 @@ const submitSchedule = () => {
   if (!isSystem) {
     const targetUid = scheduleForm.value.targetDb
     if (!targetUid) {
-      toast.warning('请选择目标数据库')
+      toast.warning('请选择目标连接')
       scheduling.value = false
       return
     }
     selectedDb = findDbByUid(targetUid)
     if (!selectedDb) {
+      toast.warning('请选择目标连接')
+      scheduling.value = false
+      return
+    }
+    if (selectedDb.type !== 'redis' && !scheduleForm.value.targetMysqlDbName) {
       toast.warning('请选择目标数据库')
       scheduling.value = false
       return
     }
   }
   
-  const targetDb = selectedDb?.name || ''
+  const targetDb = isSystem ? '' : (selectedDb?.type === 'redis' ? selectedDb?.name : scheduleForm.value.targetMysqlDbName)
 
   const body = {
     name: scheduleForm.value.name,
     backupLevel: scheduleForm.value.backupLevel,
-    database: isSystem ? '' : targetDb,
+    database: targetDb,
     serverId: selectedDb?.id || 0,
     source: selectedDb?.isRemote ? 'remote' : 'local',
     cron: scheduleForm.value.cron,

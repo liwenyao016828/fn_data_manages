@@ -363,7 +363,7 @@
                 <TabsTrigger value="info" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">基本信息</TabsTrigger>
                 <TabsTrigger value="config" v-if="currentDb.type === 'mysql' || currentDb.type === 'redis'" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">配置修改</TabsTrigger>
                 <TabsTrigger value="users" v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">用户管理</TabsTrigger>
-                <span v-if="currentDb.type === 'mysql' && currentDb.username !== 'root'" class="text-[11px] text-muted-foreground px-2 self-center">用户管理仅限 root 账户</span>
+                <span v-if="currentDb.type === 'mysql' && currentDb.username !== 'root'" class="text-[12px] text-muted-foreground px-2 self-center">用户管理<span class="text-destructive text-[11px] ml-0.5">（仅限 root 账户）</span></span>
               </TabsList>
             </div>
 
@@ -513,8 +513,8 @@
               </div>
             </TabsContent>
 
-            <TabsContent value="users" class="content-section" v-if="currentDb.type === 'mysql' && currentDb.username === 'root'">
-              <div class="rounded-xl border border-border bg-white shadow-sm">
+            <TabsContent value="users" class="content-section">
+              <div v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="rounded-xl border border-border bg-white shadow-sm">
                 <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-border gap-2">
                   <span class="text-sm text-muted-foreground">管理数据库用户及其权限</span>
                   <Button variant="primary" size="sm" class="h-8 text-[13px]" @click="showCreateUserDialog = true">
@@ -529,12 +529,17 @@
                       <TableHead class="w-[150px] text-[12px] font-normal text-muted-foreground">用户名</TableHead>
                       <TableHead class="w-[150px] text-[12px] font-normal text-muted-foreground">主机</TableHead>
                       <TableHead class="min-w-[250px] text-[12px] font-normal text-muted-foreground">全局权限</TableHead>
-                      <TableHead class="w-[150px] text-[12px] font-normal text-muted-foreground">操作</TableHead>
+                      <TableHead class="text-center text-[12px] font-normal text-muted-foreground">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     <TableRow v-for="row in users" :key="row.user + row.host" class="hover:bg-muted border-b border-[#F0F0F0]">
-                      <TableCell class="font-medium text-foreground">{{ row.user }}</TableCell>
+                      <TableCell class="font-medium text-foreground">
+                        <div class="flex items-center gap-1.5">
+                          {{ row.user }}
+                          <Lock v-if="row.account_locked" class="h-3.5 w-3.5 text-red-500" />
+                        </div>
+                      </TableCell>
                       <TableCell class="font-mono text-sm text-foreground">{{ row.host }}</TableCell>
                       <TableCell>
                         <div class="flex flex-wrap gap-1">
@@ -544,10 +549,53 @@
                           </Badge>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div class="flex items-center gap-1">
-                          <Button variant="ghost" size="xs" class="text-primary hover:bg-primary/10" @click="openEditPermDialog(row)">授权</Button>
-                          <Button variant="ghost" size="xs" class="text-destructive hover:bg-destructive/10" @click="confirmAction('deleteUser', row)">删除</Button>
+                      <TableCell class="align-middle">
+                        <div class="flex items-center justify-center h-full">
+                          <div class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
+                            <button
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              @click="openEditPermDialog(row)"
+                            >
+                              <Shield class="h-3.5 w-3.5 shrink-0" />
+                              授权
+                            </button>
+                            <button
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              @click="openDbGrantDialog(row)"
+                            >
+                              <DatabaseIcon class="h-3.5 w-3.5 shrink-0" />
+                              库权限
+                            </button>
+                            <button
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              @click="openChangePwdDialog(row)"
+                            >
+                              <KeyRound class="h-3.5 w-3.5 shrink-0" />
+                              改密
+                            </button>
+                            <button
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              @click="openChangeHostDialog(row)"
+                            >
+                              <Globe class="h-3.5 w-3.5 shrink-0" />
+                              改主机
+                            </button>
+                            <button
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              @click="toggleUserLock(row)"
+                            >
+                              <component :is="row.account_locked ? Unlock : LockIcon" class="h-3.5 w-3.5 shrink-0" />
+                              {{ row.account_locked ? '解锁' : '锁定' }}
+                            </button>
+                            <div class="w-px h-4 bg-border mx-0.5 shrink-0"></div>
+                            <button
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-500 hover:bg-white transition-all whitespace-nowrap leading-none"
+                              @click="confirmAction('deleteUser', row)"
+                            >
+                              <Trash2 class="h-3.5 w-3.5 shrink-0" />
+                              删除
+                            </button>
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -563,6 +611,15 @@
                     </TableRow>
                   </TableBody>
                 </Table>
+              </div>
+              <div v-else class="rounded-xl border border-border bg-white shadow-sm p-8">
+                <div class="empty-state">
+                  <div class="empty-state-icon">
+                    <Users class="h-10 w-10" />
+                  </div>
+                  <div class="empty-state-text">用户管理功能仅限 root 账户使用</div>
+                  <div class="text-[13px] text-muted-foreground mt-1">当前账号为 {{ currentDb.username }}，请使用 root 账号登录后重试</div>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
@@ -585,6 +642,9 @@
           <DialogTitle>创建数据库用户</DialogTitle>
         </div>
         <div class="space-y-4">
+          <div v-if="createUserResult.show" :class="createUserResult.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+            {{ createUserResult.message }}
+          </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-sm font-medium text-foreground">用户名 <span class="text-destructive">*</span></label>
             <Input v-model="userForm.username" placeholder="输入用户名" />
@@ -598,20 +658,59 @@
             <Input v-model="userForm.host" placeholder="默认: %(任意主机)" />
             <span class="text-xs text-muted-foreground">常用值: %(任意), localhost(本地), 192.168.1.%(指定网段)</span>
           </div>
-          <div class="flex flex-col gap-1.5">
+          <div class="flex flex-col gap-2">
             <label class="text-sm font-medium text-foreground">权限选择</label>
-            <div class="flex flex-wrap gap-2">
-              <label v-for="priv in [{value:'SELECT',label:'查询'},{value:'INSERT',label:'插入'},{value:'UPDATE',label:'更新'},{value:'DELETE',label:'删除'},{value:'CREATE',label:'创建'},{value:'DROP',label:'删除结构'},{value:'ALL',label:'全部权限'}]" :key="priv.value"
-                class="inline-flex items-center gap-1.5 cursor-pointer text-sm">
-                <input type="checkbox" :value="priv.value" v-model="userForm.privileges"
-                  class="h-4 w-4 rounded border-border text-primary focus:ring-primary accent-[#4facfe]" />
-                {{ priv.label }}
+            <div class="flex items-center gap-2 pb-2 border-b border-border">
+              <label
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer transition-colors border"
+                :class="userForm.privileges.includes('ALL')
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-white text-foreground border-border hover:border-primary/50'"
+                @click="toggleCreateUserPriv('ALL')"
+              >
+                <span>全部权限</span>
               </label>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <div class="text-xs font-semibold text-muted-foreground uppercase mb-2">数据操作</div>
+                <div class="flex flex-wrap gap-2">
+                  <label
+                    v-for="priv in [{value:'SELECT',label:'查询'},{value:'INSERT',label:'插入'},{value:'UPDATE',label:'更新'},{value:'DELETE',label:'删除'}]"
+                    :key="priv.value"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
+                    :class="userForm.privileges.includes(priv.value)
+                      ? 'bg-primary/10 text-primary border-primary/30 font-medium'
+                      : 'bg-white text-foreground border-border hover:border-primary/30'"
+                    @click="toggleCreateUserPriv(priv.value)"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full" :class="userForm.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
+                    {{ priv.label }}
+                  </label>
+                </div>
+              </div>
+              <div>
+                <div class="text-xs font-semibold text-muted-foreground uppercase mb-2">结构管理</div>
+                <div class="flex flex-wrap gap-2">
+                  <label
+                    v-for="priv in [{value:'CREATE',label:'创建'},{value:'DROP',label:'删除结构'}]"
+                    :key="priv.value"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
+                    :class="userForm.privileges.includes(priv.value)
+                      ? 'bg-primary/10 text-primary border-primary/30 font-medium'
+                      : 'bg-white text-foreground border-border hover:border-primary/30'"
+                    @click="toggleCreateUserPriv(priv.value)"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full" :class="userForm.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
+                    {{ priv.label }}
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
         <div class="flex justify-end gap-2 flex-wrap">
-          <Button variant="outline" @click="showCreateUserDialog = false">取消</Button>
+          <Button variant="outline" @click="showCreateUserDialog = false; createUserResult.show = false">取消</Button>
           <Button @click="createUser" :disabled="creatingUser" :loading="creatingUser">
             {{ creatingUser ? '创建中...' : '确认创建' }}
           </Button>
@@ -635,46 +734,230 @@
     </Dialog>
 
     <Dialog v-model:open="editPermState.open">
-      <DialogContent class="sm:max-w-[560px] max-h-[80vh] overflow-y-auto">
+      <DialogContent class="sm:max-w-[600px]">
         <div class="flex flex-col gap-y-1.5">
           <DialogTitle>修改权限 - {{ editPermState.row?.user }}@{{ editPermState.row?.host }}</DialogTitle>
-          <DialogDescription>勾选需要授予的权限，蓝色边框表示已选中</DialogDescription>
+          <DialogDescription>点击小卡片选择权限</DialogDescription>
         </div>
+        <div v-if="editPermState.result?.show" :class="editPermState.result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+          {{ editPermState.result.message }}
+        </div>
+
         <div class="flex flex-col gap-4 py-2">
-          <div v-for="group in privilegeGroups" :key="group.label">
-            <div class="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{{ group.label }}</div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <label
-                v-for="priv in group.items"
-                :key="priv.value"
-                class="flex items-center gap-2.5 p-2.5 rounded-lg border-2 cursor-pointer transition-all duration-200 select-none"
-                :class="editPermState.privileges.includes(priv.value)
-                  ? 'border-primary bg-primary/5 shadow-sm'
-                  : 'border-border hover:border-[#D9D9D9]'"
-                @click.prevent="togglePrivilege(priv.value)"
-              >
-                <div
-                  class="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all duration-150"
+          <div class="flex items-center gap-2 pb-2 border-b border-border">
+            <label
+              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer transition-colors border"
+              :class="editPermState.privileges.includes('ALL')
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-foreground border-border hover:border-primary/50'"
+              @click="togglePrivilege('ALL')"
+            >
+              <span>全部权限</span>
+            </label>
+            <span class="text-xs text-amber-600">授予所有操作权限</span>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <div class="text-xs font-semibold text-muted-foreground uppercase mb-2">数据操作</div>
+              <div class="flex flex-wrap gap-2">
+                <label
+                  v-for="priv in privilegeGroups[0].items"
+                  :key="priv.value"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
                   :class="editPermState.privileges.includes(priv.value)
-                    ? 'bg-primary border-primary'
-                    : 'bg-white border-[#D9D9D9]'"
+                    ? 'bg-primary/10 text-primary border-primary/30 font-medium'
+                    : 'bg-white text-foreground border-border hover:border-primary/30'"
+                  @click="togglePrivilege(priv.value)"
                 >
-                  <svg v-if="editPermState.privileges.includes(priv.value)" class="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
-                <div class="flex flex-col min-w-0">
-                  <span class="text-[13px] font-medium leading-tight" :class="editPermState.privileges.includes(priv.value) ? 'text-primary' : 'text-foreground'">{{ priv.label }}</span>
-                  <span class="text-[11px] text-muted-foreground leading-tight">{{ priv.value }}</span>
-                </div>
-              </label>
+                  <span class="w-1.5 h-1.5 rounded-full" :class="editPermState.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
+                  {{ priv.label }}
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <div class="text-xs font-semibold text-muted-foreground uppercase mb-2">结构管理</div>
+              <div class="flex flex-wrap gap-2">
+                <label
+                  v-for="priv in privilegeGroups[1].items"
+                  :key="priv.value"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
+                  :class="editPermState.privileges.includes(priv.value)
+                    ? 'bg-primary/10 text-primary border-primary/30 font-medium'
+                    : 'bg-white text-foreground border-border hover:border-primary/30'"
+                  @click="togglePrivilege(priv.value)"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="editPermState.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
+                  {{ priv.label }}
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <div class="text-xs font-semibold text-muted-foreground uppercase mb-2">视图与存储过程</div>
+              <div class="flex flex-wrap gap-2">
+                <label
+                  v-for="priv in privilegeGroups[2].items"
+                  :key="priv.value"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
+                  :class="editPermState.privileges.includes(priv.value)
+                    ? 'bg-primary/10 text-primary border-primary/30 font-medium'
+                    : 'bg-white text-foreground border-border hover:border-primary/30'"
+                  @click="togglePrivilege(priv.value)"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="editPermState.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
+                  {{ priv.label }}
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <div class="text-xs font-semibold text-muted-foreground uppercase mb-2">其他</div>
+              <div class="flex flex-wrap gap-2">
+                <label
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
+                  :class="editPermState.privileges.includes('GRANT OPTION')
+                    ? 'bg-primary/10 text-primary border-primary/30 font-medium'
+                    : 'bg-white text-foreground border-border hover:border-primary/30'"
+                  @click="togglePrivilege('GRANT OPTION')"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="editPermState.privileges.includes('GRANT OPTION') ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
+                  授权权限
+                </label>
+              </div>
             </div>
           </div>
         </div>
-        <div v-if="editPermState.privileges.includes('ALL')" class="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 -mt-1">
-          注意：已选择全部权限，将授予该用户所有操作权限
-        </div>
-        <div class="flex justify-end gap-2 mt-1 flex-wrap">
+
+        <div class="flex justify-end gap-2 flex-wrap">
           <Button variant="outline" @click="editPermState.open = false">取消</Button>
           <Button variant="primary" @click="submitEditPerm">确认修改</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="dbGrantState.open">
+      <DialogContent class="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+        <div class="flex flex-col gap-y-1.5">
+          <DialogTitle>数据库权限 - {{ dbGrantState.row?.user }}@{{ dbGrantState.row?.host }}</DialogTitle>
+          <DialogDescription>管理该用户在各数据库上的权限</DialogDescription>
+        </div>
+        <div v-if="dbGrantState.result.show" :class="dbGrantState.result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+          {{ dbGrantState.result.message }}
+        </div>
+
+        <div class="space-y-3">
+          <div class="rounded-lg border border-border bg-muted p-3 space-y-3">
+            <div class="flex items-center gap-2">
+              <div class="flex-1">
+                <label class="text-xs text-muted-foreground mb-1 block">数据库</label>
+                <Select v-model="dbGrantState.selectedDb" @update:model-value="onDbSelectChange">
+                  <SelectTrigger class="h-8 text-[13px]"><SelectValue placeholder="选择数据库" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="dbName in allDbNames" :key="dbName" :value="dbName">
+                      <span class="flex items-center gap-1.5">
+                        <span>{{ dbName }}</span>
+                        <Badge v-if="isDbGranted(dbName)" variant="outline" class="text-[10px] h-[16px] px-1 bg-primary/10 text-primary border-primary/20">已授权</Badge>
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="flex-1">
+                <label class="text-xs text-muted-foreground mb-1 block">权限</label>
+                <Select v-model="dbGrantState.selectedPrivs" multiple>
+                  <SelectTrigger class="h-8 text-[13px]"><SelectValue placeholder="选择权限" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="priv in privilegeOptions" :key="priv.value" :value="priv.value">{{ priv.label }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div class="flex justify-end">
+              <Button size="sm" variant="primary" class="h-8 text-[13px]" @click="submitDbGrant" :disabled="!dbGrantState.selectedDb || dbGrantState.selectedPrivs.length === 0">
+                {{ isDbGranted(dbGrantState.selectedDb) ? '修改权限' : '添加权限' }}
+              </Button>
+            </div>
+          </div>
+
+          <div v-if="dbGrantState.dbGrants.length > 0" class="space-y-2">
+            <div class="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider">已有权限</div>
+            <div class="space-y-2 max-h-[280px] overflow-y-auto">
+              <div v-for="grant in dbGrantState.dbGrants" :key="grant.database" class="flex items-center justify-between rounded-lg border border-border bg-white p-3">
+                <div class="flex-1 min-w-0">
+                  <div class="text-[13px] font-medium text-foreground">{{ grant.database }}</div>
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    <Badge v-for="priv in grant.privileges" :key="priv" variant="secondary" class="text-[11px] rounded-full"
+                      :class="priv === 'ALL' ? 'bg-primary text-white' : priv === 'DELETE' || priv === 'DROP' ? 'bg-red-50 text-red-500' : 'bg-muted text-foreground'">
+                      {{ privLabelMap[priv] || priv }}
+                    </Badge>
+                  </div>
+                </div>
+                <Button variant="ghost" size="xs" class="text-destructive hover:bg-destructive/10 shrink-0 ml-2" @click="removeDbGrant(grant.database)">
+                  删除
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-center py-6 text-muted-foreground text-sm">
+            暂无数据库级别权限
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 mt-1 flex-wrap">
+          <Button variant="outline" @click="dbGrantState.open = false">关闭</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="changePwdState.open">
+      <DialogContent class="sm:max-w-[420px]">
+        <div class="flex flex-col gap-y-1.5">
+          <DialogTitle>修改密码 - {{ changePwdState.row?.user }}@{{ changePwdState.row?.host }}</DialogTitle>
+        </div>
+        <div class="space-y-4">
+          <div v-if="changePwdState.result.show" :class="changePwdState.result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+            {{ changePwdState.result.message }}
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm font-medium text-foreground">新密码 <span class="text-destructive">*</span></label>
+            <Input type="password" v-model="changePwdState.password" placeholder="输入新密码" />
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 flex-wrap">
+          <Button variant="outline" @click="changePwdState.open = false">取消</Button>
+          <Button @click="submitChangePwd" :disabled="!changePwdState.password">确认修改</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="changeHostState.open">
+      <DialogContent class="sm:max-w-[420px]">
+        <div class="flex flex-col gap-y-1.5">
+          <DialogTitle>修改主机 - {{ changeHostState.row?.user }}@{{ changeHostState.row?.host }}</DialogTitle>
+        </div>
+        <div class="space-y-4">
+          <div v-if="changeHostState.result.show" :class="changeHostState.result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+            {{ changeHostState.result.message }}
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm font-medium text-foreground">当前主机</label>
+            <Input :model-value="changeHostState.row?.host || ''" disabled class="bg-muted" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm font-medium text-foreground">新主机 <span class="text-destructive">*</span></label>
+            <Input v-model="changeHostState.newHost" placeholder="默认: %(任意主机)" />
+            <span class="text-xs text-muted-foreground">常用值: %(任意), localhost(本地), 192.168.1.%(指定网段)</span>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm font-medium text-foreground">密码</label>
+            <Input type="password" v-model="changeHostState.password" placeholder="不填则生成随机密码" />
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 flex-wrap">
+          <Button variant="outline" @click="changeHostState.open = false">取消</Button>
+          <Button @click="submitChangeHost" :disabled="!changeHostState.newHost">确认修改</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -748,12 +1031,14 @@ import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
 import { sourceParam, instanceUid } from '@/lib/instance'
+import { writeLog } from '../api/log'
 import { toast } from 'vue-sonner'
 import StatusDot from './StatusDot.vue'
 import {
   RefreshCw, CircleX, FileText,
   Plus, Settings, Users, Database, HardDrive, Info, Palette, Activity,
-  FolderOpen, ChevronRight, ArrowUp
+  FolderOpen, ChevronRight, ArrowUp, Lock,
+  KeyRound, Shield, Database as DatabaseIcon, Globe, Lock as LockIcon, Unlock, Trash2
 } from 'lucide-vue-next'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs.vue'
 import { Button } from '@/components/ui/Button.vue'
@@ -846,6 +1131,8 @@ const userForm = ref({
   host: '%',
   privileges: ['SELECT']
 })
+
+const createUserResult = ref({ show: false, success: false, message: '' })
 
 const compactMode = ref(localStorage.getItem('compactMode') === 'true')
 const refreshInterval = ref(localStorage.getItem('refreshInterval') || '10000')
@@ -1099,6 +1386,88 @@ const editPermState = ref({
   row: null,
 })
 
+const dbGrantState = ref({
+  open: false,
+  row: null,
+  dbGrants: [],
+  selectedDb: '',
+  selectedPrivs: ['SELECT'],
+  result: { show: false, success: false, message: '' }
+})
+
+const allDbNames = computed(() => {
+  const db = currentDb.value
+  if (!db) return []
+  return allDatabases.value
+    .filter(d => d.id === db.id && d.databases && d.databases.length > 0)
+    .flatMap(d => d.databases)
+})
+
+const grantedDbMap = computed(() => {
+  const map = {}
+  for (const g of dbGrantState.value.dbGrants) {
+    map[g.database] = g.privileges || []
+  }
+  return map
+})
+
+const isDbGranted = (dbName) => {
+  return !!grantedDbMap.value[dbName]
+}
+
+const onDbSelectChange = (dbName) => {
+  if (!dbName) {
+    dbGrantState.value.selectedPrivs = ['SELECT']
+    return
+  }
+  const existingPrivs = grantedDbMap.value[dbName]
+  if (existingPrivs && existingPrivs.length > 0) {
+    dbGrantState.value.selectedPrivs = [...existingPrivs]
+  } else {
+    dbGrantState.value.selectedPrivs = ['SELECT']
+  }
+}
+
+const changePwdState = ref({ open: false, row: null, password: '', result: { show: false, success: false, message: '' } })
+
+const changeHostState = ref({
+  open: false,
+  row: null,
+  newHost: '%',
+  password: '',
+  result: { show: false, success: false, message: '' }
+})
+
+const openDbGrantDialog = (row) => {
+  dbGrantState.value = {
+    open: true,
+    row,
+    dbGrants: [],
+    selectedDb: '',
+    selectedPrivs: ['SELECT'],
+    result: { show: false, success: false, message: '' }
+  }
+  loadDbGrants(row)
+}
+
+const loadDbGrants = (row) => {
+  const db = currentDb.value
+  if (!db) return
+  fetch(`/api/mysql/users/db-grant?server_id=${db.id}&${sourceParam(db.isRemote || false)}&user=${encodeURIComponent(row.user)}&host=${encodeURIComponent(row.host)}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.code === 0) {
+        dbGrantState.value.dbGrants = (data.data || []).map(item => ({
+          ...item,
+          privileges: item.privileges ? item.privileges.split(',').map(p => p.trim()) : []
+        }))
+      } else {
+        toast.error(data.msg || '加载数据库权限失败')
+      }
+    })
+    .catch(() => toast.error('加载数据库权限失败'))
+}
+
 const privilegeGroups = [
   {
     label: '数据操作',
@@ -1319,7 +1688,106 @@ const openEditPermDialog = (row) => {
     open: true,
     privileges: privs,
     row,
+    result: { show: false, success: false, message: '' }
   }
+}
+
+const openChangePwdDialog = (row) => {
+  changePwdState.value = {
+    open: true,
+    row,
+    password: '',
+    result: { show: false, success: false, message: '' }
+  }
+}
+
+const openChangeHostDialog = (row) => {
+  changeHostState.value = {
+    open: true,
+    row,
+    newHost: '%',
+    password: '',
+    result: { show: false, success: false, message: '' }
+  }
+}
+
+const submitChangeHost = () => {
+  const db = currentDb.value
+  const row = changeHostState.value.row
+  if (!db || !row) return
+  if (!changeHostState.value.newHost) {
+    changeHostState.value.result = { show: true, success: false, message: '请输入新主机' }
+    return
+  }
+  changeHostState.value.result = { show: false, success: false, message: '' }
+  const body = {
+    user: row.user,
+    old_host: row.host,
+    new_host: changeHostState.value.newHost,
+  }
+  if (changeHostState.value.password) {
+    body.password = changeHostState.value.password
+  }
+  fetch(`/api/mysql/users/rename?server_id=${db.id}&${sourceParam(db.isRemote || false)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.code === 0) {
+        changeHostState.value.result = { show: true, success: true, message: data.msg || '主机修改成功' }
+        toast.success(data.msg || '主机修改成功')
+        writeLog(`修改主机: ${row.user}@${row.host} -> ${row.user}@${changeHostState.value.newHost} (实例: ${db.name})`)
+        setTimeout(() => {
+          changeHostState.value.open = false
+          loadUsers(requestId)
+        }, 1500)
+      } else {
+        const msg = data.msg || '修改失败'
+        changeHostState.value.result = { show: true, success: false, message: msg }
+        toast.error(msg)
+      }
+    })
+    .catch((err) => {
+      const msg = '修改失败: ' + (err.message || err)
+      changeHostState.value.result = { show: true, success: false, message: msg }
+      toast.error(msg)
+    })
+}
+
+const submitChangePwd = () => {
+  const db = currentDb.value
+  const row = changePwdState.value.row
+  if (!db || !row) return
+  if (!changePwdState.value.password) {
+    changePwdState.value.result = { show: true, success: false, message: '请输入新密码' }
+    return
+  }
+  changePwdState.value.result = { show: false, success: false, message: '' }
+  fetch(`/api/mysql/users?server_id=${db.id}&${sourceParam(db.isRemote || false)}&user=${encodeURIComponent(row.user)}&host=${encodeURIComponent(row.host)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: changePwdState.value.password })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.code === 0) {
+        changePwdState.value.result = { show: true, success: true, message: data.msg || '密码修改成功' }
+        toast.success(data.msg || '密码修改成功')
+        writeLog(`修改密码: ${row.user}@${row.host} (实例: ${db.name})`)
+        setTimeout(() => { changePwdState.value.open = false }, 1500)
+      } else {
+        const msg = data.msg || '修改失败'
+        changePwdState.value.result = { show: true, success: false, message: msg }
+        toast.error(msg)
+      }
+    })
+    .catch((err) => {
+      const msg = '修改失败: ' + (err.message || err)
+      changePwdState.value.result = { show: true, success: false, message: msg }
+      toast.error(msg)
+    })
 }
 
 const togglePrivilege = (priv) => {
@@ -1341,7 +1809,8 @@ const submitEditPerm = () => {
   const { privileges, row } = editPermState.value
   const value = privileges.join(', ')
   const db = currentDb.value
-  fetch(`/api/mysql/users/grant?server_id=${db.id}&${sourceParam(db.isRemote || false)}&user=${row.user}&host=${row.host}`, {
+  editPermState.value.result = { show: false, success: false, message: '' }
+  fetch(`/api/mysql/users/grant?server_id=${db.id}&${sourceParam(db.isRemote || false)}&user=${encodeURIComponent(row.user)}&host=${encodeURIComponent(row.host)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ privileges: value })
@@ -1349,21 +1818,30 @@ const submitEditPerm = () => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success('权限修改成功')
+        editPermState.value.result = { show: true, success: true, message: data.msg || '权限修改成功' }
+        toast.success(data.msg || '权限修改成功')
         loadUsers(requestId)
+        setTimeout(() => { editPermState.value.open = false }, 1500)
       } else {
-        toast.error(data.msg || '修改失败')
+        const msg = data.msg || '修改失败'
+        editPermState.value.result = { show: true, success: false, message: msg }
+        toast.error(msg)
       }
     })
-    .catch(() => toast.error('修改失败'))
-    .finally(() => { editPermState.value.open = false })
+    .catch((err) => {
+      const msg = '修改失败: ' + (err.message || err)
+      editPermState.value.result = { show: true, success: false, message: msg }
+      toast.error(msg)
+    })
 }
 
 const selectInstance = (id) => {
   selectedDbId.value = id
-  detailTab.value = 'info'
-  onInstanceChange()
   const db = allDatabases.value.find(d => d.id === id)
+  if (db && db.type === 'mysql' && db.username !== 'root' && detailTab.value === 'users') {
+    detailTab.value = 'info'
+  }
+  onInstanceChange()
   if (db) {
     store.setContext({
       connectionId: instanceUid(db),
@@ -1716,7 +2194,7 @@ const stopDb = () => {
 const deleteUser = (row) => {
   const db = currentDb.value
   writeLog(`删除用户: ${row.user}@${row.host} (实例: ${db.name})`, 'warning')
-  fetch(`/api/mysql/users?server_id=${db.id}&${sourceParam(db.isRemote || false)}&user=${row.user}&host=${row.host}`, { method: 'DELETE' })
+  fetch(`/api/mysql/users?server_id=${db.id}&${sourceParam(db.isRemote || false)}&user=${encodeURIComponent(row.user)}&host=${encodeURIComponent(row.host)}`, { method: 'DELETE' })
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
@@ -1729,42 +2207,157 @@ const deleteUser = (row) => {
     .catch(() => toast.error('删除失败'))
 }
 
+const toggleUserLock = (row) => {
+  const db = currentDb.value
+  if (!db) return
+  const newLocked = !row.account_locked
+  fetch(`/api/mysql/users?server_id=${db.id}&${sourceParam(db.isRemote || false)}&user=${encodeURIComponent(row.user)}&host=${encodeURIComponent(row.host)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ locked: newLocked })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.code === 0) {
+        toast.success(data.msg || (newLocked ? '用户已锁定' : '用户已解锁'))
+        loadUsers(requestId)
+      } else {
+        toast.error(data.msg || '操作失败')
+      }
+    })
+    .catch(() => toast.error('操作失败'))
+}
+
+const toggleCreateUserPriv = (value) => {
+  const idx = userForm.value.privileges.indexOf(value)
+  if (idx > -1) {
+    userForm.value.privileges.splice(idx, 1)
+  } else {
+    userForm.value.privileges.push(value)
+  }
+}
+
 const createUser = () => {
   if (!userForm.value.username || !userForm.value.password) {
-    toast.warning('请填写用户名和密码')
+    createUserResult.value = { show: true, success: false, message: '请填写用户名和密码' }
+    return
+  }
+  const db = currentDb.value
+  if (!db) {
+    createUserResult.value = { show: true, success: false, message: '未选择数据库实例' }
     return
   }
   creatingUser.value = true
-  const db = currentDb.value
-  fetch(`/api/mysql/users?server_id=${db.id}&${sourceParam(db.isRemote || false)}`, {
+  createUserResult.value = { show: false, success: false, message: '' }
+  const serverId = db.id
+  const isRemote = db.isRemote || false
+  fetch(`/api/mysql/users?server_id=${serverId}&${sourceParam(isRemote)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      user: userForm.value.username,
+      username: userForm.value.username,
       password: userForm.value.password,
       host: userForm.value.host || '%',
       privileges: userForm.value.privileges.join(', ')
     })
   })
+    .then(res => {
+      if (!res.ok) {
+        return res.text().then(text => {
+          try { return JSON.parse(text) } catch { return { code: res.status, msg: text || `HTTP ${res.status}` } }
+        })
+      }
+      return res.json()
+    })
+    .then(data => {
+      console.log('创建用户响应:', data)
+      if (data && data.code === 0) {
+        createUserResult.value = { show: true, success: true, message: data.msg || `用户 ${userForm.value.username}@${userForm.value.host || '%'} 创建成功` }
+        toast.success(data.msg || `用户 ${userForm.value.username}@${userForm.value.host || '%'} 创建成功`)
+        writeLog(`创建用户: ${userForm.value.username}@${userForm.value.host || '%'} (实例: ${db.name})`)
+        setTimeout(() => {
+          showCreateUserDialog.value = false
+          createUserResult.value = { show: false, success: false, message: '' }
+          userForm.value = {
+            username: '',
+            password: '',
+            host: '%',
+            privileges: ['SELECT']
+          }
+          loadUsers(requestId)
+        }, 1500)
+      } else {
+        const msg = (data && data.msg) || '创建失败'
+        console.error('创建用户失败:', msg, data)
+        createUserResult.value = { show: true, success: false, message: msg }
+        toast.error(msg)
+      }
+    })
+    .catch(err => {
+      console.error('创建用户请求异常:', err)
+      const msg = '创建失败: ' + (err.message || err)
+      createUserResult.value = { show: true, success: false, message: msg }
+      toast.error(msg)
+    })
+    .finally(() => { creatingUser.value = false })
+}
+
+const submitDbGrant = () => {
+  const { row, selectedDb, selectedPrivs } = dbGrantState.value
+  const db = currentDb.value
+  if (!db || !row || !selectedDb || selectedPrivs.length === 0) return
+  dbGrantState.value.result = { show: false, success: false, message: '' }
+  fetch(`/api/mysql/users/db-grant?server_id=${db.id}&${sourceParam(db.isRemote || false)}&user=${encodeURIComponent(row.user)}&host=${encodeURIComponent(row.host)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ database: selectedDb, privileges: selectedPrivs.join(', ') })
+  })
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success('用户创建成功')
-        writeLog(`创建用户: ${userForm.value.username}@${userForm.value.host || '%'} (实例: ${db.name})`)
-        showCreateUserDialog.value = false
-        userForm.value = {
-          username: '',
-          password: '',
-          host: '%',
-          privileges: ['SELECT']
-        }
-        loadUsers(requestId)
+        dbGrantState.value.result = { show: true, success: true, message: data.msg || '权限设置成功' }
+        toast.success(data.msg || '权限设置成功')
+        loadDbGrants(row)
+        dbGrantState.value.selectedDb = ''
+        dbGrantState.value.selectedPrivs = ['SELECT']
       } else {
-        toast.error(data.msg || '创建失败')
+        const msg = data.msg || '设置失败'
+        dbGrantState.value.result = { show: true, success: false, message: msg }
+        toast.error(msg)
       }
     })
-    .catch(() => toast.error('创建失败'))
-    .finally(() => { creatingUser.value = false })
+    .catch((err) => {
+      const msg = '设置失败: ' + (err.message || err)
+      dbGrantState.value.result = { show: true, success: false, message: msg }
+      toast.error(msg)
+    })
+}
+
+const removeDbGrant = (database) => {
+  const { row } = dbGrantState.value
+  const db = currentDb.value
+  if (!db || !row || !database) return
+  dbGrantState.value.result = { show: false, success: false, message: '' }
+  fetch(`/api/mysql/users/db-grant?server_id=${db.id}&${sourceParam(db.isRemote || false)}&user=${encodeURIComponent(row.user)}&host=${encodeURIComponent(row.host)}&database=${encodeURIComponent(database)}`, {
+    method: 'DELETE'
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.code === 0) {
+        dbGrantState.value.result = { show: true, success: true, message: data.msg || '权限已删除' }
+        toast.success(data.msg || '权限已删除')
+        loadDbGrants(row)
+      } else {
+        const msg = data.msg || '删除失败'
+        dbGrantState.value.result = { show: true, success: false, message: msg }
+        toast.error(msg)
+      }
+    })
+    .catch((err) => {
+      const msg = '删除失败: ' + (err.message || err)
+      dbGrantState.value.result = { show: true, success: false, message: msg }
+      toast.error(msg)
+    })
 }
 
 const loadUsers = (rid) => {

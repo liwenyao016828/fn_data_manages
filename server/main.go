@@ -92,6 +92,7 @@ func main() {
 
 	http.HandleFunc("/api/mysql/databases", mysqlDatabasesHandler)
 	http.HandleFunc("/api/mysql/databases/create", mysqlCreateDatabaseHandler)
+	http.HandleFunc("/api/mysql/databases/delete", mysqlDeleteDatabaseHandler)
 	http.HandleFunc("/api/mysql/tables", mysqlTablesHandler)
 	http.HandleFunc("/api/mysql/columns", mysqlColumnsHandler)
 	http.HandleFunc("/api/mysql/data", mysqlDataHandler)
@@ -101,7 +102,9 @@ func main() {
 	http.HandleFunc("/api/mysql/logs/clear", mysqlLogsClearHandler)
 	http.HandleFunc("/api/mysql/port", mysqlPortHandler)
 	http.HandleFunc("/api/mysql/users", mysqlUsersHandler)
+	http.HandleFunc("/api/mysql/users/rename", mysqlRenameUserHandler)
 	http.HandleFunc("/api/mysql/users/grant", mysqlGrantHandler)
+	http.HandleFunc("/api/mysql/users/db-grant", mysqlDbGrantHandler)
 	http.HandleFunc("/api/mysql/ping", mysqlPingHandler)
 	http.HandleFunc("/api/mysql/restart", mysqlRestartHandler)
 	http.HandleFunc("/api/mysql/stop", mysqlStopHandler)

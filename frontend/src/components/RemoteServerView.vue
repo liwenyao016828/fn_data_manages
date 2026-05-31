@@ -24,7 +24,7 @@
               <TableHead class="w-[100px] text-[12px] font-normal text-muted-foreground h-10">用户名</TableHead>
               <TableHead class="w-[90px] text-[12px] font-normal text-muted-foreground h-10">密码</TableHead>
               <TableHead class="min-w-[150px] text-[12px] font-normal text-muted-foreground h-10">描述信息</TableHead>
-              <TableHead class="w-[180px] text-[12px] font-normal text-muted-foreground h-10">操作</TableHead>
+              <TableHead class="text-center w-[180px] text-[12px] font-normal text-muted-foreground h-10">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

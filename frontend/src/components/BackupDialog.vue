@@ -28,7 +28,7 @@
                 <TableHead class="w-[80px]">来源</TableHead>
                 <TableHead class="w-[90px]">大小</TableHead>
                 <TableHead class="min-w-[160px]">创建时间</TableHead>
-                <TableHead class="w-[200px]">操作</TableHead>
+                <TableHead class="text-center w-[200px]">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -48,7 +48,7 @@
                   </Badge>
                 </TableCell>
                 <TableCell>{{ formatSize(row.fileSize) }}</TableCell>
-                <TableCell>{{ row.createdAt }}</TableCell>
+                <TableCell>{{ formatLogTime(row.createdAt) }}</TableCell>
                 <TableCell>
                   <div class="flex items-center gap-1">
                     <Button variant="link" size="sm" class="h-auto p-0 text-primary" @click="handleRestore(row)">恢复</Button>
@@ -205,6 +205,7 @@ import { Textarea } from '@/components/ui/Textarea.vue'
 import { Badge } from '@/components/ui/Badge.vue'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table.vue'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/Select.vue'
+import { formatLogTime } from '@/lib/utils'
 
 const props = defineProps({
   modelValue: Boolean,

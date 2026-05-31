@@ -353,7 +353,7 @@
                 <TableHead v-for="col in columns" :key="col.name" class="min-w-[120px] text-[12px] font-normal text-muted-foreground">
                   {{ col.name }}
                 </TableHead>
-                <TableHead class="w-[100px] sticky right-0 bg-white text-[12px] font-normal text-muted-foreground">操作</TableHead>
+                <TableHead class="text-center w-[100px] sticky right-0 bg-white text-[12px] font-normal text-muted-foreground">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -512,6 +512,10 @@
               <Input v-model="createDbForm.password" type="password" placeholder="请输入用户密码" class="w-full" />
             </div>
             <div class="grid gap-1.5">
+              <label class="text-sm font-medium leading-none">确认密码 <span class="text-muted-foreground text-xs font-normal">(如填写密码则需再次输入)</span></label>
+              <Input v-model="createDbForm.confirmPassword" type="password" placeholder="请再次输入密码" class="w-full" />
+            </div>
+            <div class="grid gap-1.5">
               <label class="text-sm font-medium leading-none">字符集</label>
               <Select v-model="createDbForm.charset">
                 <SelectTrigger class="w-full">
@@ -531,9 +535,10 @@
               </Select>
             </div>
           </div>
+          <div v-if="createDbError" class="text-[13px] text-red-500 bg-red-50 rounded-lg px-3 py-2">{{ createDbError }}</div>
           <div class="flex justify-end gap-2 flex-wrap">
             <Button variant="outline" @click="showCreateDbDialog = false">取消</Button>
-            <Button :disabled="!createDbForm.name.trim()" @click="createDatabase">创建</Button>
+            <Button :disabled="!createDbForm.name.trim() || (createDbForm.password && createDbForm.password !== createDbForm.confirmPassword)" @click="createDatabase">创建</Button>
           </div>
         </DialogContent>
       </DialogPortal>
@@ -753,7 +758,8 @@ const instanceDialogType = ref('create')
 const instanceEditData = ref(null)
 
 const showCreateDbDialog = ref(false)
-const createDbForm = ref({ name: '', password: '', charset: 'utf8mb4' })
+const createDbForm = ref({ name: '', password: '', confirmPassword: '', charset: 'utf8mb4' })
+const createDbError = ref('')
 
 const showDeleteDbDialog = ref(false)
 const deleteDbName = ref('')
@@ -766,14 +772,21 @@ const openDeleteDbDialog = (dbName) => {
 }
 
 const doDeleteDatabase = () => {
-  const sql = `DROP DATABASE IF EXISTS \`${deleteDbName.value.replace(/`/g, '``')}\``
-  fetch(`${API_BASE}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, {
+  const url = `${API_BASE}/databases/delete?${sourceParam(currentInst.value?.isRemote || false)}`
+  const body = { server_id: serverId.value, name: deleteDbName.value }
+  console.log('[删除数据库] 请求URL:', url)
+  console.log('[删除数据库] 请求体:', JSON.stringify(body))
+  fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ server_id: serverId.value, database: '', sql })
+    body: JSON.stringify(body)
   })
-    .then(res => res.json())
+    .then(res => {
+      console.log('[删除数据库] 响应状态:', res.status)
+      return res.json()
+    })
     .then(data => {
+      console.log('[删除数据库] 响应数据:', data)
       if (data.code === 0) {
         toast.success(`数据库 ${deleteDbName.value} 已删除`)
         showDeleteDbDialog.value = false
@@ -787,7 +800,10 @@ const doDeleteDatabase = () => {
         toast.error(data.msg || '删除失败')
       }
     })
-    .catch(() => { toast.error('删除失败') })
+    .catch((err) => {
+      console.error('[删除数据库] 请求异常:', err)
+      toast.error('删除失败: ' + err.message)
+    })
 }
 
 const openCreateDbDialog = () => {
@@ -1111,28 +1127,47 @@ const createDatabase = () => {
   if (!connectionId.value) return
   const name = createDbForm.value.name.trim()
   if (!name) { toast.warning('请输入数据库名称'); return }
-  fetch(`${API_BASE}/databases/create?${sourceParam(currentInst.value?.isRemote || false)}`, {
+  if (createDbForm.value.password && createDbForm.value.password !== createDbForm.value.confirmPassword) {
+    createDbError.value = '两次输入的密码不一致'
+    return
+  }
+  createDbError.value = ''
+  const url = `${API_BASE}/databases/create?${sourceParam(currentInst.value?.isRemote || false)}`
+  const body = {
+    server_id: serverId.value,
+    name,
+    password: createDbForm.value.password,
+    charset: createDbForm.value.charset,
+  }
+  console.log('[创建数据库] 请求URL:', url)
+  console.log('[创建数据库] 请求体:', JSON.stringify(body))
+  fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      server_id: serverId.value,
-      name,
-      password: createDbForm.value.password,
-      charset: createDbForm.value.charset,
-    }),
+    body: JSON.stringify(body),
   })
-    .then(res => res.json())
+    .then(res => {
+      console.log('[创建数据库] 响应状态:', res.status)
+      return res.json()
+    })
     .then(data => {
+      console.log('[创建数据库] 响应数据:', data)
       if (data.code === 0) {
         toast.success('数据库创建成功')
         showCreateDbDialog.value = false
-        createDbForm.value = { name: '', password: '', charset: 'utf8mb4' }
+        createDbForm.value = { name: '', password: '', confirmPassword: '', charset: 'utf8mb4' }
+        createDbError.value = ''
         loadDatabases()
       } else {
+        createDbError.value = data.msg || '创建数据库失败'
         toast.error(data.msg || '创建数据库失败')
       }
     })
-    .catch(err => toast.error('创建数据库失败: ' + err.message))
+    .catch(err => {
+      console.error('[创建数据库] 请求异常:', err)
+      createDbError.value = '创建数据库失败: ' + err.message
+      toast.error('创建数据库失败: ' + err.message)
+    })
 }
 const onPageChange = () => { fetchTableData() }
 

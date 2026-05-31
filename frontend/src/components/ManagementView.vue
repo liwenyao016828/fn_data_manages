@@ -97,7 +97,7 @@
               <TableHead class="text-[12px] font-normal text-muted-foreground h-10">版本</TableHead>
               <TableHead class="text-[12px] font-normal text-muted-foreground h-10">磁盘</TableHead>
               <TableHead class="text-[12px] font-normal text-muted-foreground h-10">状态</TableHead>
-              <TableHead class="text-[12px] font-normal text-muted-foreground h-10">操作</TableHead>
+              <TableHead class="text-center text-[12px] font-normal text-muted-foreground h-10">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -174,7 +174,7 @@
                         </div>
                         <div class="expand-field">
                           <span class="expand-label">创建时间</span>
-                          <span class="expand-value">{{ row.createdAt || '-' }}</span>
+                          <span class="expand-value">{{ formatLogTime(row.createdAt) || '-' }}</span>
                         </div>
                       </div>
                       <div class="expand-actions">
@@ -247,6 +247,7 @@ import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
 import { sourceParam, instanceUid } from '@/lib/instance'
+import { formatLogTime } from '@/lib/utils'
 import { toast } from 'vue-sonner'
 import { Search, Plus, Database, Server, BarChart3, Activity, ChevronRight, ChevronLeft, Inbox } from 'lucide-vue-next'
 import { databaseApi } from '../api/database'

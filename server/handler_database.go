@@ -193,7 +193,7 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 			Password: newDB.Password,
 			Type:     newDB.Type,
 		}
-		ver, dsk := fetchServerInfo(server)
+		ver, dsk, dbs := fetchServerInfo(server)
 		if ver != "" || dsk != "" {
 			mutex.Lock()
 			for i := range databases {
@@ -203,6 +203,9 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					if dsk != "" {
 						databases[i].Disk = dsk
+					}
+					if len(dbs) > 0 {
+						databases[i].Databases = dbs
 					}
 					break
 				}
@@ -458,10 +461,29 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		filtered = append(filtered, db)
 	}
+	mutex.Unlock()
+
+	// 为每个MySQL实例获取数据库列表（在掩码化密码之前）
+	for i := range filtered {
+		if strings.ToLower(filtered[i].Type) == "mysql" {
+			server := &RemoteServer{
+				Host:     filtered[i].Host,
+				Port:     filtered[i].Port,
+				Username: filtered[i].Username,
+				Password: filtered[i].Password,
+				Type:     filtered[i].Type,
+			}
+			_, _, dbs := fetchServerInfo(server)
+			if len(dbs) > 0 {
+				filtered[i].Databases = dbs
+			}
+		}
+	}
+
+	// 掩码化密码后再返回
 	for i := range filtered {
 		filtered[i].Password = maskPassword(filtered[i].Password)
 	}
-	mutex.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -507,13 +529,14 @@ func containsHelper(s, substr string) bool {
 	return false
 }
 
-func fetchServerInfo(server *RemoteServer) (string, string) {
+func fetchServerInfo(server *RemoteServer) (string, string, []string) {
 	version, disk := "", ""
+	var databases []string
 
 	if strings.ToLower(server.Type) == "redis" {
 		conn, err := openRedis(server)
 		if err != nil {
-			return "", ""
+			return "", "", nil
 		}
 		infoResp, _ := redisDo(conn, "INFO", "server")
 		if infoStr, ok := infoResp.(string); ok {
@@ -535,11 +558,14 @@ func fetchServerInfo(server *RemoteServer) (string, string) {
 		}
 		conn.Close()
 	} else {
+		fmt.Printf("[fetchServerInfo] 连接MySQL: host=%s, port=%d, user=%s\n", server.Host, server.Port, server.Username)
 		db, err := openMySQL(server)
 		if err != nil {
-			return "", ""
+			fmt.Printf("[fetchServerInfo] 连接失败: %v\n", err)
+			return "", "", nil
 		}
 		defer db.Close()
+		fmt.Printf("[fetchServerInfo] 连接成功\n")
 		db.QueryRow("SELECT VERSION()").Scan(&version)
 		var dataSize sql.NullFloat64
 		db.QueryRow("SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) FROM information_schema.TABLES").Scan(&dataSize)
@@ -554,9 +580,25 @@ func fetchServerInfo(server *RemoteServer) (string, string) {
 			db.QueryRow("SELECT COUNT(*) FROM information_schema.SCHEMATA").Scan(&dbCount)
 			disk = fmt.Sprintf("%d个库", dbCount)
 		}
-	}
 
-	return version, disk
+		rows, err := db.Query("SHOW DATABASES")
+		if err != nil {
+			fmt.Printf("[fetchServerInfo] SHOW DATABASES失败: %v\n", err)
+		} else {
+			defer rows.Close()
+			var dbName string
+			for rows.Next() {
+				if err := rows.Scan(&dbName); err == nil {
+					lower := strings.ToLower(dbName)
+					if lower != "information_schema" && lower != "mysql" && lower != "performance_schema" && lower != "sys" {
+						databases = append(databases, dbName)
+					}
+				}
+			}
+			fmt.Printf("[fetchServerInfo] 获取到%d个数据库\n", len(databases))
+		}
+	}
+	return version, disk, databases
 }
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
@@ -587,7 +629,7 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	version, disk := fetchServerInfo(server)
+	version, disk, dbs := fetchServerInfo(server)
 	if version == "" && disk == "" {
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接失败，无法获取信息"})
 		return
@@ -615,6 +657,9 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 				if disk != "" {
 					databases[i].Disk = disk
 				}
+				if len(dbs) > 0 {
+					databases[i].Databases = dbs
+				}
 				break
 			}
 		}
@@ -622,5 +667,5 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 	mutex.Unlock()
 	saveData()
 
-	writeJSON(w, map[string]interface{}{"code": 0, "data": map[string]string{"version": version, "disk": disk}})
+	writeJSON(w, map[string]interface{}{"code": 0, "data": map[string]interface{}{"version": version, "disk": disk, "databases": dbs}})
 }

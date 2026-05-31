@@ -48,25 +48,6 @@
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">版本</label>
-          <Select v-model="form.version">
-            <SelectTrigger class="w-full">
-              <SelectValue placeholder="选择版本" />
-            </SelectTrigger>
-            <SelectContent>
-              <template v-if="form.type === 'mysql'">
-                <SelectItem value="5.7">MySQL 5.7</SelectItem>
-                <SelectItem value="8.0">MySQL 8.0</SelectItem>
-              </template>
-              <template v-if="form.type === 'redis'">
-                <SelectItem value="6.x">Redis 6.x</SelectItem>
-                <SelectItem value="7.x">Redis 7.x</SelectItem>
-              </template>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div class="flex flex-col gap-1.5">
           <label class="text-sm font-medium">数据库名</label>
           <Input v-model="form.database" placeholder="默认与实例名相同" />
         </div>

@@ -49,9 +49,10 @@
               <Select v-model="logDate" @update:model-value="onDateChange">
                 <SelectTrigger class="h-[32px] w-[120px] text-[13px] border-border">
                   <Clock class="h-3.5 w-3.5 mr-1" />
-                  <SelectValue />
+                  <SelectValue placeholder="今天" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">全部</SelectItem>
                   <SelectItem v-for="d in availableDates" :key="d.value" :value="d.value">{{ d.label }}</SelectItem>
                 </SelectContent>
               </Select>
@@ -120,10 +121,10 @@
               </div>
               <div v-else>
                 <div v-for="(log, idx) in filteredSystemLogs" :key="idx" class="flex items-start gap-2 py-0.5">
-                  <span class="text-gray-500/60 shrink-0 min-w-[140px]">{{ log.time }}</span>
-                  <span class="shrink-0 min-w-[56px]" :class="systemLogLevelClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
-                  <span class="text-primary shrink-0 min-w-[80px]">[{{ log.source || 'SYSTEM' }}]</span>
-                  <span class="text-[#e0e0e0] break-all">{{ log.message }}</span>
+                  <span class="text-gray-500/60 shrink-0 text-[12px]">{{ formatLogTime(log.time) }}</span>
+                  <span class="shrink-0 min-w-[56px] text-center" :class="systemLogLevelClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
+                  <span class="text-primary shrink-0 min-w-[80px] text-[12px]">[{{ log.source || 'SYSTEM' }}]</span>
+                  <span class="text-[#e0e0e0] break-all flex-1">{{ log.message }}</span>
                 </div>
               </div>
             </div>
@@ -160,9 +161,9 @@
               </div>
               <div v-else>
                 <div v-for="(log, idx) in filteredLogs" :key="idx" class="flex items-start gap-2 py-0.5">
-                  <span class="text-gray-500/60 shrink-0 min-w-[140px]">{{ log.time }}</span>
-                  <span class="shrink-0 min-w-[56px]" :class="logLevelClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
-                  <span class="text-[#e0e0e0] break-all">{{ log.message }}</span>
+                  <span class="text-gray-500/60 shrink-0 text-[12px]">{{ formatLogTime(log.time) }}</span>
+                  <span class="shrink-0 min-w-[56px] text-center" :class="logLevelClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
+                  <span class="text-[#e0e0e0] break-all flex-1">{{ log.message }}</span>
                 </div>
               </div>
             </div>
@@ -293,6 +294,7 @@ import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
 import { writeLog } from '../api/log'
 import { sourceParam, instanceUid } from '@/lib/instance'
+import { formatLogTime } from '@/lib/utils'
 import { toast } from 'vue-sonner'
 import {
   FileText, Clock, Database, Server, Search, Settings,
@@ -369,8 +371,11 @@ const selectedInst = computed(() => allInstances.value.find(i => instanceUid(i) 
 
 const filteredLogs = computed(() => {
   let logs = [...rawLogs.value]
-  if (logDate.value !== 'today') {
+  if (logDate.value !== 'all' && logDate.value !== 'today') {
     logs = logs.filter(l => l.time?.startsWith(logDate.value))
+  } else if (logDate.value === 'today') {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    logs = logs.filter(l => l.time?.startsWith(todayStr))
   }
   if (levelFilter.value && levelFilter.value !== 'all') {
     logs = logs.filter(l => l.level?.toLowerCase() === levelFilter.value.toLowerCase())
@@ -384,8 +389,11 @@ const filteredLogs = computed(() => {
 
 const filteredSystemLogs = computed(() => {
   let logs = [...systemLogs.value]
-  if (logDate.value !== 'today') {
+  if (logDate.value !== 'all' && logDate.value !== 'today') {
     logs = logs.filter(l => l.time?.startsWith(logDate.value))
+  } else if (logDate.value === 'today') {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    logs = logs.filter(l => l.time?.startsWith(todayStr))
   }
   if (selectedSystemLogLevel.value && selectedSystemLogLevel.value !== 'all') {
     logs = logs.filter(l => l.level?.toLowerCase() === selectedSystemLogLevel.value.toLowerCase())

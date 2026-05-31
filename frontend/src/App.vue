@@ -352,7 +352,7 @@ onMounted(async () => {
       />
     </div>
 
-    <Toaster position="top-center" :duration="2000" />
+    <Toaster position="top-center" :duration="4000" />
 
     <div v-if="showSwitcher" class="fixed inset-0 z-20" @click="closeSwitcher" />
   </div>
