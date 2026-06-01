@@ -704,6 +704,7 @@ const props = defineProps({
 const emit = defineEmits(['navAccepted'])
 
 const instances = ref([])
+const previousInstanceIds = ref(new Set())
 const selectedDatabase = ref(null)
 const selectedTable = ref(null)
 const loadingDatabases = ref(false)
@@ -989,7 +990,14 @@ const handleConfirm = () => {
 
 const loadInstances = () => {
   store.loadInstances().then(result => {
+    const newIds = new Set(result.map(i => (i.isRemote ? 'r:' : 'l:') + i.id))
+    const newInstanceIds = [...newIds].filter(uid => !previousInstanceIds.value.has(uid))
     instances.value = result
+    previousInstanceIds.value = newIds
+    healthStore.cleanup([...newIds])
+    newInstanceIds.forEach(uid => {
+      healthStore.forceCheckOne(uid)
+    })
     checkOnlineStatus(result)
     if (!connectionId.value && instances.value.length > 0) {
       const inst = instances.value[0]

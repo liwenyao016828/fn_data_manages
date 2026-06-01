@@ -83,12 +83,13 @@ func main() {
 	http.HandleFunc("/api/remote-servers/test", remoteServerTestHandler)
 
 	http.HandleFunc("/api/backups", backupHandler)
-	http.HandleFunc("/api/backups/", backupDetailHandler)
 	http.HandleFunc("/api/backups/import", backupImportHandler)
 	http.HandleFunc("/api/backups/restore", backupRestoreHandler)
 	http.HandleFunc("/api/backups/scheduled", scheduledBackupHandler)
+	http.HandleFunc("/api/backups/scheduled/run", runScheduledBackupHandler)
 	http.HandleFunc("/api/backups/scheduled/", scheduledBackupDetailHandler)
 	http.HandleFunc("/api/backups/retention", backupRetentionHandler)
+	http.HandleFunc("/api/backups/", backupDetailHandler)
 
 	http.HandleFunc("/api/mysql/databases", mysqlDatabasesHandler)
 	http.HandleFunc("/api/mysql/databases/create", mysqlCreateDatabaseHandler)

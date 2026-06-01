@@ -9,6 +9,8 @@ import { LayoutDashboard, MonitorCog, HardDrive, Shield, FileText, Settings, Pan
 import { Button } from '@/components/ui/Button.vue'
 import { ScrollArea } from '@/components/ui/ScrollArea.vue'
 import { Toaster } from '@/components/ui/Sonner.vue'
+import MessageToast from '@/components/ui/MessageToast.vue'
+import { useMessage } from './composables/useMessage'
 import DataManageView from './components/DataManageView.vue'
 import BackupView from './components/BackupView.vue'
 import SettingsView from './components/SettingsView.vue'
@@ -19,6 +21,7 @@ import StatusDot from './components/StatusDot.vue'
 
 const store = useAppContext()
 const healthStore = useHealthStore()
+const { message } = useMessage()
 const { current, isActive, userName, host, port, name, logEnabled } = storeToRefs(store)
 const { favorites } = storeToRefs(store)
 const { statusMap: onlineStatus } = storeToRefs(healthStore)
@@ -353,6 +356,7 @@ onMounted(async () => {
     </div>
 
     <Toaster position="top-center" :duration="4000" />
+    <MessageToast :message="message" />
 
     <div v-if="showSwitcher" class="fixed inset-0 z-20" @click="closeSwitcher" />
   </div>

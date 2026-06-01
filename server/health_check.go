@@ -262,6 +262,19 @@ func (s *HealthCheckService) checkAll() {
 		}(srv.uid, srv.id, srv.source, srv.server)
 	}
 	wg.Wait()
+
+	// 清理已删除实例的缓存状态
+	validUids := make(map[string]bool, len(servers))
+	for _, srv := range servers {
+		validUids[srv.uid] = true
+	}
+	s.mu.Lock()
+	for uid := range s.cache {
+		if !validUids[uid] {
+			delete(s.cache, uid)
+		}
+	}
+	s.mu.Unlock()
 }
 
 func (s *HealthCheckService) checkOne(uid string, id uint, source string, server RemoteServer, timeout time.Duration) *HealthStatus {

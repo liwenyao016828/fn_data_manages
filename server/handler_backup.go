@@ -295,6 +295,14 @@ func createBackup(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]interface{}{"code": 400, "msg": "请选择具体要备份的MySQL数据库名"})
 			return
 		}
+		// 非 root 用户不允许备份全部数据库
+		if newBackup.Database == "__ALL__" {
+			server := findAnyServer(newBackup.ServerID, source)
+			if server != nil && server.Username != "root" {
+				writeJSON(w, map[string]interface{}{"code": 403, "msg": "当前账号权限不足，仅 root 用户可以备份全部数据库"})
+				return
+			}
+		}
 	}
 
 	bakDir := getDataDir() + "/backups"

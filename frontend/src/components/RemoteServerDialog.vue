@@ -235,7 +235,6 @@ const handleCancel = () => {
 const validateForm = () => {
   if (!form.name) { toast.warning('请输入名称'); return false }
   if (!form.type) { toast.warning('请选择类型'); return false }
-  if (!form.version) { toast.warning('请选择版本'); return false }
   if (!form.host) { toast.warning('请输入数据库地址'); return false }
   if (!form.port) { toast.warning('请输入端口'); return false }
   if (!form.username) { toast.warning('请输入用户名'); return false }

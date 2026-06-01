@@ -617,6 +617,13 @@ func redisLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if source == "remote" {
+		writeJSON(w, map[string]interface{}{"code": 0, "data": []map[string]string{
+			{"time": time.Now().Format("2006-01-02 15:04:05"), "level": "Note", "message": "远程服务器Redis日志文件无法直接读取，日志路径: " + logPath},
+		}})
+		return
+	}
+
 	data, err := os.ReadFile(logPath)
 	if err != nil {
 		writeJSON(w, map[string]interface{}{"code": 0, "data": []map[string]string{
@@ -632,10 +639,10 @@ func redisLogsHandler(w http.ResponseWriter, r *http.Request) {
 		if line == "" {
 			continue
 		}
-		
+
 		// 尝试解析 Redis 日志时间戳
 		logTime := time.Now().Format("2006-01-02 15:04:05")
-		
+
 		// 尝试解析标准时间格式 (Y-M-D H:M:S)
 		if len(line) > 19 {
 			if _, err := time.Parse("2006-01-02 15:04:05", line[:19]); err == nil {
@@ -653,7 +660,7 @@ func redisLogsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		
+
 		level := "Note"
 		if strings.Contains(strings.ToUpper(line), "ERROR") || strings.Contains(strings.ToUpper(line), "CRITICAL") {
 			level = "Error"
@@ -662,7 +669,7 @@ func redisLogsHandler(w http.ResponseWriter, r *http.Request) {
 		} else if strings.Contains(strings.ToUpper(line), "INFO") || strings.Contains(strings.ToUpper(line), "NOTICE") {
 			level = "Info"
 		}
-		
+
 		logs = append(logs, map[string]string{
 			"time":    logTime,
 			"level":   level,
@@ -1223,6 +1230,9 @@ func systemLogsHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]interface{}{"code": 405, "msg": "方法不允许"})
 		return
 	}
+
+	_ = r.URL.Query().Get("server_id")
+	_ = r.URL.Query().Get("source")
 
 	dataDir := getDataDir()
 	logPath := filepath.Join(dataDir, "app.log")

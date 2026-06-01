@@ -610,9 +610,9 @@ defineOptions({ name: 'BackupView' })
 import { ref, onMounted, onActivated, watch, computed, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
-import { toast } from 'vue-sonner'
 import { sourceParam } from '@/lib/instance'
 import { formatLogTime } from '@/lib/utils'
+import { useMessage } from '../composables/useMessage'
 import {
   Upload, Clock, Plus, Settings, Database,
   HardDrive, Inbox, Loader2, Search, X,
@@ -637,6 +637,8 @@ const STORAGE_KEY = 'backup_view_filters'
 
 const store = useAppContext()
 const { connectionId } = storeToRefs(store)
+
+const { success, error, warning } = useMessage()
 
 const database = computed(() => {
   if (!store.current) return null
@@ -1035,8 +1037,9 @@ const loadCreateMysqlDatabases = (selectedDb) => {
     .then(data => {
       if (data.code === 0 && data.data) {
         const filtered = data.data.filter(n => !['information_schema', 'performance_schema', 'mysql', 'sys'].includes(n))
-        // 在最前面增加「全部」选项
-        mysqlDatabaseOptions.value = ['__ALL__', ...filtered]
+        const isRoot = selectedDb.username === 'root'
+        // 只有 root 用户才显示「全部」选项
+        mysqlDatabaseOptions.value = isRoot ? ['__ALL__', ...filtered] : filtered
         // 尝试自动选中：优先选择用户当前正在看的数据库（store.dbName）
         if (store.dbName && filtered.includes(store.dbName)) {
           createForm.value.targetMysqlDbName = store.dbName
@@ -1044,8 +1047,10 @@ const loadCreateMysqlDatabases = (selectedDb) => {
           createForm.value.targetMysqlDbName = selectedDb.database
         } else if (filtered.length > 0) {
           createForm.value.targetMysqlDbName = filtered[0]
-        } else {
+        } else if (isRoot) {
           createForm.value.targetMysqlDbName = '__ALL__'
+        } else {
+          createForm.value.targetMysqlDbName = ''
         }
       }
     })
@@ -1075,13 +1080,17 @@ const onScheduleDbChange = (newVal) => {
     .then(data => {
       if (data.code === 0 && data.data) {
         const filtered = data.data.filter(n => !['information_schema', 'performance_schema', 'mysql', 'sys'].includes(n))
-        scheduleMysqlDatabaseOptions.value = ['__ALL__', ...filtered]
+        const isRoot = selectedDb.username === 'root'
+        // 只有 root 用户才显示「全部」选项
+        scheduleMysqlDatabaseOptions.value = isRoot ? ['__ALL__', ...filtered] : filtered
         if (store.dbName && filtered.includes(store.dbName)) {
           scheduleForm.value.targetMysqlDbName = store.dbName
         } else if (filtered.length > 0) {
           scheduleForm.value.targetMysqlDbName = filtered[0]
-        } else {
+        } else if (isRoot) {
           scheduleForm.value.targetMysqlDbName = '__ALL__'
+        } else {
+          scheduleForm.value.targetMysqlDbName = ''
         }
       }
     })
@@ -1193,21 +1202,21 @@ const toggleSelect = (row) => {
 
 const handleBatchDelete = () => {
   const ids = selectedBackups.value.map(b => b.id)
-  if (ids.length === 0) { toast.warning('请选择要删除的备份'); return }
+  if (ids.length === 0) { warning('请选择要删除的备份'); return }
   fetch('/api/backups', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids })
   }).then(r => r.json()).then(result => {
     if (result.code === 0) {
-      toast.success(result.msg || `成功删除 ${ids.length} 个备份`)
+      success(result.msg || `成功删除 ${ids.length} 个备份`)
     } else {
-      toast.error(result.msg || '删除失败')
+      error(result.msg || '删除失败')
     }
     selectedBackups.value = []
     loadBackups()
   }).catch(() => {
-    toast.error('删除失败')
+    error('删除失败')
   })
 }
 
@@ -1221,13 +1230,13 @@ const submitCreate = () => {
   if (!isSystem) {
     const targetUid = createForm.value.targetDb
     if (!targetUid) {
-      toast.warning('请选择目标数据库')
+      warning('请选择目标数据库')
       creating.value = false
       return
     }
     selectedDb = findDbByUid(targetUid)
     if (!selectedDb) {
-      toast.warning('请选择目标数据库')
+      warning('请选择目标数据库')
       creating.value = false
       return
     }
@@ -1240,7 +1249,7 @@ const submitCreate = () => {
   } else if (!isSystem) {
     targetDb = createForm.value.targetMysqlDbName
     if (!targetDb) {
-      toast.warning('请选择要备份的MySQL数据库名')
+      warning('请选择要备份的MySQL数据库名')
       creating.value = false
       return
     }
@@ -1261,14 +1270,14 @@ const submitCreate = () => {
       .then(res => res.json())
       .then(data => {
         if (data.code === 0) {
-          toast.success('Redis备份创建成功')
+          success('Redis备份创建成功')
           showCreateDialog.value = false
           loadBackups()
         } else {
-          toast.error(data.msg || '创建失败')
+          error(data.msg || '创建失败')
         }
       })
-      .catch(() => { toast.error('创建失败') })
+      .catch(() => { error('创建失败') })
       .finally(() => { creating.value = false })
     return
   }
@@ -1292,15 +1301,15 @@ const submitCreate = () => {
     .then(data => {
       if (data.code === 0) {
         const label = isSystem ? '系统' : isRedis ? 'Redis' : 'MySQL'
-        toast.success(label + '备份创建成功')
+        success(label + '备份创建成功')
         showCreateDialog.value = false
         loadBackups()
       } else {
-        toast.error(data.msg || '创建失败')
+        error(data.msg || '创建失败')
       }
     })
     .catch(() => {
-      toast.error('创建失败')
+      error('创建失败')
     })
     .finally(() => {
       creating.value = false
@@ -1317,14 +1326,14 @@ const handleDelete = (row) => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success('删除成功')
+        success('删除成功')
         loadBackups()
       } else {
-        toast.error(data.msg || '删除失败')
+        error(data.msg || '删除失败')
       }
     })
     .catch(() => {
-      toast.error('删除失败')
+      error('删除失败')
     })
 }
 
@@ -1351,15 +1360,15 @@ const doRestore = () => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success(data.msg || '恢复成功')
+        success(data.msg || '恢复成功')
         showRestoreDialog.value = false
         loadBackups()
       } else {
-        toast.error(data.msg || '恢复失败')
+        error(data.msg || '恢复失败')
       }
     })
     .catch(err => {
-      toast.error('恢复失败: ' + err.message)
+      error('恢复失败: ' + err.message)
     })
     .finally(() => {
       restoring.value = false
@@ -1416,18 +1425,18 @@ const submitSchedule = () => {
   if (!isSystem) {
     const targetUid = scheduleForm.value.targetDb
     if (!targetUid) {
-      toast.warning('请选择目标连接')
+      warning('请选择目标连接')
       scheduling.value = false
       return
     }
     selectedDb = findDbByUid(targetUid)
     if (!selectedDb) {
-      toast.warning('请选择目标连接')
+      warning('请选择目标连接')
       scheduling.value = false
       return
     }
     if (selectedDb.type !== 'redis' && !scheduleForm.value.targetMysqlDbName) {
-      toast.warning('请选择目标数据库')
+      warning('请选择目标数据库')
       scheduling.value = false
       return
     }
@@ -1457,15 +1466,15 @@ const submitSchedule = () => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success(editScheduleData.value ? '更新成功' : '创建成功')
+        success(editScheduleData.value ? '更新成功' : '创建成功')
         showScheduleDialog.value = false
         editScheduleData.value = null
         loadSchedules()
       } else {
-        toast.error(data.msg || '操作失败')
+        error(data.msg || '操作失败')
       }
     })
-    .catch(() => { toast.error('操作失败') })
+    .catch(() => { error('操作失败') })
     .finally(() => { scheduling.value = false })
 }
 
@@ -1479,16 +1488,16 @@ const toggleSchedule = (row) => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success(newEnabled ? '已启用定时备份' : '已禁用定时备份')
+        success(newEnabled ? '已启用定时备份' : '已禁用定时备份')
         loadSchedules()
       } else {
         row.enabled = !newEnabled
-        toast.error(data.msg || '操作失败')
+        error(data.msg || '操作失败')
       }
     })
     .catch(() => {
       row.enabled = !newEnabled
-      toast.error('操作失败')
+      error('操作失败')
     })
 }
 
@@ -1498,14 +1507,14 @@ const deleteSchedule = (row) => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success('删除成功')
+        success('删除成功')
         loadSchedules()
       } else {
-        toast.error(data.msg || '删除失败')
+        error(data.msg || '删除失败')
       }
     })
     .catch(() => {
-      toast.error('删除失败')
+      error('删除失败')
     })
 }
 

@@ -523,7 +523,7 @@
                   </Button>
                 </div>
 
-                <Table>
+                <Table class="px-4">
                   <TableHeader>
                     <TableRow class="hover:bg-transparent border-b border-[#F0F0F0]">
                       <TableHead class="w-[150px] text-[12px] font-normal text-muted-foreground">用户名</TableHead>
@@ -1032,7 +1032,7 @@ import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
 import { sourceParam, instanceUid } from '@/lib/instance'
 import { writeLog } from '../api/log'
-import { toast } from 'vue-sonner'
+import { useMessage } from '../composables/useMessage'
 import StatusDot from './StatusDot.vue'
 import {
   RefreshCw, CircleX, FileText,
@@ -1070,6 +1070,8 @@ let requestId = 0
 
 const store = useAppContext()
 const { connectionId, logEnabled, userName, host, port, name } = storeToRefs(store)
+
+const { success, error, warning, info } = useMessage()
 
 const deduplicateInstances = (instances) => {
   const seen = new Set()
@@ -1190,13 +1192,13 @@ const saveHealthConfig = () => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success('测活配置已保存')
+        success('测活配置已保存')
         writeLog(`测活配置已更新: 启用=${healthConfig.value.enabled}, 间隔=${healthConfig.value.intervalSec}s, 超时=${healthConfig.value.timeoutSec}s, 告警=${healthConfig.value.alertEnabled}`)
       } else {
-        toast.error(data.msg || '保存失败')
+        error(data.msg || '保存失败')
       }
     })
-    .catch(() => toast.error('保存失败'))
+    .catch(() => error('保存失败'))
 }
 
 const updateHealthInterval = (val) => {
@@ -1213,10 +1215,10 @@ const forceHealthCheck = () => {
   forceChecking.value = true
   healthStore.forceCheckAll()
     .then(() => {
-      toast.success('测活检测完成')
+      success('测活检测完成')
       writeLog('执行手动测活检测')
     })
-    .catch(() => toast.error('检测失败'))
+    .catch(() => error('检测失败'))
     .finally(() => { forceChecking.value = false })
 }
 
@@ -1281,7 +1283,7 @@ const saveLogConfig = () => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(cfg)
   }).catch(e => console.error(e))
-  toast.success('日志配置已保存')
+  success('日志配置已保存')
   writeLog(`日志配置已更新: 路径=${cfg.path}, 保留=${cfg.retentionDays}天, 启用=${cfg.enabled}`)
 }
 
@@ -1301,10 +1303,10 @@ const loadBrowseDirs = (path) => {
         browseDirs.value = data.dirs || []
         browseIsRoot.value = data.isRoot === true
       } else {
-        toast.error(data.msg || '无法读取目录')
+        error(data.msg || '无法读取目录')
       }
     })
-    .catch(() => toast.error('目录浏览请求失败'))
+    .catch(() => error('目录浏览请求失败'))
 }
 
 const navigateFolder = (path) => {
@@ -1325,13 +1327,13 @@ const saveBackupRetention = (val) => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success('备份保留策略已保存')
+        success('备份保留策略已保存')
         writeLog(`备份保留策略已更新: ${val === 'never' ? '永不清理' : val + '天'}`)
       } else {
-        toast.error(data.msg || '保存失败')
+        error(data.msg || '保存失败')
       }
     })
-    .catch(() => toast.error('保存失败'))
+    .catch(() => error('保存失败'))
 }
 
 watch(activeTab, (tab) => {
@@ -1462,10 +1464,10 @@ const loadDbGrants = (row) => {
           privileges: item.privileges ? item.privileges.split(',').map(p => p.trim()) : []
         }))
       } else {
-        toast.error(data.msg || '加载数据库权限失败')
+        error(data.msg || '加载数据库权限失败')
       }
     })
-    .catch(() => toast.error('加载数据库权限失败'))
+    .catch(() => error('加载数据库权限失败'))
 }
 
 const privilegeGroups = [
@@ -1620,15 +1622,15 @@ const handleConfirm = () => {
 const updatePortOnly = async () => {
   const newPortVal = currentDb.value?.type === 'redis' ? redisCommonConfig.value.port : commonConfig.value.port
   if (!newPortVal || newPortVal < 1024 || newPortVal > 65535) {
-    toast.warning('端口范围应为 1024-65535')
+    warning('端口范围应为 1024-65535')
     return
   }
   if (!currentDb.value || currentDb.value.isRemote) {
-    toast.warning('远程实例不支持在线修改端口')
+    warning('远程实例不支持在线修改端口')
     return
   }
   if (newPortVal === currentDb.value.port) {
-    toast.warning('新端口与当前端口相同')
+    warning('新端口与当前端口相同')
     return
   }
   updatingPort.value = true
@@ -1642,14 +1644,14 @@ const updatePortOnly = async () => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success(data.msg || '端口已修改')
+        success(data.msg || '端口已修改')
         loadDatabases()
         success = true
       } else {
-        toast.error(data.msg || '修改失败')
+        error(data.msg || '修改失败')
       }
     })
-    .catch(() => toast.error('修改失败'))
+    .catch(() => error('修改失败'))
     .finally(() => { updatingPort.value = false })
   return success
 }
@@ -1737,7 +1739,7 @@ const submitChangeHost = () => {
     .then(data => {
       if (data.code === 0) {
         changeHostState.value.result = { show: true, success: true, message: data.msg || '主机修改成功' }
-        toast.success(data.msg || '主机修改成功')
+        success(data.msg || '主机修改成功')
         writeLog(`修改主机: ${row.user}@${row.host} -> ${row.user}@${changeHostState.value.newHost} (实例: ${db.name})`)
         setTimeout(() => {
           changeHostState.value.open = false
@@ -1746,13 +1748,13 @@ const submitChangeHost = () => {
       } else {
         const msg = data.msg || '修改失败'
         changeHostState.value.result = { show: true, success: false, message: msg }
-        toast.error(msg)
+        error(msg)
       }
     })
     .catch((err) => {
       const msg = '修改失败: ' + (err.message || err)
       changeHostState.value.result = { show: true, success: false, message: msg }
-      toast.error(msg)
+      error(msg)
     })
 }
 
@@ -1774,19 +1776,19 @@ const submitChangePwd = () => {
     .then(data => {
       if (data.code === 0) {
         changePwdState.value.result = { show: true, success: true, message: data.msg || '密码修改成功' }
-        toast.success(data.msg || '密码修改成功')
+        success(data.msg || '密码修改成功')
         writeLog(`修改密码: ${row.user}@${row.host} (实例: ${db.name})`)
         setTimeout(() => { changePwdState.value.open = false }, 1500)
       } else {
         const msg = data.msg || '修改失败'
         changePwdState.value.result = { show: true, success: false, message: msg }
-        toast.error(msg)
+        error(msg)
       }
     })
     .catch((err) => {
       const msg = '修改失败: ' + (err.message || err)
       changePwdState.value.result = { show: true, success: false, message: msg }
-      toast.error(msg)
+      error(msg)
     })
 }
 
@@ -1819,19 +1821,19 @@ const submitEditPerm = () => {
     .then(data => {
       if (data.code === 0) {
         editPermState.value.result = { show: true, success: true, message: data.msg || '权限修改成功' }
-        toast.success(data.msg || '权限修改成功')
+        success(data.msg || '权限修改成功')
         loadUsers(requestId)
         setTimeout(() => { editPermState.value.open = false }, 1500)
       } else {
         const msg = data.msg || '修改失败'
         editPermState.value.result = { show: true, success: false, message: msg }
-        toast.error(msg)
+        error(msg)
       }
     })
     .catch((err) => {
       const msg = '修改失败: ' + (err.message || err)
       editPermState.value.result = { show: true, success: false, message: msg }
-      toast.error(msg)
+      error(msg)
     })
 }
 
@@ -1943,12 +1945,12 @@ const loadConfig = (rid) => {
         configSource.value = data.data.source || 'sql'
         parseCommonConfig(configContent.value)
       } else {
-        toast.error(data.msg || '读取配置失败')
+        error(data.msg || '读取配置失败')
       }
     })
     .catch(() => {
       if (rid !== requestId) return
-      toast.error('读取配置失败')
+      error('读取配置失败')
     })
 }
 
@@ -1973,10 +1975,10 @@ const loadRedisConfig = (rid) => {
         redisCommonConfig.value.databases = parseInt(configs['databases']) || 16
         redisCommonConfig.value.bind = configs['bind'] || '0.0.0.0'
       } else {
-        toast.error(data.msg || '读取配置失败')
+        error(data.msg || '读取配置失败')
       }
     })
-    .catch(() => { if (rid === requestId) toast.error('读取配置失败') })
+    .catch(() => { if (rid === requestId) error('读取配置失败') })
 }
 
 const updateRedisConfig = (key) => {
@@ -1998,13 +2000,13 @@ const updateRedisConfig = (key) => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success(`${key} 已更新`)
+        success(`${key} 已更新`)
         loadRedisConfig(requestId)
       } else {
-        toast.error(data.msg || '更新失败')
+        error(data.msg || '更新失败')
       }
     })
-    .catch(() => { toast.error('更新失败') })
+    .catch(() => { error('更新失败') })
 }
 
 const parseCommonConfig = (content) => {
@@ -2045,13 +2047,13 @@ const updateConfig = (key) => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success(data.msg || `${key} 已修改`)
+        success(data.msg || `${key} 已修改`)
         loadConfig(requestId)
       } else {
-        toast.error(data.msg || `${key} 修改失败`)
+        error(data.msg || `${key} 修改失败`)
       }
     })
-    .catch(() => toast.error(`${key} 修改失败`))
+    .catch(() => error(`${key} 修改失败`))
 }
 
 const saveConfigOnly = async () => {
@@ -2059,7 +2061,7 @@ const saveConfigOnly = async () => {
   savingConfig.value = true
   const db = currentDb.value
   if (db.type === 'redis') {
-    toast.info('Redis配置修改请使用下方"常用配置项"进行修改')
+    info('Redis配置修改请使用下方"常用配置项"进行修改')
     savingConfig.value = false
     return
   }
@@ -2074,13 +2076,13 @@ const saveConfigOnly = async () => {
       .then(res => res.json())
       .then(data => {
         if (data.code === 0) {
-          toast.success(data.msg || '配置已保存，请重启MySQL使配置生效')
+          success(data.msg || '配置已保存，请重启MySQL使配置生效')
           success = true
         } else {
-          toast.error(data.msg || '保存失败')
+          error(data.msg || '保存失败')
         }
       })
-      .catch(() => toast.error('保存失败'))
+      .catch(() => error('保存失败'))
   } else {
     const variables = {}
     const map = {
@@ -2094,7 +2096,7 @@ const saveConfigOnly = async () => {
       }
     }
     if (Object.keys(variables).length === 0) {
-      toast.warning('没有可修改的配置项')
+      warning('没有可修改的配置项')
       savingConfig.value = false
       return
     }
@@ -2106,14 +2108,14 @@ const saveConfigOnly = async () => {
       .then(res => res.json())
       .then(data => {
         if (data.code === 0) {
-          toast.success(data.msg || '配置已在线修改')
+          success(data.msg || '配置已在线修改')
           loadConfig(requestId)
           success = true
         } else {
-          toast.error(data.msg || '修改失败')
+          error(data.msg || '修改失败')
         }
       })
-      .catch(() => toast.error('修改失败'))
+      .catch(() => error('修改失败'))
   }
   savingConfig.value = false
   return success
@@ -2122,7 +2124,7 @@ const saveConfigOnly = async () => {
 const saveConfig = () => {
   if (!currentDb.value) return
   if (currentDb.value.type === 'redis') {
-    toast.info('Redis配置修改请使用下方"常用配置项"进行修改')
+    info('Redis配置修改请使用下方"常用配置项"进行修改')
     return
   }
   saveAndRestartState.value = {
@@ -2139,25 +2141,25 @@ const restartDb = () => {
       .then(res => res.json())
       .then(data => {
         if (data.code === 0) {
-          toast.success('Redis重启中...')
+          success('Redis重启中...')
           setTimeout(() => checkOnlineStatus([db]), 3000)
         } else {
-          toast.error(data.msg || '重启失败')
+          error(data.msg || '重启失败')
         }
       })
-      .catch(() => toast.error('重启失败'))
+      .catch(() => error('重启失败'))
   } else {
     fetch(`/api/mysql/restart?server_id=${db.id}&${sourceParam(db.isRemote || false)}`, { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         if (data.code === 0) {
-          toast.success('MySQL重启中...')
+          success('MySQL重启中...')
           setTimeout(() => checkOnlineStatus([db]), 5000)
         } else {
-          toast.error(data.msg || '重启失败')
+          error(data.msg || '重启失败')
         }
       })
-      .catch(() => toast.error('重启失败'))
+      .catch(() => error('重启失败'))
   }
 }
 
@@ -2169,25 +2171,25 @@ const stopDb = () => {
       .then(res => res.json())
       .then(data => {
         if (data.code === 0) {
-          toast.success('Redis已停止')
+          success('Redis已停止')
           checkOnlineStatus([db])
         } else {
-          toast.error(data.msg || '停止失败')
+          error(data.msg || '停止失败')
         }
       })
-      .catch(() => toast.error('停止失败'))
+      .catch(() => error('停止失败'))
   } else {
     fetch(`/api/mysql/stop?server_id=${db.id}&${sourceParam(db.isRemote || false)}`, { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         if (data.code === 0) {
-          toast.success('MySQL已停止')
+          success('MySQL已停止')
           checkOnlineStatus([db])
         } else {
-          toast.error(data.msg || '停止失败')
+          error(data.msg || '停止失败')
         }
       })
-      .catch(() => toast.error('停止失败'))
+      .catch(() => error('停止失败'))
   }
 }
 
@@ -2198,13 +2200,13 @@ const deleteUser = (row) => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success('用户已删除')
+        success('用户已删除')
         loadUsers(requestId)
       } else {
-        toast.error(data.msg || '删除失败')
+        error(data.msg || '删除失败')
       }
     })
-    .catch(() => toast.error('删除失败'))
+    .catch(() => error('删除失败'))
 }
 
 const toggleUserLock = (row) => {
@@ -2219,13 +2221,13 @@ const toggleUserLock = (row) => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        toast.success(data.msg || (newLocked ? '用户已锁定' : '用户已解锁'))
+        success(data.msg || (newLocked ? '用户已锁定' : '用户已解锁'))
         loadUsers(requestId)
       } else {
-        toast.error(data.msg || '操作失败')
+        error(data.msg || '操作失败')
       }
     })
-    .catch(() => toast.error('操作失败'))
+    .catch(() => error('操作失败'))
 }
 
 const toggleCreateUserPriv = (value) => {
@@ -2273,7 +2275,7 @@ const createUser = () => {
       console.log('创建用户响应:', data)
       if (data && data.code === 0) {
         createUserResult.value = { show: true, success: true, message: data.msg || `用户 ${userForm.value.username}@${userForm.value.host || '%'} 创建成功` }
-        toast.success(data.msg || `用户 ${userForm.value.username}@${userForm.value.host || '%'} 创建成功`)
+        success(data.msg || `用户 ${userForm.value.username}@${userForm.value.host || '%'} 创建成功`)
         writeLog(`创建用户: ${userForm.value.username}@${userForm.value.host || '%'} (实例: ${db.name})`)
         setTimeout(() => {
           showCreateUserDialog.value = false
@@ -2290,14 +2292,14 @@ const createUser = () => {
         const msg = (data && data.msg) || '创建失败'
         console.error('创建用户失败:', msg, data)
         createUserResult.value = { show: true, success: false, message: msg }
-        toast.error(msg)
+        error(msg)
       }
     })
     .catch(err => {
       console.error('创建用户请求异常:', err)
       const msg = '创建失败: ' + (err.message || err)
       createUserResult.value = { show: true, success: false, message: msg }
-      toast.error(msg)
+      error(msg)
     })
     .finally(() => { creatingUser.value = false })
 }
@@ -2316,20 +2318,20 @@ const submitDbGrant = () => {
     .then(data => {
       if (data.code === 0) {
         dbGrantState.value.result = { show: true, success: true, message: data.msg || '权限设置成功' }
-        toast.success(data.msg || '权限设置成功')
+        success(data.msg || '权限设置成功')
         loadDbGrants(row)
         dbGrantState.value.selectedDb = ''
         dbGrantState.value.selectedPrivs = ['SELECT']
       } else {
         const msg = data.msg || '设置失败'
         dbGrantState.value.result = { show: true, success: false, message: msg }
-        toast.error(msg)
+        error(msg)
       }
     })
     .catch((err) => {
       const msg = '设置失败: ' + (err.message || err)
       dbGrantState.value.result = { show: true, success: false, message: msg }
-      toast.error(msg)
+      error(msg)
     })
 }
 
@@ -2345,18 +2347,18 @@ const removeDbGrant = (database) => {
     .then(data => {
       if (data.code === 0) {
         dbGrantState.value.result = { show: true, success: true, message: data.msg || '权限已删除' }
-        toast.success(data.msg || '权限已删除')
+        success(data.msg || '权限已删除')
         loadDbGrants(row)
       } else {
         const msg = data.msg || '删除失败'
         dbGrantState.value.result = { show: true, success: false, message: msg }
-        toast.error(msg)
+        error(msg)
       }
     })
     .catch((err) => {
       const msg = '删除失败: ' + (err.message || err)
       dbGrantState.value.result = { show: true, success: false, message: msg }
-      toast.error(msg)
+      error(msg)
     })
 }
 

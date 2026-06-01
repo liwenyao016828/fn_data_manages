@@ -86,15 +86,20 @@
 
 <script setup>
 import { ref, onMounted, onActivated } from 'vue'
-import { toast } from 'vue-sonner'
+import { useMessage } from '../composables/useMessage'
 import { Plus, Inbox } from 'lucide-vue-next'
 import RemoteServerDialog from './RemoteServerDialog.vue'
 import { Button } from '@/components/ui/Button.vue'
 import { Badge } from '@/components/ui/Badge.vue'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table.vue'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/Dialog.vue'
+import { useHealthStore } from '../stores/health'
+
+const { success, error, warning } = useMessage()
+const healthStore = useHealthStore()
 
 const serverList = ref([])
+const previousIds = ref(new Set())
 const dialogVisible = ref(false)
 const dialogType = ref('create')
 const currentServer = ref(null)
@@ -104,7 +109,19 @@ const deleteTarget = ref(null)
 const loadServers = () => {
   fetch('/api/remote-servers')
     .then(res => res.json())
-    .then(data => { if (data.code === 0) { serverList.value = data.data || [] } })
+    .then(data => {
+      if (data.code === 0) {
+        const newList = data.data || []
+        const newIds = new Set(newList.map(s => 'r:' + s.id))
+        const newServerIds = [...newIds].filter(id => !previousIds.value.has(id))
+        serverList.value = newList
+        previousIds.value = newIds
+        healthStore.cleanup([...newIds])
+        newServerIds.forEach(id => {
+          healthStore.forceCheckOne(id)
+        })
+      }
+    })
     .catch((e) => { console.error(e) })
 }
 
@@ -113,13 +130,13 @@ const handleEdit = (row) => { dialogType.value = 'edit'; currentServer.value = {
 
 const handleTest = (row) => {
   if (row.password === '••••••••') {
-    toast.warning('密码为掩码，请先编辑修改密码后再测试连接')
+    warning('密码为掩码，请先编辑修改密码后再测试连接')
     return
   }
   fetch('/api/remote-servers/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host: row.host, port: row.port, username: row.username, password: row.password }) })
     .then(res => res.json())
-    .then(data => { if (data.code === 0) { toast.success('连接成功') } else { toast.error(data.msg || '连接失败') } })
-    .catch(() => { toast.error('连接失败') })
+    .then(data => { if (data.code === 0) { success('连接成功') } else { error(data.msg || '连接失败') } })
+    .catch(() => { error('连接失败') })
 }
 
 const openDeleteDialog = (row) => { deleteTarget.value = row; showDeleteDialog.value = true }
@@ -128,8 +145,8 @@ const confirmDelete = () => {
   if (!deleteTarget.value) return
   fetch(`/api/remote-servers/${deleteTarget.value.id}`, { method: 'DELETE' })
     .then(res => res.json())
-    .then(data => { if (data.code === 0) { toast.success('删除成功'); loadServers() } else { toast.error(data.msg || '删除失败') } })
-    .catch(() => { toast.error('删除失败') })
+    .then(data => { if (data.code === 0) { success('删除成功'); loadServers() } else { error(data.msg || '删除失败') } })
+    .catch(() => { error('删除失败') })
     .finally(() => { showDeleteDialog.value = false })
 }
 

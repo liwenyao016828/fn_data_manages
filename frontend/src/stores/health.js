@@ -43,8 +43,8 @@ export const useHealthStore = defineStore('health', () => {
       map[item.uid] = item.online
       details[item.uid] = item
     }
-    statusMap.value = { ...statusMap.value, ...map }
-    detailsMap.value = { ...detailsMap.value, ...details }
+    statusMap.value = map
+    detailsMap.value = details
   }
 
   const refreshAll = async () => {
@@ -97,6 +97,20 @@ export const useHealthStore = defineStore('health', () => {
     statusMap.value = { ...statusMap.value, [uid]: online }
   }
 
+  const cleanup = (validUids) => {
+    const validSet = new Set(validUids)
+    const newStatusMap = {}
+    const newDetailsMap = {}
+    for (const uid of Object.keys(statusMap.value)) {
+      if (validSet.has(uid)) {
+        newStatusMap[uid] = statusMap.value[uid]
+        newDetailsMap[uid] = detailsMap.value[uid]
+      }
+    }
+    statusMap.value = newStatusMap
+    detailsMap.value = newDetailsMap
+  }
+
   const startPolling = (intervalMs = 15000) => {
     stopPolling()
     polling.value = true
@@ -128,6 +142,7 @@ export const useHealthStore = defineStore('health', () => {
     forceCheckAll,
     forceCheckOne,
     setStatus,
+    cleanup,
     startPolling,
     stopPolling,
   }

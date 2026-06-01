@@ -951,6 +951,9 @@ func mysqlLogsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	readLogFile := func(path string) ([]map[string]string, string) {
+		if source == "remote" {
+			return nil, "远程服务器日志文件无法直接读取"
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, err.Error()
@@ -1089,39 +1092,47 @@ func mysqlLogsHandler(w http.ResponseWriter, r *http.Request) {
 						logs = append(logs, l)
 					}
 				} else {
-					statusRows, statusErr := db.Query("SHOW ENGINE INNODB STATUS")
-					if statusErr == nil {
-						defer statusRows.Close()
-						for statusRows.Next() {
-							var typ, nameVal, statusText string
-							statusRows.Scan(&typ, &nameVal, &statusText)
-							lines := strings.Split(statusText, "\n")
-							for _, line := range lines {
-								line = strings.TrimSpace(line)
-								if line == "" || strings.HasPrefix(line, "=") {
-									continue
-								}
-								level := "Note"
-								upperLine := strings.ToUpper(line)
-								if strings.Contains(upperLine, "ERROR") {
-									level = "Error"
-								} else if strings.Contains(upperLine, "WARNING") || strings.Contains(upperLine, "WARN") {
-									level = "Warning"
-								}
-								logs = append(logs, map[string]string{
-									"time":    "",
-									"level":   level,
-									"message": line,
-								})
-							}
-						}
-					}
-					if len(logs) == 0 {
+					if source == "remote" {
 						logs = append(logs, map[string]string{
 							"time":    "",
-							"level":   "Warning",
-							"message": "无法读取错误日志 (文件权限不足): " + resolvedPath,
+							"level":   "Note",
+							"message": "远程服务器错误日志文件无法直接读取，日志路径: " + resolvedPath,
 						})
+					} else {
+						statusRows, statusErr := db.Query("SHOW ENGINE INNODB STATUS")
+						if statusErr == nil {
+							defer statusRows.Close()
+							for statusRows.Next() {
+								var typ, nameVal, statusText string
+								statusRows.Scan(&typ, &nameVal, &statusText)
+								lines := strings.Split(statusText, "\n")
+								for _, line := range lines {
+									line = strings.TrimSpace(line)
+									if line == "" || strings.HasPrefix(line, "=") {
+										continue
+									}
+									level := "Note"
+									upperLine := strings.ToUpper(line)
+									if strings.Contains(upperLine, "ERROR") {
+										level = "Error"
+									} else if strings.Contains(upperLine, "WARNING") || strings.Contains(upperLine, "WARN") {
+										level = "Warning"
+									}
+									logs = append(logs, map[string]string{
+										"time":    "",
+										"level":   level,
+										"message": line,
+									})
+								}
+							}
+						}
+						if len(logs) == 0 {
+							logs = append(logs, map[string]string{
+								"time":    "",
+								"level":   "Warning",
+								"message": "无法读取错误日志 (文件权限不足): " + resolvedPath,
+							})
+						}
 					}
 				}
 			} else {

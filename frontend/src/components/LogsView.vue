@@ -295,7 +295,7 @@ import { useHealthStore } from '../stores/health'
 import { writeLog } from '../api/log'
 import { sourceParam, instanceUid } from '@/lib/instance'
 import { formatLogTime } from '@/lib/utils'
-import { toast } from 'vue-sonner'
+import { useMessage } from '../composables/useMessage'
 import {
   FileText, Clock, Database, Server, Search, Settings,
   RefreshCw, Download, Loader2, Trash2, FolderOpen, ChevronRight, ArrowUp, HardDrive
@@ -316,6 +316,8 @@ const emit = defineEmits(['navAccepted'])
 
 const store = useAppContext()
 const { connectionId, logEnabled } = storeToRefs(store)
+
+const { success, error, warning } = useMessage()
 
 const activeTab = ref('system')
 const selectedInstId = ref(null)
@@ -454,15 +456,15 @@ const loadLogs = () => {
   if (inst.type === 'mysql') {
     fetch(`/api/mysql/logs?server_id=${inst.id}&${sourceParam(inst.isRemote || false)}&type=${selectedMysqlLogType.value}`)
       .then(res => res.json()).then(data => {
-        if (data.code === 0) { rawLogs.value = data.data || [] } else { toast.error(data.msg || '加载失败') }
+        if (data.code === 0) { rawLogs.value = data.data || [] } else { error(data.msg || '加载失败') }
         loadingLogs.value = false
-      }).catch(() => { toast.error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
+      }).catch(() => { error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
   } else {
     fetch(`/api/redis/logs?server_id=${inst.id}&${sourceParam(inst.isRemote || false)}`)
       .then(res => res.json()).then(data => {
-        if (data.code === 0) { rawLogs.value = data.data || [] } else { toast.error(data.msg || '加载失败') }
+        if (data.code === 0) { rawLogs.value = data.data || [] } else { error(data.msg || '加载失败') }
         loadingLogs.value = false
-      }).catch(() => { toast.error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
+      }).catch(() => { error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
   }
 }
 
@@ -502,7 +504,7 @@ const loadSystemLogs = () => {
 }
 
 const exportSystemLogs = (format) => {
-  if (filteredSystemLogs.value.length === 0) { toast.warning('没有可导出的日志'); return }
+  if (filteredSystemLogs.value.length === 0) { warning('没有可导出的日志'); return }
   let content, filename, mimeType
   if (format === 'json') {
     content = JSON.stringify(filteredSystemLogs.value, null, 2)
@@ -518,7 +520,7 @@ const exportSystemLogs = (format) => {
   const a = document.createElement('a')
   a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  toast.success('导出成功')
+  success('导出成功')
 }
 
 const confirmClearSystemLogs = () => {
@@ -528,13 +530,13 @@ const confirmClearSystemLogs = () => {
 const doClearLogs = () => {
   fetch('/api/system/logs/clear', { method: 'POST' })
     .then(res => res.json()).then(data => {
-      if (data.code === 0) { systemLogs.value = []; toast.success('系统日志已清空'); writeLog('清空系统日志', 'warning') } else { toast.error(data.msg || '清空失败') }
-    }).catch(() => toast.error('清空失败'))
+      if (data.code === 0) { systemLogs.value = []; success('系统日志已清空'); writeLog('清空系统日志', 'warning') } else { error(data.msg || '清空失败') }
+    }).catch(() => error('清空失败'))
     .finally(() => { showClearLogDialog.value = false })
 }
 
 const exportLogs = (format) => {
-  if (filteredLogs.value.length === 0) { toast.warning('没有可导出的日志'); return }
+  if (filteredLogs.value.length === 0) { warning('没有可导出的日志'); return }
   let content, filename, mimeType
   if (format === 'json') {
     content = JSON.stringify(filteredLogs.value, null, 2)
@@ -550,7 +552,7 @@ const exportLogs = (format) => {
   const a = document.createElement('a')
   a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  toast.success('导出成功')
+  success('导出成功')
 }
 
 const loadLogConfig = () => {
@@ -589,7 +591,7 @@ const saveLogConfig = () => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(cfg)
   }).catch(e => console.error(e))
-  toast.success('日志配置已保存')
+  success('日志配置已保存')
   showLogConfigDialog.value = false
 }
 
@@ -609,10 +611,10 @@ const loadBrowseDirs = (path) => {
         browseDirs.value = data.dirs || []
         browseIsRoot.value = data.isRoot === true
       } else {
-        toast.error(data.msg || '无法读取目录')
+        error(data.msg || '无法读取目录')
       }
     })
-    .catch(() => toast.error('目录浏览请求失败'))
+    .catch(() => error('目录浏览请求失败'))
 }
 
 const navigateFolder = (path) => {

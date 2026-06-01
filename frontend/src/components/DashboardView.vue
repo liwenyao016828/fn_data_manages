@@ -456,7 +456,8 @@ const getRefreshIntervalMs = () => {
   const val = localStorage.getItem('refreshInterval')
   if (!val || val === 'off') return 0
   const ms = parseInt(val)
-  return ms > 0 ? ms : 0
+  if (isNaN(ms) || ms <= 0) return 0
+  return ms
 }
 
 const store = useAppContext()
@@ -890,11 +891,12 @@ const togglePolling = () => {
 
 const startPolling = () => {
   stopPolling()
-  const intervalMs = getRefreshIntervalMs()
+  let intervalMs = getRefreshIntervalMs()
   if (intervalMs === 0) {
-    polling.value = false
-    return
+    intervalMs = 10000
+    localStorage.setItem('refreshInterval', '10000')
   }
+  polling.value = true
   const countdownSec = Math.floor(intervalMs / 1000)
   countdown.value = countdownSec
   pollTimer = setInterval(() => {
@@ -955,8 +957,14 @@ onUnmounted(() => {
 })
 
 const onRefreshIntervalChange = () => {
-  if (polling.value) {
-    startPolling()
+  const intervalMs = getRefreshIntervalMs()
+  if (intervalMs === 0) {
+    polling.value = false
+    stopPolling()
+  } else {
+    if (polling.value) {
+      startPolling()
+    }
   }
 }
 </script>

@@ -284,6 +284,7 @@ const deleteTarget = ref(null)
 const stats = ref({ mysql: 0, redis: 0, total: 0, running: 0 })
 const healthStore = useHealthStore()
 const { statusMap: onlineStatus } = storeToRefs(healthStore)
+const previousIds = ref(new Set())
 let searchTimer = null
 
 const filteredData = computed(() => {
@@ -366,13 +367,20 @@ const fetchData = () => {
   }).catch(() => [])
 
   Promise.all([p1, p2]).then(([local, remote]) => {
-    allData.value = [...local, ...remote]
+    const result = [...local, ...remote]
+    const newIds = new Set(result.map(i => instanceUid(i)))
+    const newInstanceIds = [...newIds].filter(uid => !previousIds.value.has(uid))
+    allData.value = result
+    previousIds.value = newIds
     stats.value.total = allData.value.length
     stats.value.mysql = allData.value.filter(i => (i.type || 'mysql') === 'mysql').length
     stats.value.redis = allData.value.filter(i => i.type === 'redis').length
     stats.value.running = Object.values(onlineStatus.value).filter(Boolean).length
     autoRefreshMissing(allData.value)
     checkOnlineStatus(allData.value)
+    newInstanceIds.forEach(uid => {
+      healthStore.forceCheckOne(uid)
+    })
     completeProgress?.()
   })
 }

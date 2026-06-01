@@ -229,6 +229,15 @@ func createScheduledBackup(w http.ResponseWriter, r *http.Request) {
 		s.RetainCount = 7
 	}
 
+	// 非 root 用户不允许备份全部数据库
+	if s.Database == "__ALL__" && s.BackupLevel != "system" && s.BackupLevel != "redis" {
+		server := findAnyServer(s.ServerID, s.Source)
+		if server != nil && server.Username != "root" {
+			writeJSON(w, map[string]interface{}{"code": 403, "msg": "当前账号权限不足，仅 root 用户可以备份全部数据库"})
+			return
+		}
+	}
+
 	mutex.Lock()
 	nextSchedID++
 	scheduledBackups = append(scheduledBackups, s)
@@ -299,8 +308,11 @@ func parseSchedule(cron string) time.Duration {
 }
 
 func runScheduledBackup(s ScheduledBackup) {
+	fmt.Printf("runScheduledBackup called: Name=%s, ID=%d, BackupLevel=%s, ServerID=%d, Source=%s, Database=%s\n", 
+		s.Name, s.ID, s.BackupLevel, s.ServerID, s.Source, s.Database)
 	name := fmt.Sprintf("auto_%s_%s", s.Name, time.Now().Format("20060102_150405"))
 	bakDir := getDataDir() + "/backups"
+	fmt.Printf("Backup directory: %s\n", bakDir)
 	os.MkdirAll(bakDir, 0755)
 
 	var content string
@@ -340,13 +352,14 @@ func runScheduledBackup(s ScheduledBackup) {
 	} else {
 		server := findAnyServer(s.ServerID, s.Source)
 		if server != nil {
-			fileName, _, err := doMySQLBackup(server, s.Database, bakDir, name)
-			if err == nil {
-				_ = fileName
-			} else {
+			var fileSize int64
+			var err error
+			fileName, fileSize, err = doMySQLBackup(server, s.Database, bakDir, name)
+			if err != nil {
 				content = fmt.Sprintf("-- MySQL Auto Backup FAILED: %s\n-- Error: %s\n", s.Name, err.Error())
 				fileName = name + ".sql"
 			}
+			_ = fileSize
 		} else {
 			content = fmt.Sprintf("-- MySQL Auto Backup FAILED: server not found\n")
 			fileName = name + ".sql"
@@ -361,6 +374,12 @@ func runScheduledBackup(s ScheduledBackup) {
 		backupStatus = "failed"
 	}
 
+	filePath := filepath.Join(bakDir, fileName)
+	var fileSize int64
+	if fi, err := os.Stat(filePath); err == nil {
+		fileSize = fi.Size()
+	}
+
 	newBak := Backup{
 		ID:          nextBackupID,
 		Name:        name,
@@ -369,6 +388,7 @@ func runScheduledBackup(s ScheduledBackup) {
 		ServerID:    s.ServerID,
 		Database:    s.Database,
 		FileName:    fileName,
+		FileSize:    fileSize,
 		Status:      backupStatus,
 		Description: "定时备份",
 		CreatedAt:   time.Now().Format("2006-01-02 15:04:05"),
@@ -412,6 +432,53 @@ func runScheduledBackup(s ScheduledBackup) {
 	}
 	mutex.Unlock()
 	saveData()
+}
+
+func runScheduledBackupHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	if r.Method != "POST" {
+		writeJSON(w, map[string]interface{}{"code": 405, "msg": "method not allowed"})
+		return
+	}
+
+	var req map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": err.Error()})
+		return
+	}
+
+	id := getUint(req, "id")
+	if id == 0 {
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": "id required"})
+		return
+	}
+
+	mutex.Lock()
+	var target *ScheduledBackup
+	for i := range scheduledBackups {
+		if scheduledBackups[i].ID == id {
+			target = &scheduledBackups[i]
+			break
+		}
+	}
+	mutex.Unlock()
+
+	if target == nil {
+		writeJSON(w, map[string]interface{}{"code": 404, "msg": "计划不存在"})
+		return
+	}
+
+	go runScheduledBackup(*target)
+
+	writeJSON(w, map[string]interface{}{"code": 0, "msg": "已开始执行备份"})
 }
 
 func cleanupExpiredBackups() {
