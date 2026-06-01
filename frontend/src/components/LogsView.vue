@@ -18,8 +18,8 @@
                 :class="[
                   'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
                   activeTab === 'system'
-                    ? 'bg-gradient-to-r from-[#1A1A1A] to-[#333] text-white shadow-lg shadow-[#1A1A1A]/20'
-                    : 'bg-muted text-muted-foreground hover:bg-[#EAEAEA] hover:text-secondary-foreground'
+                    ? 'tab-active shadow-lg shadow-blue-500/20'
+                    : 'tab-inactive'
                 ]"
                 @click="activeTab = 'system'"
               >
@@ -31,8 +31,8 @@
                 :class="[
                   'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
                   activeTab === 'database'
-                    ? 'bg-gradient-to-r from-[#1A1A1A] to-[#333] text-white shadow-lg shadow-[#1A1A1A]/20'
-                    : 'bg-muted text-muted-foreground hover:bg-[#EAEAEA] hover:text-secondary-foreground'
+                    ? 'tab-active shadow-lg shadow-blue-500/20'
+                    : 'tab-inactive'
                 ]"
                 @click="activeTab = 'database'"
               >
@@ -42,7 +42,7 @@
               </button>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-              <div class="flex h-[32px] items-center rounded-lg border border-border bg-white px-2 gap-1">
+              <div class="flex h-[32px] items-center rounded-lg border border-border bg-card px-2 gap-1">
                 <Search class="h-3.5 w-3.5 text-muted-foreground" />
                 <Input v-model="searchKeyword" placeholder="搜索日志..." class="border-0 shadow-none h-[28px] text-[13px] w-[140px] bg-transparent" />
               </div>
@@ -87,13 +87,13 @@
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer transition-all duration-200 text-xs whitespace-nowrap',
                   selectedInstId === instanceUid(inst)
                     ? 'border-primary/40 bg-primary/8 shadow-sm shadow-primary/10'
-                    : 'border-border bg-white hover:border-primary/30 hover:shadow-sm',
+                    : 'border-border bg-card hover:border-primary/30 hover:shadow-sm',
                 ]"
                 @click="selectInstance(inst)"
               >
                 <StatusDot :status="selectedInstId === instanceUid(inst) ? 'selected' : onlineStatus[instanceUid(inst)] ? 'online' : 'default'" size="xs" />
                 <span class="font-medium text-foreground">{{ inst.name }}</span>
-                <span v-if="inst.isRemote" class="text-[9px] text-orange-500 bg-orange-50 px-1 rounded">远程</span>
+                <span v-if="inst.isRemote" class="text-[9px] text-orange-400 bg-orange-500/5 px-1 rounded">远程</span>
               </div>
             </div>
           </div>
@@ -105,12 +105,12 @@
             <div class="mb-2 flex items-center gap-2 shrink-0">
               <span class="text-[12px] text-muted-foreground">日志级别：</span>
               <Button v-for="t in systemLogLevels" :key="t.value" variant="ghost" size="sm"
-                :class="[selectedSystemLogLevel === t.value ? 'bg-[#1A1A1A] text-white hover:bg-[#333]' : 'text-muted-foreground hover:bg-muted', 'h-[28px] text-[12px]']"
+                :class="[selectedSystemLogLevel === t.value ? 'tab-active' : 'text-muted-foreground hover:bg-muted', 'h-[28px] text-[12px]']"
                 @click="selectedSystemLogLevel = t.value">
                 {{ t.label }}
               </Button>
             </div>
-            <div class="flex-1 min-h-0 overflow-y-auto bg-[#1a1a2e] rounded-xl p-3 font-mono text-[12px] leading-5">
+            <div class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-3 font-mono text-[12px] leading-5">
               <div v-if="loadingLogs" class="flex items-center justify-center py-16">
                 <Loader2 class="h-5 w-5 text-primary animate-spin mr-2" />
                 <span class="text-[13px] text-primary">加载中...</span>
@@ -124,7 +124,7 @@
                   <span class="text-gray-500/60 shrink-0 text-[12px]">{{ formatLogTime(log.time) }}</span>
                   <span class="shrink-0 min-w-[56px] text-center" :class="systemLogLevelClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
                   <span class="text-primary shrink-0 min-w-[80px] text-[12px]">[{{ log.source || 'SYSTEM' }}]</span>
-                  <span class="text-[#e0e0e0] break-all flex-1">{{ log.message }}</span>
+                  <span class="log-viewer-text break-all flex-1">{{ log.message }}</span>
                 </div>
               </div>
             </div>
@@ -145,12 +145,12 @@
             <div v-if="selectedInst.type === 'mysql'" class="mb-2 flex items-center gap-2 shrink-0">
               <span class="text-[12px] text-muted-foreground">日志类型：</span>
               <Button v-for="t in mysqlLogTypes" :key="t.value" variant="ghost" size="sm"
-                :class="[selectedMysqlLogType === t.value ? 'bg-[#1A1A1A] text-white hover:bg-[#333]' : 'text-muted-foreground hover:bg-muted', 'h-[28px] text-[12px]']"
+                :class="[selectedMysqlLogType === t.value ? 'tab-active' : 'text-muted-foreground hover:bg-muted', 'h-[28px] text-[12px]']"
                 @click="selectedMysqlLogType = t.value; loadLogs()">
                 {{ t.label }}
               </Button>
             </div>
-            <div class="flex-1 min-h-0 overflow-y-auto bg-[#1a1a2e] rounded-xl p-3 font-mono text-[12px] leading-5">
+            <div class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-3 font-mono text-[12px] leading-5">
               <div v-if="loadingLogs" class="flex items-center justify-center py-16">
                 <Loader2 class="h-5 w-5 text-emerald-400 animate-spin mr-2" />
                 <span class="text-[13px] text-emerald-400">加载中...</span>
@@ -163,7 +163,7 @@
                 <div v-for="(log, idx) in filteredLogs" :key="idx" class="flex items-start gap-2 py-0.5">
                   <span class="text-gray-500/60 shrink-0 text-[12px]">{{ formatLogTime(log.time) }}</span>
                   <span class="shrink-0 min-w-[56px] text-center" :class="logLevelClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
-                  <span class="text-[#e0e0e0] break-all flex-1">{{ log.message }}</span>
+                  <span class="log-viewer-text break-all flex-1">{{ log.message }}</span>
                 </div>
               </div>
             </div>
@@ -248,7 +248,7 @@
         <div class="max-h-[320px] overflow-y-auto">
           <div
             v-if="browseParent !== '' && browseParent !== browsePath && !browseIsRoot"
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-[#F0F0F0]"
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-border"
             @click="navigateFolder(browseParent)"
           >
             <ArrowUp class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -257,12 +257,12 @@
           <div
             v-for="d in browseDirs"
             :key="d.path"
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-[#F0F0F0] last:border-b-0"
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-border last:border-b-0"
             @click="navigateFolder(d.path)"
             @dblclick="selectFolder(d.path)"
           >
             <HardDrive v-if="d.drive" class="h-3.5 w-3.5 text-primary shrink-0" />
-            <FolderOpen v-else class="h-3.5 w-3.5 text-[#e6a23c] shrink-0" />
+            <FolderOpen v-else class="h-3.5 w-3.5 icon-special-color shrink-0" />
             <span class="text-[13px] text-foreground flex-1 truncate">{{ d.name }}</span>
             <ChevronRight class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           </div>
@@ -476,8 +476,8 @@ const logLevelClass = (level) => {
 }
 
 const systemLogLevelClass = (level) => {
-  const map = { info: 'text-[#4facfe]', warning: 'text-amber-500', error: 'text-red-500', debug: 'text-[#8C8C8C]' }
-  return map[(level || '').toLowerCase()] || 'text-[#4facfe]'
+  const map = { info: 'text-blue-400', warning: 'text-amber-400', error: 'text-red-400', debug: 'text-muted-foreground' }
+  return map[(level || '').toLowerCase()] || 'text-blue-400'
 }
 
 const loadSystemLogs = () => {

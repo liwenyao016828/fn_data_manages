@@ -8,7 +8,7 @@
             <p class="text-[13px] text-muted-foreground mt-0.5">管理所有数据库实例连接</p>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <div class="flex h-[32px] items-center rounded-lg border border-border bg-white px-2 gap-1">
+            <div class="flex h-[32px] items-center rounded-lg border border-border bg-card px-2 gap-1">
               <Search class="h-3.5 w-3.5 text-muted-foreground" />
               <Input v-model="searchKeyword" placeholder="搜索实例..." class="border-0 shadow-none h-[28px] text-[13px] w-[180px] bg-transparent" @input="handleSearch" />
             </div>
@@ -25,7 +25,7 @@
       <!-- Stats -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 content-body">
         <div class="flex items-center gap-3 rounded-lg bg-muted p-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/5 text-blue-400">
             <Database class="h-4 w-4" />
           </div>
           <div class="flex flex-col">
@@ -34,7 +34,7 @@
           </div>
         </div>
         <div class="flex items-center gap-3 rounded-lg bg-muted p-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-500">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/5 text-orange-400">
             <Server class="h-4 w-4" />
           </div>
           <div class="flex flex-col">
@@ -43,7 +43,7 @@
           </div>
         </div>
         <div class="flex items-center gap-3 rounded-lg bg-muted p-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-500">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/5 text-emerald-400">
             <BarChart3 class="h-4 w-4" />
           </div>
           <div class="flex flex-col">
@@ -52,7 +52,7 @@
           </div>
         </div>
         <div class="flex items-center gap-3 rounded-lg bg-muted p-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/5 text-blue-400">
             <Activity class="h-4 w-4" />
           </div>
           <div class="flex flex-col">
@@ -66,9 +66,9 @@
       <div class="px-5 pb-3">
         <Tabs v-model="activeTab" class="w-full">
           <TabsList class="bg-muted">
-            <TabsTrigger value="all" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">所有实例</TabsTrigger>
-            <TabsTrigger value="mysql" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">MySQL</TabsTrigger>
-            <TabsTrigger value="redis" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">Redis</TabsTrigger>
+            <TabsTrigger value="all" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">所有实例</TabsTrigger>
+            <TabsTrigger value="mysql" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">MySQL</TabsTrigger>
+            <TabsTrigger value="redis" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">Redis</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -112,7 +112,7 @@
               </TableRow>
             </template>
             <template v-for="row in tableData" :key="instanceUid(row)">
-              <TableRow class="cursor-pointer transition-colors duration-150 border-b border-[#F0F0F0]" :class="[connectionId === instanceUid(row) ? 'bg-primary/[0.04] hover:bg-primary/[0.08]' : 'hover:bg-muted']" @click="toggleExpand(row)">
+              <TableRow class="cursor-pointer transition-colors duration-150 border-b border-border" :class="[connectionId === instanceUid(row) ? 'bg-primary/[0.04] hover:bg-primary/[0.08]' : 'hover:bg-muted']" @click="toggleExpand(row)">
                 <TableCell class="w-8">
                   <ChevronRight class="h-4 w-4 text-muted-foreground transition-transform duration-200" :class="{ 'rotate-90': expandedRowUid === instanceUid(row) }" />
                 </TableCell>
@@ -120,10 +120,10 @@
                   <div class="flex items-center gap-2 min-w-0">
                     <StatusDot :status="connectionId === instanceUid(row) ? 'selected' : (onlineStatus[instanceUid(row)] ? 'online' : 'default')" />
                     <span class="text-[13px] text-foreground truncate">{{ row.name }}</span>
-                    <Badge :class="row.isRemote ? 'bg-orange-50 text-orange-500 border-orange-200' : 'bg-blue-50 text-blue-500 border-blue-200'" variant="outline" class="text-[10px] h-[18px] ml-0.5 shrink-0">
+                    <Badge :class="row.isRemote ? 'bg-orange-500/5 text-orange-400 border-orange-500/20' : 'bg-blue-500/5 text-blue-400 border-blue-500/20'" variant="outline" class="text-[10px] h-[18px] ml-0.5 shrink-0">
                       {{ row.isRemote ? '远程' : '本地' }}
                     </Badge>
-                    <Badge v-if="isDuplicate(row)" variant="outline" class="bg-amber-50 text-amber-600 border-amber-200 text-[10px] h-[18px] shrink-0">
+                    <Badge v-if="isDuplicate(row)" variant="outline" class="bg-amber-500/5 text-amber-500 border-amber-500/20 text-[10px] h-[18px] shrink-0">
                       重复
                     </Badge>
                   </div>
@@ -145,7 +145,7 @@
                 <TableCell>
                   <div class="flex items-center gap-1.5">
                     <StatusDot :status="onlineStatus[instanceUid(row)] ? 'online' : 'offline'" size="sm" />
-                    <span class="text-[12px]" :class="onlineStatus[instanceUid(row)] ? 'text-emerald-600' : 'text-muted-foreground'">{{ onlineStatus[instanceUid(row)] ? '在线' : '离线' }}</span>
+                    <span class="text-[12px]" :class="onlineStatus[instanceUid(row)] ? 'text-emerald-500' : 'text-muted-foreground'">{{ onlineStatus[instanceUid(row)] ? '在线' : '离线' }}</span>
                   </div>
                 </TableCell>
                 <TableCell @click.stop>

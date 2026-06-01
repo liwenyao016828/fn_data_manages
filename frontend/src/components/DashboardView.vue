@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full overflow-y-auto bg-muted flex flex-col page-padding">
+  <div class="h-full overflow-y-auto bg-background flex flex-col page-padding">
     <div class="flex items-center gap-2 flex-wrap section-gap shrink-0">
       <div class="flex gap-1.5 flex-wrap flex-1">
         <div
@@ -8,8 +8,8 @@
           :class="[
             'flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer transition-all duration-200 text-xs',
             selectedUid === instanceUid(db)
-              ? 'border-primary/40 bg-primary/8 shadow-sm shadow-primary/10'
-              : 'border-border bg-white hover:border-primary/30 hover:shadow-sm',
+              ? 'border-primary/40 bg-primary/10 shadow-sm shadow-primary/10'
+              : 'border-border bg-card hover:border-primary/30 hover:shadow-sm',
           ]"
           @click="selectInstance(db)"
         >
@@ -22,11 +22,11 @@
         <span
           :class="[
             'flex items-center gap-1.5 text-xs cursor-pointer select-none px-2 py-1 rounded-md transition-colors duration-200',
-            polling ? 'text-[#16a34a] hover:bg-[#16a34a]/10' : 'text-muted-foreground hover:bg-muted',
+            polling ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-muted-foreground hover:bg-muted',
           ]"
           @click="togglePolling"
         >
-          <span v-if="polling" class="w-1.5 h-1.5 rounded-full bg-[#16a34a] animate-pulse" />
+          <span v-if="polling" class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span v-else class="w-1.5 h-1.5 rounded-sm bg-muted-foreground" />
           {{ polling ? `自动刷新 ${countdown}s` : '已暂停 · 点击恢复' }}
         </span>
@@ -48,10 +48,10 @@
       </div>
     </div>
 
-    <div v-if="loadError" class="flex items-center gap-2 px-3 py-2 mb-2.5 rounded-lg bg-red-50 border border-red-200 text-red-500 text-xs shrink-0">
+    <div v-if="loadError" class="flex items-center gap-2 px-3 py-2 mb-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs shrink-0">
       <CircleX class="h-4 w-4 shrink-0" />
       <span>{{ loadError }}</span>
-      <Button size="sm" variant="ghost" class="ml-auto text-red-500 hover:text-red-600 h-auto px-2 py-0.5 text-xs" @click="loadError = ''; fetchMetrics()">重试</Button>
+      <Button size="sm" variant="ghost" class="ml-auto text-red-400 hover:text-red-300 h-auto px-2 py-0.5 text-xs" @click="loadError = ''; fetchMetrics()">重试</Button>
     </div>
 
     <div v-if="switching" class="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground text-sm">
@@ -60,7 +60,7 @@
     </div>
 
     <template v-if="metrics">
-      <div v-if="metrics.online === false" class="flex items-center gap-2 px-3 py-2 mb-2.5 rounded-lg bg-orange-50 border border-orange-200 text-orange-600 text-xs shrink-0">
+      <div v-if="metrics.online === false" class="flex items-center gap-2 px-3 py-2 mb-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs shrink-0">
         <CircleX class="h-4 w-4 shrink-0" />
         <span>该数据库实例已离线，图表显示历史数据</span>
       </div>
@@ -77,7 +77,7 @@
         </div>
 
         <div class="content-card-interactive flex items-center gap-3 stat-padding shadow-sm hover:shadow-md transition-shadow duration-200">
-          <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-[#16a34a]/10 text-[#16a34a]">
+          <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-400">
             <Clock class="h-4 w-4" />
           </div>
           <div class="flex-1 min-w-0">
@@ -88,18 +88,18 @@
 
         <div
           :class="[
-            'content-card-interactive flex items-center gap-3 stat-padding shadow-sm transition-shadow duration-200 cursor-pointer',
-            connStatusClass === 'danger' ? 'border-red-200 bg-red-50 hover:shadow-md' :
-            connStatusClass === 'warn' ? 'border-amber-200 bg-amber-50 hover:shadow-md' :
-            'border-border hover:shadow-md',
+            'content-card-interactive flex items-center gap-3 stat-padding transition-shadow duration-200 cursor-pointer',
+            connStatusClass === 'danger' ? 'border-red-500/30 bg-red-500/5 hover:shadow-md' :
+            connStatusClass === 'warn' ? 'border-amber-500/30 bg-amber-500/5 hover:shadow-md' :
+            'hover:shadow-md',
           ]"
           @click="showProcessPanel = !showProcessPanel"
         >
           <div :class="[
             'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
-            connStatusClass === 'danger' ? 'bg-red-500/10 text-red-500' :
-            connStatusClass === 'warn' ? 'bg-amber-500/10 text-amber-500' :
-            'bg-[#16a34a]/10 text-[#16a34a]',
+            connStatusClass === 'danger' ? 'bg-red-500/15 text-red-400' :
+            connStatusClass === 'warn' ? 'bg-amber-500/15 text-amber-400' :
+            'bg-emerald-500/15 text-emerald-400',
           ]">
             <Link class="h-4 w-4" />
           </div>
@@ -112,7 +112,7 @@
               <div class="flex-1 h-1 rounded-full bg-muted overflow-hidden">
                 <div
                   class="h-full rounded-full transition-all duration-500"
-                  :class="connStatusClass === 'danger' ? 'bg-red-500' : connStatusClass === 'warn' ? 'bg-amber-500' : 'bg-[#16a34a]'"
+                  :class="connStatusClass === 'danger' ? 'bg-red-400' : connStatusClass === 'warn' ? 'bg-amber-400' : 'bg-emerald-400'"
                   :style="{ width: connUsageNum + '%' }"
                 />
               </div>
@@ -122,7 +122,7 @@
         </div>
 
         <div class="content-card-interactive flex items-center gap-3 stat-padding shadow-sm hover:shadow-md transition-shadow duration-200">
-          <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-500">
+          <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-400">
             <TrendingUp class="h-4 w-4" />
           </div>
           <div class="flex-1 min-w-0">
@@ -136,13 +136,13 @@
 
       <div v-if="showProcessPanel && metrics.type === 'mysql' && metrics.processlist" class="section-gap shrink-0">
         <div class="content-card stat-padding shadow-sm">
-          <div class="flex items-center gap-2 text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-[#F0F0F0]">
+          <div class="flex items-center gap-2 text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">
             当前连接
             <span class="text-[11px] font-normal text-muted-foreground">{{ metrics.processlist.length }} 个</span>
           </div>
           <Table>
             <TableHeader>
-              <TableRow class="hover:bg-transparent border-b border-[#F0F0F0]">
+              <TableRow class="hover:bg-transparent border-b border-border">
                 <TableHead class="text-[11px] text-muted-foreground font-normal">用户</TableHead>
                 <TableHead class="text-[11px] text-muted-foreground font-normal">来源</TableHead>
                 <TableHead class="text-[11px] text-muted-foreground font-normal">数据库</TableHead>
@@ -153,14 +153,14 @@
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="p in metrics.processlist" :key="p.id" :class="p.time > 10 ? 'bg-red-50' : 'hover:bg-muted'" class="border-b border-[#F0F0F0]">
+              <TableRow v-for="p in metrics.processlist" :key="p.id" :class="p.time > 10 ? 'bg-red-500/5' : 'hover:bg-muted'" class="border-b border-border">
                 <TableCell>
                   <Badge variant="secondary" class="text-[11px] font-medium bg-muted text-foreground">{{ p.user }}</Badge>
                 </TableCell>
                 <TableCell class="font-mono-data text-[11px] text-secondary-foreground">{{ p.host }}</TableCell>
                 <TableCell class="text-xs text-foreground">{{ p.db || '-' }}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" class="text-[10px] font-semibold bg-[#16a34a]/10 text-[#16a34a] border-[#16a34a]/30 rounded-full">{{ p.command }}</Badge>
+                  <Badge variant="outline" class="text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border-emerald-500/30 rounded-full">{{ p.command }}</Badge>
                 </TableCell>
                 <TableCell :class="['font-mono-data text-[11px] text-foreground', p.time > 10 && 'text-red-500 font-semibold']">{{ p.time }}s</TableCell>
                 <TableCell class="text-xs text-foreground max-w-[100px] truncate">{{ p.state || '-' }}</TableCell>
@@ -189,7 +189,7 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 grid-gap shrink-0" v-if="metrics.type === 'mysql'">
         <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-[#F0F0F0]">线程</div>
+          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">线程</div>
           <div class="flex flex-col gap-1.5">
             <div class="flex justify-between items-center">
               <span class="text-xs text-muted-foreground">运行中</span>
@@ -211,7 +211,7 @@
         </div>
 
         <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-[#F0F0F0]">连接数趋势</div>
+          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">连接数趋势</div>
           <div class="flex flex-col gap-1.5">
             <div class="flex justify-between items-center">
               <span class="text-xs text-muted-foreground">当前</span>
@@ -229,19 +229,19 @@
         </div>
 
         <div class="content-card stat-padding shadow-sm">
-          <div class="flex justify-between items-center mb-2 pb-1.5 border-b border-[#F0F0F0]"><span class="text-xs font-semibold text-foreground">查询分布</span></div>
+          <div class="flex justify-between items-center mb-2 pb-1.5 border-b border-border"><span class="text-xs font-semibold text-foreground">查询分布</span></div>
           <div class="flex flex-col gap-2">
             <div class="flex items-center gap-2">
               <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">SELECT</span>
               <div class="flex-1 h-[18px] bg-muted rounded overflow-hidden">
-                <div class="h-full rounded bg-gradient-to-r from-[#4facfe] to-[#00f2fe] transition-[width] duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComSelect : metrics.com_select) }" />
+                <div class="h-full rounded bg-gradient-to-r from-blue-500 to-cyan-400 transition-[width] duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComSelect : metrics.com_select) }" />
               </div>
               <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComSelect : metrics.com_select) }}</span>
             </div>
             <div class="flex items-center gap-2">
               <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">INSERT</span>
               <div class="flex-1 h-[18px] bg-muted rounded overflow-hidden">
-                <div class="h-full rounded bg-gradient-to-r from-[#16a34a] to-[#4ade80] transition-[width] duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComInsert : metrics.com_insert) }" />
+                <div class="h-full rounded bg-gradient-to-r from-emerald-500 to-emerald-300 transition-[width] duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComInsert : metrics.com_insert) }" />
               </div>
               <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComInsert : metrics.com_insert) }}</span>
             </div>
@@ -263,11 +263,11 @@
         </div>
 
         <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-[#F0F0F0]">InnoDB 缓冲池</div>
+          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">InnoDB 缓冲池</div>
           <div class="flex flex-col gap-1.5">
             <div class="flex justify-between items-center">
               <span class="text-xs text-muted-foreground">命中率</span>
-              <span :class="['text-xs font-semibold font-mono-data', parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'text-[#16a34a]' : 'text-amber-500']">
+              <span :class="['text-xs font-semibold font-mono-data', parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'text-emerald-400' : 'text-amber-400']">
                 {{ metrics.innodb_buffer_pool_hit_rate }}%
               </span>
             </div>
@@ -288,7 +288,7 @@
             <div class="h-2 rounded-full bg-muted overflow-hidden">
               <div
                 class="h-full rounded-full transition-all"
-                :class="parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'bg-[#16a34a]' : 'bg-amber-500'"
+                :class="parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'bg-emerald-400' : 'bg-amber-400'"
                 :style="{ width: Math.min(parseFloat(metrics.innodb_buffer_pool_hit_rate) || 0, 100) + '%' }"
               />
             </div>
@@ -296,7 +296,7 @@
         </div>
 
         <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-[#F0F0F0]">效率指标</div>
+          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">效率指标</div>
           <div class="flex flex-col gap-1.5">
             <div class="flex justify-between items-center">
               <span class="text-xs text-muted-foreground">慢查询</span>
@@ -322,7 +322,7 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 grid-gap shrink-0" v-if="metrics.type === 'redis'">
         <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-[#F0F0F0]">内存</div>
+          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">内存</div>
           <div class="flex flex-col gap-1.5">
             <div class="flex justify-between items-center">
               <span class="text-xs text-muted-foreground">当前使用</span>
@@ -340,7 +340,7 @@
         </div>
 
         <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-[#F0F0F0]">客户端</div>
+          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">客户端</div>
           <div class="flex flex-col gap-1.5">
             <div class="flex justify-between items-center">
               <span class="text-xs text-muted-foreground">已连接</span>
@@ -358,7 +358,7 @@
         </div>
 
         <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-[#F0F0F0]">键空间</div>
+          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">键空间</div>
           <div class="flex flex-col gap-1.5">
             <div class="flex justify-between items-center">
               <span class="text-xs text-muted-foreground">命中</span>
@@ -370,7 +370,7 @@
             </div>
             <div class="flex justify-between items-center">
               <span class="text-xs text-muted-foreground">命中率</span>
-              <span :class="['text-xs font-semibold font-mono-data', parseFloat(metrics.hit_rate) > 90 ? 'text-[#16a34a]' : 'text-amber-500']">
+              <span :class="['text-xs font-semibold font-mono-data', parseFloat(metrics.hit_rate) > 90 ? 'text-emerald-400' : 'text-amber-400']">
                 {{ metrics.hit_rate }}%
               </span>
             </div>
@@ -378,11 +378,11 @@
         </div>
 
         <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-[#F0F0F0]">持久化</div>
+          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">持久化</div>
           <div class="flex flex-col gap-1.5">
             <div class="flex justify-between items-center">
               <span class="text-xs text-muted-foreground">AOF</span>
-              <span :class="['text-xs font-semibold font-mono-data', metrics.aof_enabled === '1' ? 'text-[#16a34a]' : 'text-foreground']">
+              <span :class="['text-xs font-semibold font-mono-data', metrics.aof_enabled === '1' ? 'text-emerald-400' : 'text-foreground']">
                 {{ metrics.aof_enabled === '1' ? '已启用' : '未启用' }}
               </span>
             </div>
@@ -403,6 +403,7 @@ import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted, watc
 import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
+import { useThemeStore } from '../stores/theme'
 import { sourceParam, instanceUid } from '@/lib/instance'
 import { Button } from '@/components/ui/Button.vue'
 import { Badge } from '@/components/ui/Badge.vue'
@@ -436,8 +437,16 @@ const connHistory = ref([])
 const qpsHistory = ref([])
 const tpsHistory = ref([])
 const healthStore = useHealthStore()
+const themeStore = useThemeStore()
 const { statusMap: onlineStatus } = storeToRefs(healthStore)
 const prevRawCounters = ref({ questions: 0, writes: 0, timestamp: 0 })
+
+const isDark = computed(() => themeStore.theme === 'dark')
+const chartAxisColor = computed(() => isDark.value ? '#64748b' : '#94a3b8')
+const chartGridColor = computed(() => isDark.value ? 'rgba(148, 163, 184, 0.08)' : 'rgba(148, 163, 184, 0.15)')
+const chartTooltipBg = computed(() => isDark.value ? 'rgba(0, 0, 0, 0.85)' : 'rgba(255, 255, 255, 0.95)')
+const chartTooltipBorder = computed(() => isDark.value ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
+const chartTooltipText = computed(() => isDark.value ? '#fff' : '#0f172a')
 const timeRanges = [
   { value: 900, label: '15分钟' },
   { value: 3600, label: '1小时' },
@@ -583,7 +592,7 @@ const xAxisOption = computed(() => {
     axisLine: { show: false },
     axisTick: { show: false },
     axisLabel: {
-      color: '#8C8C8C',
+      color: chartAxisColor.value,
       fontSize: 9,
       formatter: formatter,
       hideOverlap: true,
@@ -592,23 +601,23 @@ const xAxisOption = computed(() => {
     splitLine: { show: false },
   }
 })
-const yAxisTemplate = {
+const yAxisTemplate = computed(() => ({
   type: 'value',
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: '#8C8C8C', fontSize: 9 },
-  splitLine: { lineStyle: { color: '#F5F5F5' } },
+  axisLabel: { color: chartAxisColor.value, fontSize: 9 },
+  splitLine: { lineStyle: { color: chartGridColor.value } },
   minInterval: 1,
-}
+}))
 const gridTemplate = { left: '8px', right: '8px', bottom: '8px', top: '24px', containLabel: true }
-const tooltipTemplate = {
+const tooltipTemplate = computed(() => ({
   trigger: 'axis',
   axisPointer: { type: 'cross' },
-  backgroundColor: 'rgba(0, 0, 0, 0.85)',
-  borderColor: 'rgba(255,255,255,0.1)',
+  backgroundColor: chartTooltipBg.value,
+  borderColor: chartTooltipBorder.value,
   borderWidth: 1,
-  textStyle: { color: '#fff', fontSize: 11 },
-}
+  textStyle: { color: chartTooltipText.value, fontSize: 11 },
+}))
 
 const connChartOption = computed(() => {
   const data = connHistory.value.map(d => [d.timestamp, d.value])
@@ -617,14 +626,15 @@ const connChartOption = computed(() => {
     animationDuration: 420,
     animationDurationUpdate: 500,
     animationEasingUpdate: 'cubicInOut',
-    tooltip: tooltipTemplate,
+    tooltip: tooltipTemplate.value,
     grid: gridTemplate,
     xAxis: xAxisOption.value,
-    yAxis: yAxisTemplate,
+    yAxis: yAxisTemplate.value,
+    legend: { data: ['连接数'], right: '24px', top: '0px', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: chartAxisColor.value } },
     series: [{
       name: '连接数', type: 'line', smooth: true, symbol: 'none',
-      lineStyle: { color: '#4facfe', width: 2 }, itemStyle: { color: '#4facfe' },
-      areaStyle: { opacity: 0.05, color: '#4facfe' },
+      lineStyle: { color: '#3b82f6', width: 2 }, itemStyle: { color: '#3b82f6' },
+      areaStyle: { opacity: isDark.value ? 0.08 : 0.12, color: '#3b82f6' },
       emphasis: { focus: 'series' },
       connectNulls: true,
       data: data.length > 0 ? data : [],
@@ -637,7 +647,7 @@ const netChartOption = computed(() => {
   if (!base || !base.network) {
     return {
       animation: true, animationDuration: 420, animationDurationUpdate: 500, animationEasingUpdate: 'cubicInOut',
-      tooltip: tooltipTemplate, grid: gridTemplate, xAxis: xAxisOption.value, yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#8C8C8C', fontSize: 9, formatter: (v) => formatBytes(v) + '/s' }, splitLine: { lineStyle: { color: '#F5F5F5' } }, min: 0 },
+      tooltip: tooltipTemplate.value, grid: gridTemplate, xAxis: xAxisOption.value, yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: chartAxisColor.value, fontSize: 9, formatter: (v) => formatBytes(v) + '/s' }, splitLine: { lineStyle: { color: chartGridColor.value } }, min: 0 },
       series: [],
     }
   }
@@ -651,7 +661,7 @@ const netChartOption = computed(() => {
     animationDurationUpdate: 500,
     animationEasingUpdate: 'cubicInOut',
     tooltip: {
-      ...tooltipTemplate,
+      ...tooltipTemplate.value,
       formatter: (params) => {
         const arr = Array.isArray(params) ? params : [params]
         const t = arr[0]?.axisValueLabel ?? ''
@@ -670,25 +680,25 @@ const netChartOption = computed(() => {
       type: 'value', 
       axisLine: { show: false }, 
       axisTick: { show: false }, 
-      axisLabel: { color: '#8C8C8C', fontSize: 9, formatter: (v) => formatBytes(v) + '/s' }, 
-      splitLine: { lineStyle: { color: '#F5F5F5' } }, 
+      axisLabel: { color: chartAxisColor.value, fontSize: 9, formatter: (v) => formatBytes(v) + '/s' }, 
+      splitLine: { lineStyle: { color: chartGridColor.value } }, 
       min: 0,
     },
     series: [
       {
         name: '接收', type: 'line', smooth: true, symbol: 'none',
-        lineStyle: { color: '#4facfe', width: 2 }, itemStyle: { color: '#4facfe' },
-        areaStyle: { opacity: 0.05, color: '#4facfe' },
+        lineStyle: { color: '#3b82f6', width: 2 }, itemStyle: { color: '#3b82f6' },
+        areaStyle: { opacity: isDark.value ? 0.08 : 0.12, color: '#3b82f6' },
         emphasis: { focus: 'series' }, connectNulls: true, data: inData,
       },
       {
         name: '发送', type: 'line', smooth: true, symbol: 'none',
-        lineStyle: { color: '#16a34a', width: 2 }, itemStyle: { color: '#16a34a' },
-        areaStyle: { opacity: 0.05, color: '#16a34a' },
+        lineStyle: { color: '#8b5cf6', width: 2 }, itemStyle: { color: '#8b5cf6' },
+        areaStyle: { opacity: isDark.value ? 0.08 : 0.12, color: '#8b5cf6' },
         emphasis: { focus: 'series' }, connectNulls: true, data: outData,
       },
     ],
-    legend: { data: ['接收', '发送'], right: '24px', top: '0px', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#8C8C8C' } },
+    legend: { data: ['接收', '发送'], right: '24px', top: '0px', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: chartAxisColor.value } },
   }
 })
 
@@ -696,8 +706,8 @@ const qpsTpsChartOption = computed(() => {
   const mk = (arr) => arr.map(d => [d.timestamp, d.value])
   const series = [{
     name: 'QPS', type: 'line', smooth: true, symbol: 'none',
-    lineStyle: { color: '#4facfe', width: 2 }, itemStyle: { color: '#4facfe' },
-    areaStyle: { opacity: 0.05, color: '#4facfe' },
+    lineStyle: { color: '#3b82f6', width: 2 }, itemStyle: { color: '#3b82f6' },
+    areaStyle: { opacity: isDark.value ? 0.08 : 0.12, color: '#3b82f6' },
     emphasis: { focus: 'series' },
     connectNulls: true,
     data: mk(qpsHistory.value),
@@ -706,8 +716,8 @@ const qpsTpsChartOption = computed(() => {
   if (metrics.value?.type === 'mysql') {
     series.push({
       name: 'TPS', type: 'line', smooth: true, symbol: 'none',
-      lineStyle: { color: '#16a34a', width: 2, type: 'dashed' }, itemStyle: { color: '#16a34a' },
-      areaStyle: { opacity: 0.05, color: '#16a34a' },
+      lineStyle: { color: '#8b5cf6', width: 2, type: 'dashed' }, itemStyle: { color: '#8b5cf6' },
+      areaStyle: { opacity: isDark.value ? 0.08 : 0.12, color: '#8b5cf6' },
       emphasis: { focus: 'series' },
       connectNulls: true,
       data: mk(tpsHistory.value),
@@ -719,8 +729,8 @@ const qpsTpsChartOption = computed(() => {
     animationDuration: 420,
     animationDurationUpdate: 500,
     animationEasingUpdate: 'cubicInOut',
-    tooltip: tooltipTemplate, grid: gridTemplate, xAxis: xAxisOption.value, yAxis: yAxisTemplate, series,
-    legend: { data: legendData, right: '24px', top: '0px', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#8C8C8C' } }
+    tooltip: tooltipTemplate.value, grid: gridTemplate, xAxis: xAxisOption.value, yAxis: yAxisTemplate.value, series,
+    legend: { data: legendData, right: '24px', top: '0px', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: chartAxisColor.value } }
   }
 })
 

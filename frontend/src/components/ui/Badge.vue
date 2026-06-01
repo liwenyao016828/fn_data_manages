@@ -12,6 +12,11 @@ export const badgeVariants = cva(
         secondary: 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
         destructive: 'border-transparent bg-destructive text-white shadow hover:bg-destructive/80',
         outline: 'text-foreground',
+        success: 'badge-status badge-status-success border-transparent',
+        warning: 'badge-status badge-status-warning border-transparent',
+        error: 'badge-status badge-status-error border-transparent',
+        info: 'badge-status badge-status-info border-transparent',
+        neutral: 'badge-status badge-status-neutral border-transparent',
       },
     },
     defaultVariants: {
@@ -26,7 +31,7 @@ export const Badge = defineComponent({
     variant: {
       type: String,
       default: 'default',
-      validator: (v) => ['default', 'secondary', 'destructive', 'outline'].includes(v),
+      validator: (v) => ['default', 'secondary', 'destructive', 'outline', 'success', 'warning', 'error', 'info', 'neutral'].includes(v),
     },
     class: { type: String, default: '' },
   },

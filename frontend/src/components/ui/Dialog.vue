@@ -36,14 +36,14 @@ export const DialogContent = defineComponent({
   setup(props, { slots }) {
     return () => h(RekaDialogContent, {
       class: cn(
-        'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-[#E8E8E8] bg-white p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 sm:rounded-xl',
+        'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 sm:rounded-xl',
         props.class,
       ),
     }, {
       default: () => [
         slots.default?.(),
         h(RekaDialogClose, {
-          class: 'absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#4facfe] focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-[#F5F5F5] data-[state=open]:text-[#8C8C8C]',
+          class: 'absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-muted data-[state=open]:text-muted-foreground',
         }, () => [
           h('svg', {
             xmlns: 'http://www.w3.org/2000/svg',

@@ -60,3 +60,4 @@ build_fnapp.sh
 
 # Trae internal
 .trae/
+data/database.sqlite

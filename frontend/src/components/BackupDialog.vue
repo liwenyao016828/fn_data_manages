@@ -8,7 +8,7 @@
       <template v-if="!importMode">
         <div class="flex items-center justify-between mb-4">
           <span class="flex items-center gap-3">
-            <Badge variant="secondary" class="bg-emerald-500/10 text-emerald-600 border-emerald-200">
+            <Badge variant="secondary" class="bg-emerald-500/10 text-emerald-500 border-emerald-200">
               {{ database.name }}
             </Badge>
             <span v-if="bakList.length" class="text-xs text-muted-foreground">共 {{ bakList.length }} 个备份</span>
@@ -35,9 +35,9 @@
               <TableRow v-for="row in bakList" :key="row.id">
                 <TableCell>{{ row.name }}</TableCell>
                 <TableCell>
-                  <Badge v-if="row.backupLevel === 'system'" variant="outline" class="bg-amber-500/10 text-amber-600 border-amber-200">系统</Badge>
-                  <Badge v-else-if="row.backupLevel === 'redis'" variant="outline" class="bg-amber-500/10 text-amber-600 border-amber-200">Redis</Badge>
-                  <Badge v-else variant="outline" class="bg-blue-500/10 text-blue-600 border-blue-200">MySQL</Badge>
+                  <Badge v-if="row.backupLevel === 'system'" variant="outline" class="bg-amber-500/10 text-amber-500 border-amber-200">系统</Badge>
+                  <Badge v-else-if="row.backupLevel === 'redis'" variant="outline" class="bg-amber-500/10 text-amber-500 border-amber-200">Redis</Badge>
+                  <Badge v-else variant="outline" class="bg-blue-500/10 text-blue-500 border-blue-200">MySQL</Badge>
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -102,7 +102,7 @@
                     {{ selectedImportDb.name }}
                     <Badge
                       :variant="selectedImportDb.type === 'redis' ? 'outline' : 'default'"
-                      :class="selectedImportDb.type === 'redis' ? 'bg-amber-500/10 text-amber-600 border-amber-200' : 'bg-blue-500/10 text-blue-600 border-blue-200'"
+                      :class="selectedImportDb.type === 'redis' ? 'bg-amber-500/10 text-amber-500 border-amber-200' : 'bg-blue-500/10 text-blue-500 border-blue-200'"
                       class="text-[10px] px-1.5 py-0 shrink-0"
                     >
                       {{ selectedImportDb.type === 'redis' ? 'Redis' : 'MySQL' }}
@@ -123,7 +123,7 @@
                     <div class="flex items-center gap-2 shrink-0">
                       <Badge
                         :variant="db.type === 'redis' ? 'outline' : 'default'"
-                        :class="db.type === 'redis' ? 'bg-amber-500/10 text-amber-600 border-amber-200' : 'bg-blue-500/10 text-blue-600 border-blue-200'"
+                        :class="db.type === 'redis' ? 'bg-amber-500/10 text-amber-500 border-amber-200' : 'bg-blue-500/10 text-blue-500 border-blue-200'"
                         class="text-[10px] px-1.5 py-0"
                       >
                         {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}

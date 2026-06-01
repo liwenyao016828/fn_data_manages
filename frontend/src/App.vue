@@ -6,6 +6,7 @@ import { useAppContext } from './stores/context'
 import { useHealthStore } from './stores/health'
 import { instanceUid } from '@/lib/instance'
 import { LayoutDashboard, MonitorCog, HardDrive, Shield, FileText, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
+import ThemeToggle from './components/ThemeToggle.vue'
 import { Button } from '@/components/ui/Button.vue'
 import { ScrollArea } from '@/components/ui/ScrollArea.vue'
 import { Toaster } from '@/components/ui/Sonner.vue'
@@ -226,18 +227,20 @@ onMounted(async () => {
 <template>
   <div class="flex h-dvh w-full bg-background" :class="{ compact: compactMode }">
     <aside
-      class="sticky top-0 z-30 flex h-dvh shrink-0 flex-col bg-sidebar transition-all duration-300 ease-in-out max-md:w-[56px]"
-      :class="sidebarCollapsed ? 'w-[56px]' : 'w-[200px]'"
+      class="sticky top-0 z-30 flex h-dvh shrink-0 flex-col transition-all duration-300 ease-in-out max-md:w-[56px] divider-r"
+      :class="[sidebarCollapsed ? 'w-[56px]' : 'w-[200px]', 'bg-sidebar']"
     >
       <div class="flex h-[52px] items-center shrink-0" :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-2.5 px-3'">
         <div
-          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#fff]/10 cursor-pointer hover:bg-[#fff]/15 transition-colors duration-150"
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md cursor-pointer transition-all duration-200"
+          :class="sidebarCollapsed ? 'bg-[var(--soft-info-bg)]' : 'bg-primary/15 hover:bg-primary/25'"
           @click="sidebarCollapsed = !sidebarCollapsed"
+          :aria-label="sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'"
         >
-          <PanelLeftClose v-if="!sidebarCollapsed" class="h-3.5 w-3.5 text-white/70" />
-          <PanelLeftOpen v-else class="h-3.5 w-3.5 text-white/70" />
+          <PanelLeftClose v-if="!sidebarCollapsed" class="h-3.5 w-3.5 icon-primary" />
+          <PanelLeftOpen v-else class="h-3.5 w-3.5 icon-primary" />
         </div>
-        <span v-if="!sidebarCollapsed" class="truncate text-[13px] font-semibold text-white tracking-tight">
+        <span v-if="!sidebarCollapsed" class="truncate text-[13px] font-semibold tracking-tight text-sidebar-foreground">
           数据库管理
         </span>
       </div>
@@ -249,19 +252,20 @@ onMounted(async () => {
             :key="item.key"
             :variant="activeMenu === item.key ? 'default' : 'ghost'"
             :class="[
-              'group w-full rounded-md h-[34px] text-[13px] transition-all duration-150',
+              'group w-full rounded-lg h-[34px] text-[13px] transition-all duration-200 cursor-pointer',
               sidebarCollapsed ? 'justify-center px-0' : 'justify-start gap-3 px-3',
               activeMenu === item.key
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-none hover:bg-sidebar-accent'
-                : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 hover:bg-sidebar-accent/60'
+                ? 'text-sidebar-primary-foreground shadow-lg'
+                : 'text-sidebar-foreground/55 hover:text-sidebar-foreground'
             ]"
+            :style="activeMenu === item.key ? 'background: var(--sidebar-primary); color: var(--sidebar-primary-foreground); box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 35%, transparent);' : ''"
             @click="handleMenuSelect(item.key)"
           >
             <component
               :is="item.icon"
               :class="[
-                'h-4 w-4 shrink-0 transition-colors duration-150',
-                activeMenu === item.key ? 'text-white' : 'text-white/40 group-hover:text-white/70'
+                'h-4 w-4 shrink-0 transition-colors duration-200',
+                activeMenu === item.key ? 'text-white' : 'text-sidebar-foreground/45 group-hover:text-sidebar-foreground/75'
               ]"
             />
             <span v-if="!sidebarCollapsed" class="truncate">{{ item.label }}</span>
@@ -269,26 +273,30 @@ onMounted(async () => {
         </nav>
       </ScrollArea>
 
-      <div class="px-2 pb-3 relative">
+      <div class="px-2 pb-2 relative">
+        <div class="flex items-center justify-center mb-2" v-if="!sidebarCollapsed">
+          <ThemeToggle />
+        </div>
         <div
-          class="flex items-center gap-2 rounded-md cursor-pointer transition-colors duration-150 hover:bg-sidebar-accent/70"
+          class="flex items-center gap-2 rounded-lg cursor-pointer transition-all duration-200"
           :class="[
-            isActive ? 'bg-sidebar-accent/40' : 'bg-sidebar-accent/20',
+            isActive ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent',
             sidebarCollapsed ? 'justify-center px-1 py-2' : 'px-3 py-2'
           ]"
           @click="openSwitcher"
         >
           <div class="h-6 w-6 rounded-full flex items-center justify-center shrink-0"
-            :class="isActive ? 'bg-white/15' : 'bg-white/10'"
+            :class="{ 'bg-sidebar-accent': !isActive }"
+            :style="isActive ? 'background: var(--sidebar-primary);' : ''"
           >
-            <span class="text-[9px] font-bold tracking-tight" :class="isActive ? 'text-white' : 'text-white/60'">{{ avatarText }}</span>
+            <span class="text-[9px] font-bold tracking-tight" :class="isActive ? 'text-sidebar-primary-foreground' : 'text-sidebar-foreground/65'">{{ avatarText }}</span>
           </div>
           <div v-if="!sidebarCollapsed" class="flex-1 min-w-0">
-            <div class="text-[12px] text-white/70 truncate flex items-center gap-1.5">
+            <div class="text-[12px] text-sidebar-foreground truncate flex items-center gap-1.5">
               <StatusDot v-if="isActive" :status="onlineStatus[current?.connectionId] === undefined ? 'checking' : (onlineStatus[current?.connectionId] !== false ? 'online' : 'offline')" size="xs" />
               {{ isActive ? (userName || name) : (systemInfo.username || '系统用户') }}
             </div>
-            <div class="text-[10px] text-white/30 truncate">
+            <div class="text-[10px] text-sidebar-foreground/50 truncate">
               {{ isActive ? `${host}:${port}` : (systemInfo.hostname || '') }}
             </div>
           </div>
@@ -296,13 +304,13 @@ onMounted(async () => {
 
         <div
           v-if="showSwitcher"
-          class="absolute bottom-full mb-1 bg-sidebar border border-sidebar-border rounded-lg shadow-xl overflow-hidden z-50"
+          class="absolute bottom-full mb-1 rounded-xl shadow-2xl overflow-hidden z-50 bg-card border border-border fade-slide-in"
           :class="sidebarCollapsed ? 'left-2 right-2' : 'left-3 right-3'"
           @click.stop
         >
-          <div class="flex items-center justify-between px-3 py-2 border-b border-white/10">
-            <span class="text-[11px] text-white/50">选择数据库</span>
-            <Button variant="ghost" size="icon" class="h-5 w-5 text-white/40 hover:text-white/70" @click="closeSwitcher">
+          <div class="flex items-center justify-between px-3 py-2 divider-b">
+            <span class="text-[11px] text-helper">选择数据库</span>
+            <Button variant="ghost" size="icon" class="h-5 w-5 icon-muted hover:text-foreground" @click="closeSwitcher">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </Button>
           </div>
@@ -310,16 +318,16 @@ onMounted(async () => {
             <div
               v-for="inst in instances"
               :key="(inst.isRemote ? 'r' : 'l') + inst.id"
-              class="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors hover:bg-white/5"
-              :class="current?.connectionId === instanceUid(inst) ? 'bg-sidebar-primary/10' : ''"
+              class="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors duration-200 hover:bg-muted"
+              :class="current?.connectionId === instanceUid(inst) ? 'bg-sidebar-accent' : ''"
               @click="selectContext(inst)"
             >
               <StatusDot :status="current?.connectionId === instanceUid(inst) ? 'selected' : (onlineStatus[instanceUid(inst)] === undefined ? 'checking' : (onlineStatus[instanceUid(inst)] !== false ? 'online' : 'offline'))" size="sm" />
               <div class="flex-1 min-w-0">
-                <div class="text-[12px] text-white/80 truncate">{{ inst.name }}</div>
-                <div class="text-[10px] text-white/30 truncate">{{ inst.username }}@{{ inst.host }}:{{ inst.port }}</div>
+                <div class="text-[12px] text-foreground truncate">{{ inst.name }}</div>
+                <div class="text-[10px] text-helper truncate">{{ inst.username }}@{{ inst.host }}:{{ inst.port }}</div>
               </div>
-              <span v-if="inst.isRemote" class="text-[9px] text-orange-400/70 bg-orange-400/10 px-1 rounded">远程</span>
+              <span v-if="inst.isRemote" class="badge-status badge-status-warning text-[9px]">远程</span>
             </div>
           </div>
         </div>
@@ -350,8 +358,8 @@ onMounted(async () => {
       class="fixed top-0 left-0 right-0 h-[3px] z-[9999]"
     >
       <div
-        class="h-full bg-primary transition-all duration-300 ease-out"
-        :style="{ width: progressWidth + '%' }"
+        class="h-full transition-all duration-300 ease-out"
+        :style="{ width: progressWidth + '%', background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)', boxShadow: '0 0 8px rgba(59, 130, 246, 0.5)' }"
       />
     </div>
 

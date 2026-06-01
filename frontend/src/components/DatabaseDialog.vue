@@ -24,14 +24,14 @@
                   <Badge
                     v-if="inst.status === '已认证'"
                     variant="secondary"
-                    class="bg-emerald-500/10 text-emerald-600 border-emerald-200 text-[10px] px-1.5 py-0"
+                    class="bg-emerald-500/10 text-emerald-500 border-emerald-200 text-[10px] px-1.5 py-0"
                   >
                     已认证
                   </Badge>
                   <Badge
                     v-else
                     variant="outline"
-                    class="bg-amber-500/10 text-amber-600 border-amber-200 text-[10px] px-1.5 py-0"
+                    class="bg-amber-500/10 text-amber-500 border-amber-200 text-[10px] px-1.5 py-0"
                   >
                     需密码
                   </Badge>

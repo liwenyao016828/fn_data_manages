@@ -30,7 +30,7 @@ export const SelectTrigger = defineComponent({
   setup(props, { slots }) {
     return () => h(RekaSelectTrigger, {
       class: cn(
-        'flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
+        'flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground shadow-sm ring-offset-background placeholder:text-helper focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
         props.class,
       ),
     }, {
@@ -55,7 +55,7 @@ const SelectIcon = defineComponent({
       'stroke-width': '2',
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
-      class: 'h-4 w-4 opacity-50',
+      class: 'h-4 w-4 opacity-50 icon-secondary',
     }, [
       h('path', { d: 'm6 9 6 6 6-6' }),
     ])
@@ -79,7 +79,7 @@ export const SelectScrollUpButton = defineComponent({
         'stroke-width': '2',
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
-        class: 'h-4 w-4',
+        class: 'h-4 w-4 icon-muted',
       }, [
         h('path', { d: 'm18 15-6-6-6 6' }),
       ]),
@@ -104,7 +104,7 @@ export const SelectScrollDownButton = defineComponent({
         'stroke-width': '2',
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
-        class: 'h-4 w-4',
+        class: 'h-4 w-4 icon-muted',
       }, [
         h('path', { d: 'm6 9 6 6 6-6' }),
       ]),
@@ -170,7 +170,7 @@ export const SelectItem = defineComponent({
       value: props.value,
       disabled: props.disabled,
       class: cn(
-        'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm text-foreground outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         props.class,
       ),
     }, {

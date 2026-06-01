@@ -1,7 +1,8 @@
 <template>
   <span
-    class="inline-block rounded-full shrink-0"
-    :class="[sizeClass, colorClass, blinkClass]"
+    class="status-dot"
+    :class="[sizeClass, statusClass, blinkClass]"
+    :aria-label="ariaLabel"
   />
 </template>
 
@@ -12,7 +13,7 @@ const props = defineProps({
   status: {
     type: String,
     default: 'default',
-    validator: (v) => ['online', 'offline', 'selected', 'checking', 'default'].includes(v),
+    validator: (v) => ['online', 'offline', 'selected', 'checking', 'warning', 'info', 'default'].includes(v),
   },
   size: {
     type: String,
@@ -26,18 +27,33 @@ const sizeClass = computed(() => {
   return map[props.size]
 })
 
-const colorClass = computed(() => {
+const statusClass = computed(() => {
   const map = {
-    online: 'bg-emerald-500',
-    offline: 'bg-red-500',
-    selected: 'bg-[#4facfe]',
-    checking: 'bg-amber-400',
-    default: 'bg-[#D9D9D9]',
+    online: 'status-dot-online',
+    offline: 'status-dot-offline',
+    selected: 'status-dot-selected',
+    checking: 'status-dot-warning',
+    warning: 'status-dot-warning',
+    info: 'status-dot-info',
+    default: 'status-dot-default',
   }
-  return map[props.status]
+  return map[props.status] || 'status-dot-default'
 })
 
 const blinkClass = computed(() => {
   return props.status === 'online' || props.status === 'checking' ? 'blink-dot' : ''
+})
+
+const ariaLabel = computed(() => {
+  const map = {
+    online: '在线',
+    offline: '离线',
+    selected: '已选中',
+    checking: '检测中',
+    warning: '警告',
+    info: '提示',
+    default: '默认',
+  }
+  return map[props.status] || '默认'
 })
 </script>

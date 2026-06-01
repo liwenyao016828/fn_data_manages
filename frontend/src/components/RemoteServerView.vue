@@ -39,7 +39,7 @@
               </TableRow>
             </template>
             <template v-for="row in serverList" :key="row.id">
-              <TableRow class="hover:bg-muted transition-colors duration-150 border-b border-[#F0F0F0]">
+              <TableRow class="hover:bg-muted transition-colors duration-150 border-b border-border">
                 <TableCell><span class="text-[13px] text-foreground">{{ row.name }}</span></TableCell>
                 <TableCell>
                   <Badge :variant="row.type === 'mysql' ? 'default' : 'secondary'" class="rounded-full text-[10px] py-0">

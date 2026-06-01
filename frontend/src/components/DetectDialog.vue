@@ -27,11 +27,11 @@
               </Badge>
               <Badge
                 :variant="tagCounts('redis').total > 0 ? 'secondary' : 'outline'"
-                class="rounded-full bg-amber-500/10 text-amber-600 border-amber-200"
+                class="rounded-full bg-amber-500/10 text-amber-500 border-amber-200"
               >
                 Redis {{ tagCounts('redis').total }}
               </Badge>
-              <Badge variant="secondary" class="rounded-full bg-emerald-500/10 text-emerald-600 border-emerald-200">
+              <Badge variant="secondary" class="rounded-full bg-emerald-500/10 text-emerald-500 border-emerald-200">
                 已认证 {{ tagCounts('').authCount }}
               </Badge>
             </div>
@@ -48,7 +48,7 @@
                 </span>
                 <Badge
                   :variant="row.source === 'Docker' ? 'outline' : 'secondary'"
-                  :class="row.source === 'Docker' ? 'bg-amber-500/10 text-amber-600 border-amber-200' : 'bg-emerald-500/10 text-emerald-600 border-emerald-200'"
+                  :class="row.source === 'Docker' ? 'bg-amber-500/10 text-amber-500 border-amber-200' : 'bg-emerald-500/10 text-emerald-500 border-emerald-200'"
                   class="text-xs"
                 >
                   {{ row.source }}
@@ -57,7 +57,7 @@
                 <span class="text-xs text-muted-foreground flex-1">{{ row.version }}</span>
                 <Badge
                   :variant="row.status === '已认证' ? 'secondary' : 'outline'"
-                  :class="row.status === '已认证' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-200' : 'bg-amber-500/10 text-amber-600 border-amber-200'"
+                  :class="row.status === '已认证' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-200' : 'bg-amber-500/10 text-amber-500 border-amber-200'"
                   class="text-xs"
                 >
                   {{ row.status }}
@@ -65,7 +65,7 @@
                 <Badge
                   v-if="row.weakPassword"
                   variant="outline"
-                  class="bg-red-500/10 text-red-600 border-red-200 text-xs"
+                  class="bg-red-500/10 text-red-500 border-red-200 text-xs"
                 >
                   <AlertTriangle class="h-3 w-3 mr-0.5" />
                   弱密码
@@ -91,7 +91,7 @@
                   v-if="row._testResult"
                   class="px-2.5 py-1 rounded text-xs whitespace-nowrap"
                   :class="row._testResult.type === 'success'
-                    ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-200'
+                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-200'
                     : 'bg-destructive/10 text-destructive border border-destructive/20'"
                 >
                   {{ row._testResult.msg }}

@@ -29,7 +29,7 @@
             <div class="flex-1 flex flex-col gap-0.5 min-w-0">
               <div class="flex items-center gap-1.5">
                 <span class="text-[13px] font-medium text-foreground truncate">{{ inst.name }}</span>
-                <Badge v-if="inst.isRemote" variant="outline" class="bg-orange-50 text-orange-500 border-orange-200 text-[10px] h-[18px] shrink-0">远程</Badge>
+                <Badge v-if="inst.isRemote" variant="outline" class="bg-orange-500/5 text-orange-400 border-orange-500/20 text-[10px] h-[18px] shrink-0">远程</Badge>
               </div>
               <div class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <StatusDot :status="connectionId === instanceUid(inst) ? 'selected' : (onlineStatus[instanceUid(inst)] !== false ? 'online' : 'offline')" size="xs" />
@@ -42,7 +42,7 @@
             <span class="text-[11px] text-muted-foreground">{{ inst.version || '—' }}</span>
             <div class="flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100" @click.stop>
               <Button variant="link" size="sm" class="h-auto p-0 text-xs text-primary hover:bg-primary/10" @click="editInstance(inst)">编辑</Button>
-              <Button variant="link" size="sm" class="h-auto p-0 text-xs text-red-500 hover:bg-red-50" @click="confirmDeleteInstance(inst)">删除</Button>
+              <Button variant="link" size="sm" class="h-auto p-0 text-xs text-red-400 hover:bg-red-500/5" @click="confirmDeleteInstance(inst)">删除</Button>
             </div>
           </div>
         </div>
@@ -105,7 +105,7 @@
         </div>
 
         <div v-if="isRedis && !selectedRedisKey" class="content-body">
-          <div class="flex gap-3 flex-wrap rounded-xl border border-border bg-muted section-padding mb-3">
+          <div class="flex gap-3 flex-wrap rounded-xl border border-border bg-card section-padding mb-3">
             <div class="flex flex-col gap-0.5 min-w-[100px]">
               <span class="text-[11px] text-muted-foreground">版本</span>
               <span class="text-sm font-semibold text-foreground">{{ redisInfo.redis_version || '—' }}</span>
@@ -144,7 +144,7 @@
           </div>
 
           <div class="rounded-xl border border-border overflow-hidden relative">
-            <div v-if="loadingRedisKeys" class="absolute inset-0 flex items-center justify-center bg-white/60 z-10">
+            <div v-if="loadingRedisKeys" class="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
               <Loader2 class="h-6 w-6 animate-spin text-primary" />
             </div>
             <div v-if="redisKeys.length === 0 && !loadingRedisKeys" class="flex flex-col items-center justify-center py-10 text-muted-foreground">
@@ -154,7 +154,7 @@
             <div
               v-for="rk in redisKeys"
               :key="rk.key"
-              class="flex justify-between items-center px-4 py-2.5 cursor-pointer transition-colors border-b border-[#F0F0F0] last:border-b-0 hover:bg-primary/[0.06]"
+              class="flex justify-between items-center px-4 py-2.5 cursor-pointer transition-colors border-b border-border last:border-b-0 hover:bg-primary/[0.06]"
               @click="selectRedisKey(rk.key)"
             >
               <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -163,11 +163,11 @@
               </div>
               <div class="flex items-center gap-3 shrink-0">
                 <span class="text-[11px] text-muted-foreground">{{ formatKeySize(rk.type, rk.size) }}</span>
-                <span v-if="rk.ttl > 0" class="text-[11px] text-amber-500">TTL: {{ rk.ttl }}s</span>
-                <span v-else-if="rk.ttl === -1" class="text-[11px] text-[#16a34a]">永不过期</span>
+                <span v-if="rk.ttl > 0" class="text-[11px] text-amber-400">TTL: {{ rk.ttl }}s</span>
+                <span v-else-if="rk.ttl === -1" class="text-[11px] text-emerald-400">永不过期</span>
               </div>
             </div>
-            <div v-if="redisCursor !== '0'" class="text-center py-2 border-t border-[#F0F0F0]">
+            <div v-if="redisCursor !== '0'" class="text-center py-2 border-t border-border">
               <Button variant="link" size="sm" class="text-primary" @click="loadMoreRedisKeys" :disabled="loadingRedisKeys">加载更多</Button>
             </div>
           </div>
@@ -200,26 +200,26 @@
               <Textarea :model-value="selectedRedisKeyData?.value" readonly rows="6" class="font-mono text-sm bg-muted border-border" />
             </div>
             <div v-else-if="selectedRedisKeyData?.type === 'list'">
-              <div v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="flex items-center gap-2 px-2 py-1.5 border-b border-[#F0F0F0] last:border-b-0 font-mono text-[13px]">
+              <div v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="flex items-center gap-2 px-2 py-1.5 border-b border-border last:border-b-0 font-mono text-[13px]">
                 <span class="text-muted-foreground min-w-[30px] text-[11px]">{{ idx }}</span>
                 <span class="text-foreground">{{ item }}</span>
               </div>
             </div>
             <div v-else-if="selectedRedisKeyData?.type === 'set'">
-              <div v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="flex items-center gap-2 px-2 py-1.5 border-b border-[#F0F0F0] last:border-b-0 font-mono text-[13px]">
+              <div v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="flex items-center gap-2 px-2 py-1.5 border-b border-border last:border-b-0 font-mono text-[13px]">
                 <span class="text-foreground">{{ item }}</span>
               </div>
             </div>
             <div v-else-if="selectedRedisKeyData?.type === 'hash'">
               <Table>
                 <TableHeader>
-                  <TableRow class="hover:bg-transparent border-b border-[#F0F0F0]">
+                  <TableRow class="hover:bg-transparent border-b border-border">
                     <TableHead class="min-w-[200px] text-[12px] font-normal text-muted-foreground">Field</TableHead>
                   <TableHead class="min-w-[300px] text-[12px] font-normal text-muted-foreground">Value</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow v-for="entry in hashEntries" :key="entry.field" class="hover:bg-muted border-b border-[#F0F0F0]">
+                  <TableRow v-for="entry in hashEntries" :key="entry.field" class="hover:bg-muted border-b border-border">
                     <TableCell class="font-mono text-sm truncate max-w-[200px] text-foreground">{{ entry.field }}</TableCell>
                     <TableCell class="font-mono text-sm truncate max-w-[300px] text-foreground">{{ entry.value }}</TableCell>
                   </TableRow>
@@ -229,13 +229,13 @@
             <div v-else-if="selectedRedisKeyData?.type === 'zset'">
               <Table>
                 <TableHeader>
-                  <TableRow class="hover:bg-transparent border-b border-[#F0F0F0]">
+                  <TableRow class="hover:bg-transparent border-b border-border">
                     <TableHead class="min-w-[200px] text-[12px] font-normal text-muted-foreground">Member</TableHead>
                   <TableHead class="w-[120px] text-[12px] font-normal text-muted-foreground">Score</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="hover:bg-muted border-b border-[#F0F0F0]">
+                  <TableRow v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="hover:bg-muted border-b border-border">
                     <TableCell class="font-mono text-sm truncate max-w-[200px] text-foreground">{{ item.member }}</TableCell>
                     <TableCell class="text-foreground">{{ item.score }}</TableCell>
                   </TableRow>
@@ -258,7 +258,7 @@
             <div
               v-for="db in databases"
               :key="db"
-              class="group relative flex items-center gap-2.5 px-4 py-3 border rounded-xl cursor-pointer transition-all duration-200 bg-white hover:border-primary/40 hover:shadow-sm hover:-translate-y-px"
+              class="group relative flex items-center gap-2.5 px-4 py-3 border rounded-xl cursor-pointer transition-all duration-200 bg-card hover:border-primary/40 hover:shadow-sm hover:-translate-y-px"
               @click="selectDatabase(db)"
             >
               <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary">
@@ -266,11 +266,11 @@
               </div>
               <span class="text-[13px] font-medium text-foreground truncate flex-1">{{ db }}</span>
               <button
-                class="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-50 transition-all duration-150"
+                class="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/5 transition-all duration-150"
                 title="删除数据库"
                 @click.stop="openDeleteDbDialog(db)"
               >
-                <Trash2 class="h-3.5 w-3.5 text-red-400 hover:text-red-500" />
+                <Trash2 class="h-3.5 w-3.5 text-red-400 hover:text-red-400" />
               </button>
             </div>
           </div>
@@ -301,23 +301,23 @@
             <div
               v-for="tbl in tables"
               :key="tbl"
-              class="group relative flex items-center gap-2.5 px-4 py-3 border rounded-xl cursor-pointer transition-all duration-200 bg-white hover:border-[#16a34a]/40 hover:shadow-sm hover:-translate-y-px"
+              class="group relative flex items-center gap-2.5 px-4 py-3 border rounded-xl cursor-pointer transition-all duration-200 bg-card hover:border-emerald-500/40 hover:shadow-sm hover:-translate-y-px"
               @click="selectTable(tbl)"
             >
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[#16a34a]/10 text-[#16a34a]">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-400">
                 <Table2 class="h-4 w-4" />
               </div>
               <span class="text-[13px] font-medium text-foreground truncate flex-1">{{ tbl }}</span>
               <button
-                class="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-50 transition-all duration-150"
+                class="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/5 transition-all duration-150"
                 title="删除表"
                 @click.stop="confirmDeleteTable(tbl)"
               >
-                <Trash2 class="h-3.5 w-3.5 text-red-400 hover:text-red-500" />
+                <Trash2 class="h-3.5 w-3.5 text-red-400 hover:text-red-400" />
               </button>
             </div>
           </div>
-          <div v-if="!loadingTables && tables.length === 0 && tableLoadError" class="flex items-center gap-2 py-6 text-[13px] text-red-500">
+          <div v-if="!loadingTables && tables.length === 0 && tableLoadError" class="flex items-center gap-2 py-6 text-[13px] text-red-400">
             <AlertTriangle class="h-4 w-4" />
             <span>加载失败</span>
             <Button variant="link" size="sm" class="h-auto p-0 text-xs text-primary" @click="loadTables()">重试</Button>
@@ -344,29 +344,29 @@
         </div>
 
         <div class="relative overflow-hidden" :style="{ height: tableHeight }">
-          <div v-if="loadingData" class="absolute inset-0 flex items-center justify-center bg-white/60 z-10">
+          <div v-if="loadingData" class="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
             <Loader2 class="h-6 w-6 animate-spin text-primary" />
           </div>
           <Table class="h-full">
             <TableHeader>
-              <TableRow class="hover:bg-transparent border-b border-[#F0F0F0]">
+              <TableRow class="hover:bg-transparent border-b border-border">
                 <TableHead v-for="col in columns" :key="col.name" class="min-w-[120px] text-[12px] font-normal text-muted-foreground">
                   {{ col.name }}
                 </TableHead>
-                <TableHead class="text-center w-[100px] sticky right-0 bg-white text-[12px] font-normal text-muted-foreground">操作</TableHead>
+                <TableHead class="text-center w-[100px] sticky right-0 bg-card text-[12px] font-normal text-muted-foreground">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="(row, idx) in tableData" :key="idx" class="hover:bg-muted border-b border-[#F0F0F0]">
+              <TableRow v-for="(row, idx) in tableData" :key="idx" class="hover:bg-muted border-b border-border">
                 <TableCell v-for="col in columns" :key="col.name" class="max-w-[300px]">
                   <span :class="row[col.name] === null ? 'text-muted-foreground italic' : 'font-mono text-[13px] text-foreground'">
                     {{ row[col.name] !== null ? row[col.name] : 'NULL' }}
                   </span>
                 </TableCell>
-                <TableCell class="sticky right-0 bg-white">
+                <TableCell class="sticky right-0 bg-card">
                   <div class="flex gap-1">
                     <Button variant="link" size="sm" class="h-auto p-0 text-xs text-primary hover:bg-primary/10" @click="editRow(row)" :disabled="!columns.some(c => c.key === 'PRI')">编辑</Button>
-                    <Button variant="link" size="sm" class="h-auto p-0 text-xs text-red-500 hover:bg-red-50" @click="confirmDeleteRow(row)" :disabled="!columns.some(c => c.key === 'PRI')">删除</Button>
+                    <Button variant="link" size="sm" class="h-auto p-0 text-xs text-red-400 hover:bg-red-500/5" @click="confirmDeleteRow(row)" :disabled="!columns.some(c => c.key === 'PRI')">删除</Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -377,13 +377,13 @@
         <div class="section-padding border-t border-border">
           <Tabs v-model="activeTab">
             <TabsList class="bg-muted">
-              <TabsTrigger value="structure" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">表结构</TabsTrigger>
-              <TabsTrigger value="sql" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">SQL</TabsTrigger>
+              <TabsTrigger value="structure" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">表结构</TabsTrigger>
+              <TabsTrigger value="sql" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">SQL</TabsTrigger>
             </TabsList>
             <TabsContent value="structure">
               <Table>
                 <TableHeader>
-                  <TableRow class="hover:bg-transparent border-b border-[#F0F0F0]">
+                  <TableRow class="hover:bg-transparent border-b border-border">
                     <TableHead class="min-w-[120px] text-[12px] font-normal text-muted-foreground">字段名</TableHead>
                     <TableHead class="min-w-[140px] text-[12px] font-normal text-muted-foreground">类型</TableHead>
                     <TableHead class="w-[80px] text-[12px] font-normal text-muted-foreground">键</TableHead>
@@ -392,7 +392,7 @@
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow v-for="col in columns" :key="col.name" class="hover:bg-muted border-b border-[#F0F0F0]">
+                  <TableRow v-for="col in columns" :key="col.name" class="hover:bg-muted border-b border-border">
                     <TableCell class="font-mono text-foreground">{{ col.name }}</TableCell>
                     <TableCell class="text-foreground">{{ col.type }}</TableCell>
                     <TableCell class="text-foreground">{{ col.key }}</TableCell>
@@ -425,7 +425,7 @@
                   </Table>
                   <div class="text-xs text-muted-foreground px-3 py-2 border-t border-border">共 {{ sqlResult.data.length }} 行</div>
                 </div>
-                <div v-else-if="sqlResult.type === 'message'" class="p-3 bg-green-500/10 border border-green-500/20 rounded-md text-sm text-green-600">{{ sqlResult.data }}</div>
+                <div v-else-if="sqlResult.type === 'message'" class="p-3 bg-emerald-500/15 border border-green-500/20 rounded-md text-sm text-green-600">{{ sqlResult.data }}</div>
                 <div v-else-if="sqlResult.type === 'error'" class="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">{{ sqlResult.data }}</div>
               </div>
             </TabsContent>
@@ -504,7 +504,7 @@
           <DialogDescription />
           <div class="grid gap-4 py-4">
             <div class="grid gap-1.5">
-              <label class="text-sm font-medium leading-none">数据库名称 <span class="text-red-500">*</span></label>
+              <label class="text-sm font-medium leading-none">数据库名称 <span class="text-red-400">*</span></label>
               <Input v-model="createDbForm.name" placeholder="请输入数据库名称" class="w-full" />
             </div>
             <div class="grid gap-1.5">
@@ -535,7 +535,7 @@
               </Select>
             </div>
           </div>
-          <div v-if="createDbError" class="text-[13px] text-red-500 bg-red-50 rounded-lg px-3 py-2">{{ createDbError }}</div>
+          <div v-if="createDbError" class="text-[13px] text-red-400 bg-red-500/5 rounded-lg px-3 py-2">{{ createDbError }}</div>
           <div class="flex justify-end gap-2 flex-wrap">
             <Button variant="outline" @click="showCreateDbDialog = false">取消</Button>
             <Button :disabled="!createDbForm.name.trim() || (createDbForm.password && createDbForm.password !== createDbForm.confirmPassword)" @click="createDatabase">创建</Button>
@@ -554,7 +554,7 @@
           </div>
           <div class="flex flex-col gap-4 py-2">
             <div class="flex flex-col gap-1.5">
-              <label class="text-sm font-medium text-foreground">表名 <span class="text-red-500">*</span></label>
+              <label class="text-sm font-medium text-foreground">表名 <span class="text-red-400">*</span></label>
               <Input v-model="createTableForm.name" placeholder="例如: users" class="border-border shadow-none" />
             </div>
             <div class="flex flex-col gap-1.5">
@@ -572,7 +572,7 @@
                 <div class="flex flex-col gap-0.5 flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <Input v-model="col.name" placeholder="字段名" class="flex-1 border-border shadow-none h-[32px] text-[13px]" />
-                    <select v-model="col.type" class="h-[32px] px-2 rounded-md border border-border text-[13px] bg-white outline-none focus:border-primary">
+                    <select v-model="col.type" class="h-[32px] px-2 rounded-md border border-border text-[13px] bg-card outline-none focus:border-primary">
                       <option v-for="t in columnTypes" :key="t" :value="t">{{ t }}</option>
                     </select>
                     <Input v-model="col.length" placeholder="长度" class="w-[70px] border-border shadow-none h-[32px] text-[13px]" />
@@ -590,7 +590,7 @@
                       <span class="text-muted-foreground">默认值:</span>
                       <Input v-model="col.defaultValue" placeholder="NULL" class="w-[100px] border-border shadow-none h-[24px] text-[12px]" />
                     </label>
-                    <select v-model="col.keyType" class="h-[24px] px-1.5 rounded border border-border text-[12px] bg-white outline-none focus:border-primary">
+                    <select v-model="col.keyType" class="h-[24px] px-1.5 rounded border border-border text-[12px] bg-card outline-none focus:border-primary">
                       <option value="">无</option>
                       <option value="PRI">主键</option>
                       <option value="UNI">唯一键</option>
@@ -598,13 +598,13 @@
                     </select>
                   </div>
                 </div>
-                <button class="w-7 h-7 rounded-md flex items-center justify-center hover:bg-red-50 shrink-0 transition-colors" @click="removeColumn(idx)">
+                <button class="w-7 h-7 rounded-md flex items-center justify-center hover:bg-red-500/5 shrink-0 transition-colors" @click="removeColumn(idx)">
                   <X class="h-3.5 w-3.5 text-red-400" />
                 </button>
               </div>
             </div>
           </div>
-          <div v-if="createTableError" class="text-[13px] text-red-500 bg-red-50 rounded-lg px-3 py-2">{{ createTableError }}</div>
+          <div v-if="createTableError" class="text-[13px] text-red-400 bg-red-500/5 rounded-lg px-3 py-2">{{ createTableError }}</div>
           <div class="flex justify-end gap-2 mt-1 flex-wrap">
             <Button variant="outline" @click="showCreateTableDialog = false">取消</Button>
             <Button variant="primary" :disabled="!createTableForm.name.trim() || createTableForm.columns.length === 0" @click="createTable">创建表</Button>
@@ -619,7 +619,7 @@
         <DialogContent class="sm:max-w-[400px]">
           <div class="flex flex-col gap-y-1.5">
             <DialogTitle>删除数据表</DialogTitle>
-            <DialogDescription>确定要删除表 <strong class="text-red-500">{{ deleteTableName }}</strong> 吗？此操作不可撤销，所有数据将永久丢失。</DialogDescription>
+            <DialogDescription>确定要删除表 <strong class="text-red-400">{{ deleteTableName }}</strong> 吗？此操作不可撤销，所有数据将永久丢失。</DialogDescription>
           </div>
           <div class="flex justify-end gap-2 flex-wrap">
             <Button variant="outline" @click="showDeleteTableDialog = false">取消</Button>
@@ -636,11 +636,11 @@
           <div class="flex flex-col gap-y-1.5">
             <DialogTitle>删除数据库</DialogTitle>
             <DialogDescription>
-              此操作将永久删除数据库 <strong class="text-red-500">{{ deleteDbName }}</strong> 及其所有数据，且不可恢复。
+              此操作将永久删除数据库 <strong class="text-red-400">{{ deleteDbName }}</strong> 及其所有数据，且不可恢复。
             </DialogDescription>
           </div>
           <div class="flex flex-col gap-1.5 mt-3">
-            <label class="text-sm text-foreground">请输入数据库名称 <strong class="text-red-500">{{ deleteDbName }}</strong> 以确认删除</label>
+            <label class="text-sm text-foreground">请输入数据库名称 <strong class="text-red-400">{{ deleteDbName }}</strong> 以确认删除</label>
             <Input v-model="deleteDbConfirmInput" :placeholder="deleteDbName" class="border-border shadow-none" />
           </div>
           <div class="flex justify-end gap-2 mt-3 flex-wrap">
@@ -959,7 +959,7 @@ const formatKeySize = (type, size) => {
 const getInstanceColor = (inst) => {
   if (inst.type === 'redis') return '#e6a23c'
   if (inst.isRemote) return '#67c23a'
-  return '#4facfe'
+  return '#3b82f6'
 }
 
 const isNumericType = (t) => /^(int|tinyint|smallint|mediumint|bigint|float|double|decimal|numeric|number)/i.test(t || '')

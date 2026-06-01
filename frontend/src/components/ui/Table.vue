@@ -35,7 +35,7 @@ export const TableFooter = defineComponent({
   props: { class: { type: String, default: '' } },
   setup(props, { slots }) {
     return () => h('tfoot', {
-      class: cn('border-t bg-[#F5F5F5] font-medium [&>tr]:last:border-b-0', props.class),
+      class: cn('border-t bg-muted font-medium [&>tr]:last:border-b-0', props.class),
     }, slots)
   },
 })
@@ -45,7 +45,7 @@ export const TableRow = defineComponent({
   props: { class: { type: String, default: '' } },
   setup(props, { slots }) {
     return () => h('tr', {
-      class: cn('border-b transition-colors hover:bg-[#FAFAFA] data-[state=selected]:bg-[#F5F5F5]', props.class),
+      class: cn('border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted', props.class),
     }, slots)
   },
 })
@@ -56,7 +56,7 @@ export const TableHead = defineComponent({
   setup(props, { slots }) {
     return () => h('th', {
       class: cn(
-        'h-10 px-2 text-left align-middle font-medium text-[#8C8C8C] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-0.5',
+        'h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-0.5',
         props.class,
       ),
     }, slots)

@@ -28,8 +28,8 @@
               :class="[
                 'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
                 activeMainTab === 'records'
-                  ? 'bg-gradient-to-r from-[#1A1A1A] to-[#333] text-white shadow-lg shadow-[#1A1A1A]/20'
-                  : 'bg-muted text-muted-foreground hover:bg-[#EAEAEA] hover:text-secondary-foreground'
+                  ? 'tab-active shadow-lg shadow-blue-500/20'
+                  : 'tab-inactive'
               ]"
               @click="activeMainTab = 'records'"
             >
@@ -40,8 +40,8 @@
               :class="[
                 'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
                 activeMainTab === 'scheduled'
-                  ? 'bg-gradient-to-r from-[#1A1A1A] to-[#333] text-white shadow-lg shadow-[#1A1A1A]/20'
-                  : 'bg-muted text-muted-foreground hover:bg-[#EAEAEA] hover:text-secondary-foreground'
+                  ? 'tab-active shadow-lg shadow-blue-500/20'
+                  : 'tab-inactive'
               ]"
               @click="activeMainTab = 'scheduled'"
             >
@@ -50,7 +50,7 @@
             </button>
           </div>
           <div v-if="activeMainTab === 'records'" class="flex items-center gap-2 flex-wrap">
-            <div class="flex h-[32px] items-center rounded-lg border border-border bg-white px-2 gap-1">
+            <div class="flex h-[32px] items-center rounded-lg border border-border bg-card px-2 gap-1">
               <Search class="h-3.5 w-3.5 text-muted-foreground" />
               <Input v-model="searchQuery" placeholder="搜索备份" class="border-0 shadow-none h-[28px] text-[13px] w-[140px] bg-transparent" @input="onSearchInput" />
             </div>
@@ -63,7 +63,7 @@
                 <SelectItem value="all">全部数据库</SelectItem>
                 <SelectItem v-for="db in allDbOptions" :key="(db.isRemote ? 'r:' : 'l:') + db.id + ':' + db.name" :value="(db.isRemote ? 'r:' : 'l:') + db.id + ':' + db.name">
                   <div class="flex items-center gap-2">
-                    <Badge :class="db.type === 'redis' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200'" class="text-[10px] px-1.5 py-0 rounded-full">
+                    <Badge :class="db.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'" class="text-[10px] px-1.5 py-0 rounded-full">
                       {{ db.type === 'redis' ? 'R' : 'M' }}
                     </Badge>
                     {{ db.name }}
@@ -86,10 +86,10 @@
         <div class="flex items-center gap-2">
           <span class="text-[12px] text-muted-foreground">备份级别：</span>
           <Button v-for="opt in levelOptions" :key="opt.value" variant="ghost" size="sm"
-            :class="[backupLevelFilter === opt.value ? 'bg-[#1A1A1A] text-white hover:bg-[#333]' : 'text-secondary-foreground hover:bg-muted', 'h-[28px] text-[12px] gap-1.5']"
+            :class="[backupLevelFilter === opt.value ? 'tab-active' : 'text-secondary-foreground hover:bg-muted', 'h-[28px] text-[12px] gap-1.5']"
             @click="backupLevelFilter = opt.value; onFilterChange()">
             <Database v-if="opt.value === 'mysql'" class="h-3 w-3 shrink-0 text-primary" />
-            <HardDrive v-else-if="opt.value === 'redis'" class="h-3 w-3 shrink-0 text-[#e6a23c]" />
+            <HardDrive v-else-if="opt.value === 'redis'" class="h-3 w-3 shrink-0 icon-special-color" />
             <Settings v-else-if="opt.value === 'system'" class="h-3 w-3 shrink-0 text-muted-foreground" />
             {{ opt.label }}
           </Button>
@@ -109,9 +109,9 @@
             </div>
             <Table v-else :class="{ 'opacity-40 pointer-events-none': loading }">
               <TableHeader>
-                <TableRow class="hover:bg-transparent border-b border-[#F0F0F0]">
+                <TableRow class="hover:bg-transparent border-b border-border">
                   <TableHead class="w-10 text-[12px] font-normal text-muted-foreground h-10">
-                    <input type="checkbox" class="h-[15px] w-[15px] rounded border-border accent-[#4facfe] cursor-pointer" :checked="isAllSelected" :indeterminate="isPartialSelected" @change="toggleSelectAll" />
+                    <input type="checkbox" class="h-[15px] w-[15px] rounded border-border accent-primary cursor-pointer" :checked="isAllSelected" :indeterminate="isPartialSelected" @change="toggleSelectAll" />
                   </TableHead>
                   <TableHead class="min-w-[220px] text-[12px] font-normal text-muted-foreground h-10 cursor-pointer select-none hover:text-foreground transition-colors" @click="toggleSort('name')">
                     <span class="flex items-center gap-1">
@@ -154,27 +154,27 @@
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="row in pageItems" :key="row.id" :class="{ 'bg-muted': selectedIds.has(row.id) }" class="hover:bg-muted transition-colors duration-150 border-b border-[#F0F0F0]">
+                <TableRow v-for="row in pageItems" :key="row.id" :class="{ 'bg-muted': selectedIds.has(row.id) }" class="hover:bg-muted transition-colors duration-150 border-b border-border">
                   <TableCell>
-                    <input type="checkbox" class="h-[15px] w-[15px] rounded border-border accent-[#4facfe] cursor-pointer" :checked="selectedIds.has(row.id)" @change="toggleSelect(row)" />
+                    <input type="checkbox" class="h-[15px] w-[15px] rounded border-border accent-primary cursor-pointer" :checked="selectedIds.has(row.id)" @change="toggleSelect(row)" />
                   </TableCell>
                   <TableCell>
                     <div class="flex items-center gap-1.5">
                       <Settings v-if="row.backupLevel === 'system'" class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <HardDrive v-else-if="row.backupLevel === 'redis'" class="h-3.5 w-3.5 text-[#e6a23c] shrink-0" />
+                      <HardDrive v-else-if="row.backupLevel === 'redis'" class="h-3.5 w-3.5 icon-special-color shrink-0" />
                       <Database v-else class="h-3.5 w-3.5 text-primary shrink-0" />
                       <span class="text-[13px] truncate text-foreground max-w-[180px] inline-block" :title="row.name">{{ row.name }}</span>
-                      <Badge v-if="row.backupType === 'import'" variant="outline" class="text-[10px] py-0 bg-[#16a34a]/10 text-[#16a34a] border-[#16a34a]/20 shrink-0">导入</Badge>
+                      <Badge v-if="row.backupType === 'import'" variant="outline" class="text-[10px] py-0 bg-emerald-500/15 text-emerald-400 border-emerald-500/20 shrink-0">导入</Badge>
                       <Badge v-else-if="row.backupType === 'scheduled'" variant="secondary" class="text-[10px] py-0 bg-muted text-foreground shrink-0">定时</Badge>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div class="inline-flex items-center gap-1">
-                      <span v-if="row.status === 'success'" class="inline-flex items-center gap-1 text-[11px] text-[#16a34a]">
-                        <span class="h-1.5 w-1.5 rounded-full bg-[#16a34a]"></span>
+                      <span v-if="row.status === 'success'" class="inline-flex items-center gap-1 text-[11px] text-emerald-400">
+                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
                         成功
                       </span>
-                      <span v-else class="inline-flex items-center gap-1 text-[11px] text-red-500">
+                      <span v-else class="inline-flex items-center gap-1 text-[11px] text-red-400">
                         <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span>
                         失败
                       </span>
@@ -186,14 +186,14 @@
                   <TableCell>
                     <div class="flex items-center justify-center h-full">
                       <div class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none" @click="handleRestore(row)">
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none" @click="handleRestore(row)">
                           <RotateCcw class="h-3.5 w-3.5 shrink-0" />恢复
                         </button>
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none" @click="handleDownload(row)">
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none" @click="handleDownload(row)">
                           <Download class="h-3.5 w-3.5 shrink-0" />下载
                         </button>
                         <div class="w-px h-4 bg-border mx-0.5 shrink-0"></div>
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-500 hover:bg-white transition-all whitespace-nowrap leading-none" @click="confirmDeleteTarget = row; showDeleteDialog = true">
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-400 hover:bg-muted transition-all whitespace-nowrap leading-none" @click="confirmDeleteTarget = row; showDeleteDialog = true">
                           <Trash2 class="h-3.5 w-3.5 shrink-0" />删除
                         </button>
                       </div>
@@ -216,7 +216,7 @@
                   variant="outline"
                   size="sm"
                   class="h-7 min-w-[28px] px-1 text-[12px]"
-                  :class="p === currentPage ? 'bg-foreground text-white border-foreground hover:bg-[#333]' : ''"
+                  :class="p === currentPage ? 'pagination-active' : ''"
                   @click="goToPage(p)"
                 >{{ p }}</Button>
               </template>
@@ -240,7 +240,7 @@
             </div>
             <Table v-else>
               <TableHeader>
-                <TableRow class="hover:bg-transparent border-b border-[#F0F0F0]">
+                <TableRow class="hover:bg-transparent border-b border-border">
                   <TableHead class="min-w-[160px] text-[12px] font-normal text-muted-foreground">计划名称</TableHead>
                   <TableHead class="w-[75px] text-[12px] font-normal text-muted-foreground">级别</TableHead>
                   <TableHead class="min-w-[120px] text-[12px] font-normal text-muted-foreground">目标数据库</TableHead>
@@ -252,14 +252,14 @@
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="row in scheduleList" :key="row.id" class="hover:bg-muted border-b border-[#F0F0F0]">
+                <TableRow v-for="row in scheduleList" :key="row.id" class="hover:bg-muted border-b border-border">
                   <TableCell>
                     <span class="truncate text-[13px] text-foreground">{{ row.name }}</span>
                   </TableCell>
                   <TableCell>
-                    <Badge v-if="row.backupLevel === 'system'" variant="outline" class="bg-amber-50 text-amber-600 border-amber-200">系统</Badge>
-                    <Badge v-else-if="row.backupLevel === 'redis'" variant="outline" class="bg-amber-50 text-amber-600 border-amber-200">Redis</Badge>
-                    <Badge v-else variant="outline" class="bg-blue-50 text-blue-600 border-blue-200">MySQL</Badge>
+                    <Badge v-if="row.backupLevel === 'system'" variant="outline" class="bg-amber-500/5 text-amber-600 border-amber-500/20">系统</Badge>
+                    <Badge v-else-if="row.backupLevel === 'redis'" variant="outline" class="bg-amber-500/5 text-amber-600 border-amber-500/20">Redis</Badge>
+                    <Badge v-else variant="outline" class="bg-blue-500/5 text-blue-600 border-blue-500/20">MySQL</Badge>
                   </TableCell>
                   <TableCell>
                     <span v-if="row.database" class="text-foreground">{{ row.database }}</span>
@@ -280,11 +280,11 @@
                   <TableCell>
                     <div class="flex items-center justify-center h-full">
                       <div class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none" @click="openScheduleDialog(row)">
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none" @click="openScheduleDialog(row)">
                           <FileText class="h-3.5 w-3.5 shrink-0" />编辑
                         </button>
                         <div class="w-px h-4 bg-border mx-0.5 shrink-0"></div>
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-500 hover:bg-white transition-all whitespace-nowrap leading-none" @click="confirmDeleteTarget = row; showDeleteScheduleDialog = true">
+                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-400 hover:bg-muted transition-all whitespace-nowrap leading-none" @click="confirmDeleteTarget = row; showDeleteScheduleDialog = true">
                           <Trash2 class="h-3.5 w-3.5 shrink-0" />删除
                         </button>
                       </div>
@@ -305,7 +305,7 @@
         </div>
         <div class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">备份类型 <span class="text-red-500">*</span></label>
+            <label class="text-sm font-medium text-foreground">备份类型 <span class="text-red-400">*</span></label>
             <div class="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground">
               <button
                 v-for="opt in createLevelOptions"
@@ -313,7 +313,7 @@
                 :class="[
                   'inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-medium transition-all',
                   createForm.backupLevel === opt.value
-                    ? 'bg-white text-foreground shadow'
+                    ? 'bg-card text-foreground shadow'
                     : 'hover:text-foreground'
                 ]"
                 @click="createForm.backupLevel = opt.value"
@@ -326,7 +326,7 @@
             </p>
           </div>
           <div v-if="createForm.backupLevel !== 'system'" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">目标数据库 <span class="text-red-500">*</span></label>
+            <label class="text-sm font-medium text-foreground">目标数据库 <span class="text-red-400">*</span></label>
             <Select v-model="createForm.targetDb">
               <SelectTrigger class="border-border shadow-none">
                 <template v-if="selectedCreateDb">
@@ -334,7 +334,7 @@
                     {{ selectedCreateDb.name }}
                     <Badge
                       variant="outline"
-                      :class="selectedCreateDb.type === 'redis' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200'"
+                      :class="selectedCreateDb.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'"
                       class="text-[10px] px-1.5 py-0 shrink-0"
                     >
                       {{ selectedCreateDb.type === 'redis' ? 'Redis' : 'MySQL' }}
@@ -355,7 +355,7 @@
                     <div class="flex items-center gap-2 shrink-0">
                       <Badge
                         variant="outline"
-                        :class="db.type === 'redis' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200'"
+                        :class="db.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'"
                         class="text-[10px] px-1.5 py-0"
                       >
                         {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}
@@ -369,7 +369,7 @@
           </div>
           <!-- MySQL 备份：选择具体要备份的数据库名 -->
           <div v-if="createForm.backupLevel === 'mysql'" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">选择要备份的数据库 <span class="text-red-500">*</span></label>
+            <label class="text-sm font-medium text-foreground">选择要备份的数据库 <span class="text-red-400">*</span></label>
             <Select v-model="createForm.targetMysqlDbName">
               <SelectTrigger class="border-border shadow-none">
                 <SelectValue placeholder="选择要备份的数据库" />
@@ -387,7 +387,7 @@
             <p v-if="loadingMysqlDatabases" class="text-xs text-muted-foreground flex items-center gap-1 mt-1">
               <Loader2 class="h-3 w-3 animate-spin" /> 正在加载数据库列表...
             </p>
-            <p v-else-if="createForm.targetDb && mysqlDatabaseOptions.length === 0" class="text-xs text-amber-500 mt-1">
+            <p v-else-if="createForm.targetDb && mysqlDatabaseOptions.length === 0" class="text-xs text-amber-400 mt-1">
               该连接下没有可用的数据库
             </p>
           </div>
@@ -417,11 +417,11 @@
         </div>
         <div class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">计划名称 <span class="text-red-500">*</span></label>
+            <label class="text-sm font-medium text-foreground">计划名称 <span class="text-red-400">*</span></label>
             <Input v-model="scheduleForm.name" placeholder="如：每日数据库备份" class="border-border shadow-none" />
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">备份类型 <span class="text-red-500">*</span></label>
+            <label class="text-sm font-medium text-foreground">备份类型 <span class="text-red-400">*</span></label>
             <div class="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground">
               <button
                 v-for="opt in createLevelOptions"
@@ -429,7 +429,7 @@
                 :class="[
                   'inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-medium transition-all',
                   scheduleForm.backupLevel === opt.value
-                    ? 'bg-white text-foreground shadow'
+                    ? 'bg-card text-foreground shadow'
                     : 'hover:text-foreground'
                 ]"
                 @click="scheduleForm.backupLevel = opt.value"
@@ -439,7 +439,7 @@
             </div>
           </div>
           <div v-if="scheduleForm.backupLevel !== 'system'" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">目标连接 <span class="text-red-500">*</span></label>
+            <label class="text-sm font-medium text-foreground">目标连接 <span class="text-red-400">*</span></label>
             <Select v-model="scheduleForm.targetDb" @update:model-value="onScheduleDbChange">
               <SelectTrigger class="border-border shadow-none">
                 <template v-if="selectedScheduleDb">
@@ -447,7 +447,7 @@
                     {{ selectedScheduleDb.name }}
                     <Badge
                       variant="outline"
-                      :class="selectedScheduleDb.type === 'redis' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200'"
+                      :class="selectedScheduleDb.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'"
                       class="text-[10px] px-1.5 py-0 shrink-0"
                     >
                       {{ selectedScheduleDb.type === 'redis' ? 'Redis' : 'MySQL' }}
@@ -468,7 +468,7 @@
                     <div class="flex items-center gap-2 shrink-0">
                       <Badge
                         variant="outline"
-                        :class="db.type === 'redis' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200'"
+                        :class="db.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'"
                         class="text-[10px] px-1.5 py-0"
                       >
                         {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}
@@ -481,7 +481,7 @@
             </Select>
           </div>
           <div v-if="scheduleForm.backupLevel === 'mysql' && scheduleForm.targetDb" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">目标数据库 <span class="text-red-500">*</span></label>
+            <label class="text-sm font-medium text-foreground">目标数据库 <span class="text-red-400">*</span></label>
             <Select v-model="scheduleForm.targetMysqlDbName">
               <SelectTrigger class="border-border shadow-none">
                 <SelectValue placeholder="选择数据库" />
@@ -499,12 +499,12 @@
             <p v-if="loadingScheduleMysqlDatabases" class="text-xs text-muted-foreground mt-1 flex items-center gap-1">
               <Loader2 class="h-3 w-3 animate-spin" /> 正在加载数据库列表...
             </p>
-            <p v-else-if="scheduleForm.targetDb && scheduleMysqlDatabaseOptions.length === 0" class="text-xs text-amber-500 mt-1">
+            <p v-else-if="scheduleForm.targetDb && scheduleMysqlDatabaseOptions.length === 0" class="text-xs text-amber-400 mt-1">
               该连接下没有可用的数据库
             </p>
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">执行周期 <span class="text-red-500">*</span></label>
+            <label class="text-sm font-medium text-foreground">执行周期 <span class="text-red-400">*</span></label>
             <Select v-model="scheduleForm.cron">
               <SelectTrigger class="border-border shadow-none">
                 <SelectValue placeholder="选择周期" />

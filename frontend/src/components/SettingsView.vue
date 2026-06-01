@@ -14,8 +14,8 @@
             :class="[
               'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
               activeTab === 'instance'
-                ? 'bg-gradient-to-r from-[#1A1A1A] to-[#333] text-white shadow-lg shadow-[#1A1A1A]/20'
-                : 'bg-muted text-muted-foreground hover:bg-[#EAEAEA] hover:text-secondary-foreground'
+                ? 'tab-active shadow-lg shadow-blue-500/20'
+                : 'tab-inactive'
             ]"
             @click="activeTab = 'instance'"
           >
@@ -26,8 +26,8 @@
             :class="[
               'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
               activeTab === 'system'
-                ? 'bg-gradient-to-r from-[#1A1A1A] to-[#333] text-white shadow-lg shadow-[#1A1A1A]/20'
-                : 'bg-muted text-muted-foreground hover:bg-[#EAEAEA] hover:text-secondary-foreground'
+                ? 'tab-active shadow-lg shadow-blue-500/20'
+                : 'tab-inactive'
             ]"
             @click="activeTab = 'system'"
           >
@@ -42,19 +42,19 @@
         <div class="content-section border-t border-border">
           <Tabs v-model="systemSubTab">
             <TabsList class="bg-muted">
-              <TabsTrigger value="logs" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">
+              <TabsTrigger value="logs" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
                 <FileText class="h-4 w-4 mr-1.5" />日志中心
               </TabsTrigger>
-              <TabsTrigger value="interface" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">
+              <TabsTrigger value="interface" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
                 <Palette class="h-4 w-4 mr-1.5" />界面设置
               </TabsTrigger>
-              <TabsTrigger value="data" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">
+              <TabsTrigger value="data" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
                 <HardDrive class="h-4 w-4 mr-1.5" />数据设置
               </TabsTrigger>
-              <TabsTrigger value="health" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">
+              <TabsTrigger value="health" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
                 <Activity class="h-4 w-4 mr-1.5" />测活配置
               </TabsTrigger>
-              <TabsTrigger value="about" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">
+              <TabsTrigger value="about" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
                 <Info class="h-4 w-4 mr-1.5" />关于系统
               </TabsTrigger>
             </TabsList>
@@ -63,7 +63,7 @@
 
         <!-- 日志中心设置 -->
         <div v-if="systemSubTab === 'logs'" class="content-section">
-          <div class="rounded-xl border border-border bg-white shadow-sm p-4 space-y-3">
+          <div class="rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
             <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
               <div class="flex flex-col gap-0.5">
                 <span class="text-[13px] font-medium text-foreground">启用日志中心</span>
@@ -106,7 +106,7 @@
 
         <!-- 界面设置 -->
         <div v-if="systemSubTab === 'interface'" class="content-section">
-          <div class="rounded-xl border border-border bg-white shadow-sm p-4 space-y-3">
+          <div class="rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
             <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
               <div class="flex flex-col gap-0.5">
                 <span class="text-[13px] font-medium text-foreground">侧边栏状态</span>
@@ -129,7 +129,7 @@
 
         <!-- 数据设置 -->
         <div v-if="systemSubTab === 'data'" class="content-section">
-          <div class="rounded-xl border border-border bg-white shadow-sm p-4 space-y-3">
+          <div class="rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
             <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
               <div class="flex flex-col gap-0.5">
                 <span class="text-[13px] font-medium text-foreground">自动刷新间隔</span>
@@ -168,7 +168,7 @@
 
         <!-- 关于系统 -->
         <div v-if="systemSubTab === 'health'" class="content-section">
-          <div class="rounded-xl border border-border bg-white shadow-sm p-4 space-y-3">
+          <div class="rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
             <div class="grid grid-cols-2 gap-3">
               <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
                 <div class="flex flex-col gap-0.5">
@@ -237,15 +237,15 @@
             </div>
           </div>
 
-          <div v-if="healthStore.totalCount > 0" class="mt-3 rounded-xl border border-border bg-white shadow-sm p-4">
+          <div v-if="healthStore.totalCount > 0" class="mt-3 rounded-xl border border-border bg-card shadow-sm p-4">
             <div class="flex items-center gap-4 mb-3">
-              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
+              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
                 <span class="h-2 w-2 rounded-full bg-emerald-500" />
-                <span class="text-[12px] font-medium text-emerald-700">在线 {{ healthStore.onlineCount }}</span>
+                <span class="text-[12px] font-medium text-emerald-400">在线 {{ healthStore.onlineCount }}</span>
               </div>
-              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200">
+              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/5 border border-red-500/20">
                 <span class="h-2 w-2 rounded-full bg-red-500" />
-                <span class="text-[12px] font-medium text-red-700">离线 {{ healthStore.offlineCount }}</span>
+                <span class="text-[12px] font-medium text-red-400">离线 {{ healthStore.offlineCount }}</span>
               </div>
               <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
                 <span class="text-[12px] text-muted-foreground">共 {{ healthStore.totalCount }} 个实例</span>
@@ -257,7 +257,7 @@
                 v-for="item in healthSortedDetails"
                 :key="item.uid"
                 class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors"
-                :class="item.online ? 'bg-emerald-50/50' : 'bg-red-50/50'"
+                :class="item.online ? 'bg-emerald-500/5' : 'bg-red-500/5'"
               >
                 <StatusDot :status="item.online ? 'online' : 'offline'" size="sm" />
                 <div class="flex-1 min-w-0">
@@ -265,10 +265,10 @@
                   <div class="text-[10px] text-muted-foreground truncate">{{ item.host }}:{{ item.port }}</div>
                 </div>
                 <span class="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                  :class="item.type === 'redis' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'"
+                  :class="item.type === 'redis' ? 'bg-blue-100 text-blue-400' : 'bg-orange-100 text-orange-400'"
                 >{{ item.type === 'redis' ? 'Redis' : 'MySQL' }}</span>
                 <span v-if="item.latencyMs >= 0" class="text-[10px] text-muted-foreground w-[50px] text-right">{{ item.latencyMs }}ms</span>
-                <span v-if="!item.online && item.error" class="text-[10px] text-red-500 max-w-[120px] truncate" :title="item.error">{{ item.error }}</span>
+                <span v-if="!item.online && item.error" class="text-[10px] text-red-400 max-w-[120px] truncate" :title="item.error">{{ item.error }}</span>
               </div>
             </div>
           </div>
@@ -276,7 +276,7 @@
 
         <!-- 关于系统 -->
         <div v-if="systemSubTab === 'about'" class="content-section">
-          <div class="rounded-xl border border-border bg-white shadow-sm p-4">
+          <div class="rounded-xl border border-border bg-card shadow-sm p-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
               <div class="flex flex-col gap-0.5 rounded-lg bg-muted px-4 py-3">
                 <span class="text-xs text-muted-foreground">系统版本</span>
@@ -312,16 +312,16 @@
         <div class="content-section">
           <Tabs v-model="instanceTab">
             <TabsList class="bg-muted">
-              <TabsTrigger value="local" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">
+              <TabsTrigger value="local" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
                 本地实例
-                <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold text-white"
+                <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold text-on-foreground"
                   :class="instanceTab === 'local' ? 'bg-foreground' : 'bg-muted-foreground'">
                   {{ localInstances.length }}
                 </span>
               </TabsTrigger>
-              <TabsTrigger value="remote" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">
+              <TabsTrigger value="remote" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
                 远程服务器
-                <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold text-white"
+                <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold text-on-foreground"
                   :class="instanceTab === 'remote' ? 'bg-foreground' : 'bg-muted-foreground'">
                   {{ remoteInstances.length }}
                 </span>
@@ -360,15 +360,15 @@
           <Tabs v-model="detailTab">
             <div class="content-section-top">
               <TabsList class="bg-muted">
-                <TabsTrigger value="info" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">基本信息</TabsTrigger>
-                <TabsTrigger value="config" v-if="currentDb.type === 'mysql' || currentDb.type === 'redis'" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">配置修改</TabsTrigger>
-                <TabsTrigger value="users" v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="text-[12px] data-[state=active]:bg-white data-[state=active]:text-foreground">用户管理</TabsTrigger>
+                <TabsTrigger value="info" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">基本信息</TabsTrigger>
+                <TabsTrigger value="config" v-if="currentDb.type === 'mysql' || currentDb.type === 'redis'" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">配置修改</TabsTrigger>
+                <TabsTrigger value="users" v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">用户管理</TabsTrigger>
                 <span v-if="currentDb.type === 'mysql' && currentDb.username !== 'root'" class="text-[12px] text-muted-foreground px-2 self-center">用户管理<span class="text-destructive text-[11px] ml-0.5">（仅限 root 账户）</span></span>
               </TabsList>
             </div>
 
             <TabsContent value="info" class="content-section">
-              <div class="rounded-xl border border-border bg-white shadow-sm">
+              <div class="rounded-xl border border-border bg-card shadow-sm">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 p-5">
                   <div class="flex flex-col gap-1">
                     <span class="text-xs text-muted-foreground">实例名称</span>
@@ -376,7 +376,7 @@
                   </div>
                   <div class="flex flex-col gap-1">
                     <span class="text-xs text-muted-foreground">数据库类型</span>
-                    <Badge :variant="currentDb.type === 'mysql' ? 'default' : 'secondary'" class="w-fit rounded-full bg-primary text-white">
+                    <Badge :variant="currentDb.type === 'mysql' ? 'default' : 'secondary'" class="w-fit rounded-full tab-active">
                       {{ currentDb.type === 'mysql' ? 'MySQL' : 'Redis' }}
                     </Badge>
                   </div>
@@ -388,7 +388,7 @@
                     <span class="text-xs text-muted-foreground">端口</span>
                     <span class="text-sm text-foreground font-mono">
                       {{ currentDb.port }}
-                      <span v-if="currentDb.container" class="ml-1.5 text-[11px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Docker</span>
+                      <span v-if="currentDb.container" class="ml-1.5 text-[11px] text-blue-400 bg-blue-500/5 px-1.5 py-0.5 rounded">Docker</span>
                     </span>
                   </div>
                   <div class="flex flex-col gap-1">
@@ -402,7 +402,7 @@
                 </div>
 
                 <div class="flex flex-wrap gap-3 content-section">
-                  <Button size="sm" variant="secondary" class="h-8 text-[13px] border-border shadow-none bg-white hover:bg-muted" @click="confirmAction('restart')">
+                  <Button size="sm" variant="secondary" class="h-8 text-[13px] border-border shadow-none bg-card hover:bg-muted" @click="confirmAction('restart')">
                     <RefreshCw class="h-4 w-4" />
                     重启实例
                   </Button>
@@ -415,7 +415,7 @@
             </TabsContent>
 
             <TabsContent value="config" class="content-section" v-if="currentDb.type === 'mysql' || currentDb.type === 'redis'">
-              <div class="rounded-xl border border-border bg-white shadow-sm">
+              <div class="rounded-xl border border-border bg-card shadow-sm">
                 <div class="border border-border rounded-lg m-4 overflow-hidden">
                   <div class="flex flex-wrap items-center justify-between px-4 py-2 bg-muted border-b border-border gap-2">
                     <span class="text-xs text-muted-foreground">
@@ -434,7 +434,7 @@
                   </div>
                   <Textarea
                     v-model="configContent"
-                    class="font-mono text-sm leading-relaxed bg-[#1a1a2e] text-[#e0e0e0] border-0 rounded-none min-h-[360px] focus-visible:ring-0"
+                    class="font-mono text-sm leading-relaxed code-editor border-0 rounded-none min-h-[360px] focus-visible:ring-0"
                   />
                 </div>
 
@@ -457,8 +457,8 @@
                           {{ updatingPort ? '修改中...' : '应用端口' }}
                         </Button>
                       </div>
-                      <div v-if="currentDb?.container" class="mt-1.5 p-2.5 bg-blue-50 rounded-lg border border-blue-100">
-                        <div class="text-xs text-blue-600 font-medium mb-1.5">Docker 端口映射</div>
+                      <div v-if="currentDb?.container" class="mt-1.5 p-2.5 bg-blue-500/5 rounded-lg border border-blue-100">
+                        <div class="text-xs text-blue-500 font-medium mb-1.5">Docker 端口映射</div>
                         <div class="flex items-center gap-3 text-xs">
                           <span class="text-muted-foreground">容器内: <span class="text-foreground font-mono">{{ dockerInternalPort }}</span></span>
                           <span class="text-muted-foreground">→</span>
@@ -514,7 +514,7 @@
             </TabsContent>
 
             <TabsContent value="users" class="content-section">
-              <div v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="rounded-xl border border-border bg-white shadow-sm">
+              <div v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="rounded-xl border border-border bg-card shadow-sm">
                 <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-border gap-2">
                   <span class="text-sm text-muted-foreground">管理数据库用户及其权限</span>
                   <Button variant="primary" size="sm" class="h-8 text-[13px]" @click="showCreateUserDialog = true">
@@ -525,7 +525,7 @@
 
                 <Table class="px-4">
                   <TableHeader>
-                    <TableRow class="hover:bg-transparent border-b border-[#F0F0F0]">
+                    <TableRow class="hover:bg-transparent border-b border-border">
                       <TableHead class="w-[150px] text-[12px] font-normal text-muted-foreground">用户名</TableHead>
                       <TableHead class="w-[150px] text-[12px] font-normal text-muted-foreground">主机</TableHead>
                       <TableHead class="min-w-[250px] text-[12px] font-normal text-muted-foreground">全局权限</TableHead>
@@ -533,18 +533,18 @@
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow v-for="row in users" :key="row.user + row.host" class="hover:bg-muted border-b border-[#F0F0F0]">
+                    <TableRow v-for="row in users" :key="row.user + row.host" class="hover:bg-muted border-b border-border">
                       <TableCell class="font-medium text-foreground">
                         <div class="flex items-center gap-1.5">
                           {{ row.user }}
-                          <Lock v-if="row.account_locked" class="h-3.5 w-3.5 text-red-500" />
+                          <Lock v-if="row.account_locked" class="h-3.5 w-3.5 text-red-400" />
                         </div>
                       </TableCell>
                       <TableCell class="font-mono text-sm text-foreground">{{ row.host }}</TableCell>
                       <TableCell>
                         <div class="flex flex-wrap gap-1">
                           <Badge v-for="priv in row.privileges" :key="priv" variant="secondary" class="text-[11px] rounded-full"
-                            :class="priv === 'ALL' ? 'bg-primary text-white' : priv === 'DELETE' || priv === 'DROP' ? 'bg-red-50 text-red-500' : 'bg-muted text-foreground'">
+                            :class="priv === 'ALL' ? 'tab-active' : priv === 'DELETE' || priv === 'DROP' ? 'bg-red-500/5 text-red-400' : 'bg-muted text-foreground'">
                             {{ privLabelMap[priv] || priv }}
                           </Badge>
                         </div>
@@ -553,35 +553,35 @@
                         <div class="flex items-center justify-center h-full">
                           <div class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
                               @click="openEditPermDialog(row)"
                             >
                               <Shield class="h-3.5 w-3.5 shrink-0" />
                               授权
                             </button>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
                               @click="openDbGrantDialog(row)"
                             >
                               <DatabaseIcon class="h-3.5 w-3.5 shrink-0" />
                               库权限
                             </button>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
                               @click="openChangePwdDialog(row)"
                             >
                               <KeyRound class="h-3.5 w-3.5 shrink-0" />
                               改密
                             </button>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
                               @click="openChangeHostDialog(row)"
                             >
                               <Globe class="h-3.5 w-3.5 shrink-0" />
                               改主机
                             </button>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-white transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
                               @click="toggleUserLock(row)"
                             >
                               <component :is="row.account_locked ? Unlock : LockIcon" class="h-3.5 w-3.5 shrink-0" />
@@ -589,7 +589,7 @@
                             </button>
                             <div class="w-px h-4 bg-border mx-0.5 shrink-0"></div>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-500 hover:bg-white transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-400 hover:bg-muted transition-all whitespace-nowrap leading-none"
                               @click="confirmAction('deleteUser', row)"
                             >
                               <Trash2 class="h-3.5 w-3.5 shrink-0" />
@@ -612,7 +612,7 @@
                   </TableBody>
                 </Table>
               </div>
-              <div v-else class="rounded-xl border border-border bg-white shadow-sm p-8">
+              <div v-else class="rounded-xl border border-border bg-card shadow-sm p-8">
                 <div class="empty-state">
                   <div class="empty-state-icon">
                     <Users class="h-10 w-10" />
@@ -642,7 +642,7 @@
           <DialogTitle>创建数据库用户</DialogTitle>
         </div>
         <div class="space-y-4">
-          <div v-if="createUserResult.show" :class="createUserResult.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+          <div v-if="createUserResult.show" :class="createUserResult.success ? 'bg-emerald-500/5 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/5 border border-red-500/20 text-red-400'" class="rounded-md p-3 text-sm">
             {{ createUserResult.message }}
           </div>
           <div class="flex flex-col gap-1.5">
@@ -665,7 +665,7 @@
                 class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer transition-colors border"
                 :class="userForm.privileges.includes('ALL')
                   ? 'bg-primary text-white border-primary'
-                  : 'bg-white text-foreground border-border hover:border-primary/50'"
+                  : 'bg-card text-foreground border-border hover:border-primary/50'"
                 @click="toggleCreateUserPriv('ALL')"
               >
                 <span>全部权限</span>
@@ -681,7 +681,7 @@
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
                     :class="userForm.privileges.includes(priv.value)
                       ? 'bg-primary/10 text-primary border-primary/30 font-medium'
-                      : 'bg-white text-foreground border-border hover:border-primary/30'"
+                      : 'bg-card text-foreground border-border hover:border-primary/30'"
                     @click="toggleCreateUserPriv(priv.value)"
                   >
                     <span class="w-1.5 h-1.5 rounded-full" :class="userForm.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
@@ -698,7 +698,7 @@
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
                     :class="userForm.privileges.includes(priv.value)
                       ? 'bg-primary/10 text-primary border-primary/30 font-medium'
-                      : 'bg-white text-foreground border-border hover:border-primary/30'"
+                      : 'bg-card text-foreground border-border hover:border-primary/30'"
                     @click="toggleCreateUserPriv(priv.value)"
                   >
                     <span class="w-1.5 h-1.5 rounded-full" :class="userForm.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
@@ -739,7 +739,7 @@
           <DialogTitle>修改权限 - {{ editPermState.row?.user }}@{{ editPermState.row?.host }}</DialogTitle>
           <DialogDescription>点击小卡片选择权限</DialogDescription>
         </div>
-        <div v-if="editPermState.result?.show" :class="editPermState.result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+        <div v-if="editPermState.result?.show" :class="editPermState.result.success ? 'bg-emerald-500/5 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/5 border border-red-500/20 text-red-400'" class="rounded-md p-3 text-sm">
           {{ editPermState.result.message }}
         </div>
 
@@ -749,12 +749,12 @@
               class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer transition-colors border"
               :class="editPermState.privileges.includes('ALL')
                 ? 'bg-primary text-white border-primary'
-                : 'bg-white text-foreground border-border hover:border-primary/50'"
+                : 'bg-card text-foreground border-border hover:border-primary/50'"
               @click="togglePrivilege('ALL')"
             >
               <span>全部权限</span>
             </label>
-            <span class="text-xs text-amber-600">授予所有操作权限</span>
+            <span class="text-xs text-amber-500">授予所有操作权限</span>
           </div>
 
           <div class="space-y-4">
@@ -767,7 +767,7 @@
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
                   :class="editPermState.privileges.includes(priv.value)
                     ? 'bg-primary/10 text-primary border-primary/30 font-medium'
-                    : 'bg-white text-foreground border-border hover:border-primary/30'"
+                    : 'bg-card text-foreground border-border hover:border-primary/30'"
                   @click="togglePrivilege(priv.value)"
                 >
                   <span class="w-1.5 h-1.5 rounded-full" :class="editPermState.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
@@ -785,7 +785,7 @@
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
                   :class="editPermState.privileges.includes(priv.value)
                     ? 'bg-primary/10 text-primary border-primary/30 font-medium'
-                    : 'bg-white text-foreground border-border hover:border-primary/30'"
+                    : 'bg-card text-foreground border-border hover:border-primary/30'"
                   @click="togglePrivilege(priv.value)"
                 >
                   <span class="w-1.5 h-1.5 rounded-full" :class="editPermState.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
@@ -803,7 +803,7 @@
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
                   :class="editPermState.privileges.includes(priv.value)
                     ? 'bg-primary/10 text-primary border-primary/30 font-medium'
-                    : 'bg-white text-foreground border-border hover:border-primary/30'"
+                    : 'bg-card text-foreground border-border hover:border-primary/30'"
                   @click="togglePrivilege(priv.value)"
                 >
                   <span class="w-1.5 h-1.5 rounded-full" :class="editPermState.privileges.includes(priv.value) ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
@@ -819,7 +819,7 @@
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-all border"
                   :class="editPermState.privileges.includes('GRANT OPTION')
                     ? 'bg-primary/10 text-primary border-primary/30 font-medium'
-                    : 'bg-white text-foreground border-border hover:border-primary/30'"
+                    : 'bg-card text-foreground border-border hover:border-primary/30'"
                   @click="togglePrivilege('GRANT OPTION')"
                 >
                   <span class="w-1.5 h-1.5 rounded-full" :class="editPermState.privileges.includes('GRANT OPTION') ? 'bg-primary' : 'bg-muted-foreground/30'"></span>
@@ -843,7 +843,7 @@
           <DialogTitle>数据库权限 - {{ dbGrantState.row?.user }}@{{ dbGrantState.row?.host }}</DialogTitle>
           <DialogDescription>管理该用户在各数据库上的权限</DialogDescription>
         </div>
-        <div v-if="dbGrantState.result.show" :class="dbGrantState.result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+        <div v-if="dbGrantState.result.show" :class="dbGrantState.result.success ? 'bg-emerald-500/5 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/5 border border-red-500/20 text-red-400'" class="rounded-md p-3 text-sm">
           {{ dbGrantState.result.message }}
         </div>
 
@@ -884,12 +884,12 @@
           <div v-if="dbGrantState.dbGrants.length > 0" class="space-y-2">
             <div class="text-[12px] font-semibold text-muted-foreground uppercase tracking-wider">已有权限</div>
             <div class="space-y-2 max-h-[280px] overflow-y-auto">
-              <div v-for="grant in dbGrantState.dbGrants" :key="grant.database" class="flex items-center justify-between rounded-lg border border-border bg-white p-3">
+              <div v-for="grant in dbGrantState.dbGrants" :key="grant.database" class="flex items-center justify-between rounded-lg border border-border bg-card p-3">
                 <div class="flex-1 min-w-0">
                   <div class="text-[13px] font-medium text-foreground">{{ grant.database }}</div>
                   <div class="flex flex-wrap gap-1 mt-1">
                     <Badge v-for="priv in grant.privileges" :key="priv" variant="secondary" class="text-[11px] rounded-full"
-                      :class="priv === 'ALL' ? 'bg-primary text-white' : priv === 'DELETE' || priv === 'DROP' ? 'bg-red-50 text-red-500' : 'bg-muted text-foreground'">
+                      :class="priv === 'ALL' ? 'tab-active' : priv === 'DELETE' || priv === 'DROP' ? 'bg-red-500/5 text-red-400' : 'bg-muted text-foreground'">
                       {{ privLabelMap[priv] || priv }}
                     </Badge>
                   </div>
@@ -917,7 +917,7 @@
           <DialogTitle>修改密码 - {{ changePwdState.row?.user }}@{{ changePwdState.row?.host }}</DialogTitle>
         </div>
         <div class="space-y-4">
-          <div v-if="changePwdState.result.show" :class="changePwdState.result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+          <div v-if="changePwdState.result.show" :class="changePwdState.result.success ? 'bg-emerald-500/5 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/5 border border-red-500/20 text-red-400'" class="rounded-md p-3 text-sm">
             {{ changePwdState.result.message }}
           </div>
           <div class="flex flex-col gap-1.5">
@@ -938,7 +938,7 @@
           <DialogTitle>修改主机 - {{ changeHostState.row?.user }}@{{ changeHostState.row?.host }}</DialogTitle>
         </div>
         <div class="space-y-4">
-          <div v-if="changeHostState.result.show" :class="changeHostState.result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'" class="rounded-md p-3 text-sm">
+          <div v-if="changeHostState.result.show" :class="changeHostState.result.success ? 'bg-emerald-500/5 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/5 border border-red-500/20 text-red-400'" class="rounded-md p-3 text-sm">
             {{ changeHostState.result.message }}
           </div>
           <div class="flex flex-col gap-1.5">
@@ -992,7 +992,7 @@
           <div class="max-h-[320px] overflow-y-auto">
             <div
               v-if="browseParent !== '' && browseParent !== browsePath && !browseIsRoot"
-              class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-[#F0F0F0]"
+              class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-border"
               @click="navigateFolder(browseParent)"
             >
               <ArrowUp class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -1001,12 +1001,12 @@
             <div
               v-for="d in browseDirs"
               :key="d.path"
-              class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-[#F0F0F0] last:border-b-0"
+              class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-border last:border-b-0"
               @click="navigateFolder(d.path)"
               @dblclick="selectFolder(d.path)"
             >
               <HardDrive v-if="d.drive" class="h-3.5 w-3.5 text-primary shrink-0" />
-              <FolderOpen v-else class="h-3.5 w-3.5 text-[#e6a23c] shrink-0" />
+              <FolderOpen v-else class="h-3.5 w-3.5 icon-special-color shrink-0" />
               <span class="text-[13px] text-foreground flex-1 truncate">{{ d.name }}</span>
               <ChevronRight class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </div>

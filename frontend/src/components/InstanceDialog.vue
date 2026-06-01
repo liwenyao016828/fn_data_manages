@@ -62,16 +62,16 @@
         <div class="flex items-start gap-2">
           <AlertTriangle class="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
           <div class="flex-1 min-w-0">
-            <p class="text-sm text-amber-800 font-medium">连接已存在</p>
-            <p class="text-xs text-amber-700 mt-0.5">
+            <p class="text-sm text-amber-500 font-medium">连接已存在</p>
+            <p class="text-xs text-amber-500 mt-0.5">
               该主机({{ form.host }})、用户名({{ form.username }})和端口({{ form.port }})的数据库连接已存在
             </p>
             <div class="flex items-center gap-2 mt-2">
-              <span class="text-xs text-amber-600">{{ duplicateInstance.name }}</span>
+              <span class="text-xs text-amber-500">{{ duplicateInstance.name }}</span>
               <Badge v-if="duplicateInstance.isRemote" variant="outline" class="bg-orange-50 text-orange-500 border-orange-200 text-[10px] h-[16px]">远程</Badge>
               <span class="text-xs text-amber-500 font-mono-data">{{ duplicateInstance.type === 'mysql' ? 'MySQL' : 'Redis' }}</span>
             </div>
-            <Button variant="link" size="sm" class="h-auto p-0 mt-1 text-xs text-amber-700 hover:text-amber-900" @click="goToDuplicate">
+            <Button variant="link" size="sm" class="h-auto p-0 mt-1 text-xs text-amber-500 hover:text-amber-500" @click="goToDuplicate">
               跳转到该连接 →
             </Button>
           </div>
@@ -80,12 +80,12 @@
 
       <div class="flex justify-between items-center mt-4">
         <div class="flex items-center gap-2">
-          <Button variant="outline" @click="testConnection" :disabled="testLoading" class="text-[#4facfe] border-[#4facfe]/40 hover:bg-[#4facfe]/10">
+          <Button variant="outline" @click="testConnection" :disabled="testLoading" class="text-primary border-primary/40 hover:bg-primary/10">
             <Loader2 v-if="testLoading" class="h-4 w-4 animate-spin" />
             <Zap v-else class="h-4 w-4" />
             测试连接
           </Button>
-          <span v-if="testResult !== null" :class="testResult ? 'text-emerald-600' : 'text-red-500'" class="text-xs font-medium">
+          <span v-if="testResult !== null" :class="testResult ? 'text-emerald-400' : 'text-red-400'" class="text-xs font-medium">
             {{ testResult ? '连接成功' : '连接失败' }}
           </span>
         </div>
