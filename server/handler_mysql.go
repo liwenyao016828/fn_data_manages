@@ -184,7 +184,7 @@ func mysqlCreateDatabaseHandler(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]interface{}{"code": 400, "msg": "用户名验证失败: " + err.Error()})
 			return
 		}
-		createUserSQL := fmt.Sprintf("CREATE USER IF NOT EXISTS %s@%s IDENTIFIED BY '%s'", quoteString(req.Name), quoteString("%"), escapeQuote(req.Password))
+		createUserSQL := fmt.Sprintf("CREATE USER IF NOT EXISTS %s@%s IDENTIFIED BY %s", quoteString(req.Name), quoteString("%"), quoteString(req.Password))
 		fmt.Printf("[创建数据库] 创建用户SQL: %s\n", createUserSQL)
 		_, err = db.Exec(createUserSQL)
 		if err != nil {
