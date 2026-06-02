@@ -10,19 +10,19 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+          "bg-primary text-primary-foreground shadow-[0_1px_2px_rgba(37,99,235,0.1),0_4px_12px_rgba(37,99,235,0.15)] hover:bg-primary/90 hover:shadow-[0_2px_4px_rgba(37,99,235,0.12),0_8px_20px_rgba(37,99,235,0.2)]",
         destructive:
-          "bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20",
+          "bg-destructive text-white shadow-[0_1px_2px_rgba(220,38,38,0.1),0_4px_12px_rgba(220,38,38,0.15)] hover:bg-destructive/90 hover:shadow-[0_2px_4px_rgba(220,38,38,0.12),0_8px_20px_rgba(220,38,38,0.2)] focus-visible:ring-destructive/20",
         outline:
-          "border border-border bg-card text-foreground shadow-none hover:bg-accent hover:border-primary/40",
+          "border border-primary/30 bg-white text-primary shadow-none hover:bg-primary/5 hover:border-primary/50",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-none hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground shadow-none",
+          "bg-indigo-50 text-indigo-700 shadow-none hover:bg-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:bg-indigo-950/50",
+        ghost: "text-primary hover:bg-primary/5 hover:text-primary shadow-none",
         link: "text-primary underline-offset-4 hover:underline shadow-none",
         primary:
-          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+          "bg-primary text-primary-foreground shadow-[0_1px_2px_rgba(37,99,235,0.1),0_4px_12px_rgba(37,99,235,0.15)] hover:bg-primary/90 hover:shadow-[0_2px_4px_rgba(37,99,235,0.12),0_8px_20px_rgba(37,99,235,0.2)]",
         accent:
-          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+          "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.1),0_4px_12px_rgba(37,99,235,0.15)] hover:from-blue-700 hover:to-indigo-700 hover:shadow-[0_2px_4px_rgba(37,99,235,0.12),0_8px_20px_rgba(37,99,235,0.2)]",
       },
       size: {
         default: "h-9 px-4 py-2 text-sm rounded-[var(--btn-radius)]",

@@ -232,13 +232,12 @@ onMounted(async () => {
     >
       <div class="flex h-[52px] items-center shrink-0" :class="sidebarCollapsed ? 'justify-center px-0' : 'gap-2.5 px-3'">
         <div
-          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md cursor-pointer transition-all duration-200"
-          :class="sidebarCollapsed ? 'bg-[var(--soft-info-bg)]' : 'bg-primary/15 hover:bg-primary/25'"
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md cursor-pointer transition-colors duration-200 hover:bg-muted"
           @click="sidebarCollapsed = !sidebarCollapsed"
           :aria-label="sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'"
         >
-          <PanelLeftClose v-if="!sidebarCollapsed" class="h-3.5 w-3.5 icon-primary" />
-          <PanelLeftOpen v-else class="h-3.5 w-3.5 icon-primary" />
+          <PanelLeftClose v-if="!sidebarCollapsed" class="h-3.5 w-3.5 icon-secondary" />
+          <PanelLeftOpen v-else class="h-3.5 w-3.5 icon-secondary" />
         </div>
         <span v-if="!sidebarCollapsed" class="truncate text-[13px] font-semibold tracking-tight text-sidebar-foreground">
           数据库管理
@@ -252,20 +251,19 @@ onMounted(async () => {
             :key="item.key"
             :variant="activeMenu === item.key ? 'default' : 'ghost'"
             :class="[
-              'group w-full rounded-lg h-[34px] text-[13px] transition-all duration-200 cursor-pointer',
+              'group w-full rounded-lg h-[34px] text-[13px] transition-colors duration-200 cursor-pointer',
               sidebarCollapsed ? 'justify-center px-0' : 'justify-start gap-3 px-3',
               activeMenu === item.key
-                ? 'text-sidebar-primary-foreground shadow-lg'
-                : 'text-sidebar-foreground/55 hover:text-sidebar-foreground'
+                ? 'bg-muted text-foreground font-semibold'
+                : 'text-sidebar-foreground/65 hover:bg-muted hover:text-foreground'
             ]"
-            :style="activeMenu === item.key ? 'background: var(--sidebar-primary); color: var(--sidebar-primary-foreground); box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 35%, transparent);' : ''"
             @click="handleMenuSelect(item.key)"
           >
             <component
               :is="item.icon"
               :class="[
                 'h-4 w-4 shrink-0 transition-colors duration-200',
-                activeMenu === item.key ? 'text-white' : 'text-sidebar-foreground/45 group-hover:text-sidebar-foreground/75'
+                activeMenu === item.key ? 'text-foreground' : 'text-sidebar-foreground/55 group-hover:text-foreground/80'
               ]"
             />
             <span v-if="!sidebarCollapsed" class="truncate">{{ item.label }}</span>
@@ -278,18 +276,17 @@ onMounted(async () => {
           <ThemeToggle />
         </div>
         <div
-          class="flex items-center gap-2 rounded-lg cursor-pointer transition-all duration-200"
+          class="flex items-center gap-2 rounded-lg cursor-pointer transition-colors duration-200"
           :class="[
-            isActive ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent',
+            isActive ? 'bg-muted' : 'hover:bg-muted',
             sidebarCollapsed ? 'justify-center px-1 py-2' : 'px-3 py-2'
           ]"
           @click="openSwitcher"
         >
           <div class="h-6 w-6 rounded-full flex items-center justify-center shrink-0"
-            :class="{ 'bg-sidebar-accent': !isActive }"
-            :style="isActive ? 'background: var(--sidebar-primary);' : ''"
+            :class="isActive ? 'bg-foreground' : 'bg-muted'"
           >
-            <span class="text-[9px] font-bold tracking-tight" :class="isActive ? 'text-sidebar-primary-foreground' : 'text-sidebar-foreground/65'">{{ avatarText }}</span>
+            <span class="text-[9px] font-bold tracking-tight" :class="isActive ? 'text-background' : 'text-sidebar-foreground/70'">{{ avatarText }}</span>
           </div>
           <div v-if="!sidebarCollapsed" class="flex-1 min-w-0">
             <div class="text-[12px] text-sidebar-foreground truncate flex items-center gap-1.5">
@@ -319,7 +316,7 @@ onMounted(async () => {
               v-for="inst in instances"
               :key="(inst.isRemote ? 'r' : 'l') + inst.id"
               class="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors duration-200 hover:bg-muted"
-              :class="current?.connectionId === instanceUid(inst) ? 'bg-sidebar-accent' : ''"
+              :class="current?.connectionId === instanceUid(inst) ? 'bg-muted' : ''"
               @click="selectContext(inst)"
             >
               <StatusDot :status="current?.connectionId === instanceUid(inst) ? 'selected' : (onlineStatus[instanceUid(inst)] === undefined ? 'checking' : (onlineStatus[instanceUid(inst)] !== false ? 'online' : 'offline'))" size="sm" />

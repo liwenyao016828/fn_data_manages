@@ -233,29 +233,29 @@
           <div class="flex flex-col gap-2">
             <div class="flex items-center gap-2">
               <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">SELECT</span>
-              <div class="flex-1 h-[18px] bg-muted rounded overflow-hidden">
-                <div class="h-full rounded bg-gradient-to-r from-blue-500 to-cyan-400 transition-[width] duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComSelect : metrics.com_select) }" />
+              <div class="flex-1 h-[18px] rounded overflow-hidden" style="background: var(--muted)">
+                <div class="h-full rounded transition-all duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComSelect : metrics.com_select), background: 'linear-gradient(to right, #3b82f6, #22d3ee)' }" />
               </div>
               <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComSelect : metrics.com_select) }}</span>
             </div>
             <div class="flex items-center gap-2">
               <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">INSERT</span>
-              <div class="flex-1 h-[18px] bg-muted rounded overflow-hidden">
-                <div class="h-full rounded bg-gradient-to-r from-emerald-500 to-emerald-300 transition-[width] duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComInsert : metrics.com_insert) }" />
+              <div class="flex-1 h-[18px] rounded overflow-hidden" style="background: var(--muted)">
+                <div class="h-full rounded transition-all duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComInsert : metrics.com_insert, 'INSERT'), background: 'linear-gradient(to right, #10b981, #6ee7b7)' }" />
               </div>
               <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComInsert : metrics.com_insert) }}</span>
             </div>
             <div class="flex items-center gap-2">
               <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">UPDATE</span>
-              <div class="flex-1 h-[18px] bg-muted rounded overflow-hidden">
-                <div class="h-full rounded bg-gradient-to-r from-[#e6a23c] to-[#f59e0b] transition-[width] duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComUpdate : metrics.com_update) }" />
+              <div class="flex-1 h-[18px] rounded overflow-hidden" style="background: var(--muted)">
+                <div class="h-full rounded transition-all duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComUpdate : metrics.com_update, 'UPDATE'), background: 'linear-gradient(to right, #e6a23c, #f59e0b)' }" />
               </div>
               <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComUpdate : metrics.com_update) }}</span>
             </div>
             <div class="flex items-center gap-2">
               <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">DELETE</span>
-              <div class="flex-1 h-[18px] bg-muted rounded overflow-hidden">
-                <div class="h-full rounded bg-gradient-to-r from-[#ef4444] to-[#f97316] transition-[width] duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComDelete : metrics.com_delete) }" />
+              <div class="flex-1 h-[18px] rounded overflow-hidden" style="background: var(--muted)">
+                <div class="h-full rounded transition-all duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComDelete : metrics.com_delete, 'DELETE'), background: 'linear-gradient(to right, #ef4444, #f97316)' }" />
               </div>
               <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComDelete : metrics.com_delete) }}</span>
             </div>
@@ -500,8 +500,9 @@ watch(onlineStatus, (status) => {
 }, { deep: true })
 
 const formatNum = (val) => {
-  if (!val && val !== 0) return '-'
+  if (val == null) return '-'
   const n = parseInt(val)
+  if (isNaN(n) || n < 0) return '0'
   if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B'
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'
   if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'
@@ -509,15 +510,28 @@ const formatNum = (val) => {
 }
 
 const queryBarWidth = (val) => {
-  if (!val) return '0%'
-  const values = [
-    parseInt(metrics.value?.com_select) || 0,
-    parseInt(metrics.value?.com_insert) || 0,
-    parseInt(metrics.value?.com_update) || 0,
-    parseInt(metrics.value?.com_delete) || 0
-  ]
+  const numVal = Math.max(parseInt(val) || 0, 0)
+  if (numVal === 0) return '0%'
+  const clampZero = (v) => Math.max(parseInt(v) || 0, 0)
+  let values
+  if (rangeStatsAvailable.value) {
+    values = [
+      clampZero(rangeStats.deltaComSelect),
+      clampZero(rangeStats.deltaComInsert),
+      clampZero(rangeStats.deltaComUpdate),
+      clampZero(rangeStats.deltaComDelete)
+    ]
+  } else {
+    values = [
+      clampZero(metrics.value?.com_select),
+      clampZero(metrics.value?.com_insert),
+      clampZero(metrics.value?.com_update),
+      clampZero(metrics.value?.com_delete)
+    ]
+  }
   const max = Math.max(...values, 1)
-  return ((parseInt(val) / max) * 100).toFixed(0) + '%'
+  const width = (numVal / max) * 100
+  return `${Math.max(width, 1)}%`
 }
 
 const connUsageNum = computed(() => {

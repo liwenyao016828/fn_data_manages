@@ -1,5 +1,36 @@
 <template>
   <span
+    v-if="props.status === 'online'"
+    class="inline-block rounded-full shrink-0 transition-all duration-200"
+    :class="[
+      sizeClass,
+      'bg-emerald-500 dark:bg-emerald-400',
+      'shadow-[0_0_8px_rgba(16,185,129,0.4)] dark:shadow-[0_0_12px_rgba(16,185,129,0.5)]',
+      'animate-pulse',
+    ]"
+    :aria-label="ariaLabel"
+  />
+  <span
+    v-else-if="props.status === 'offline'"
+    class="inline-block rounded-full shrink-0 transition-all duration-200"
+    :class="[
+      sizeClass,
+      'bg-red-500 dark:bg-red-400',
+    ]"
+    :aria-label="ariaLabel"
+  />
+  <span
+    v-else-if="props.status === 'selected'"
+    class="inline-block rounded-full shrink-0 transition-all duration-200"
+    :class="[
+      sizeClass,
+      'bg-blue-600 dark:bg-blue-400',
+      'shadow-[0_0_8px_rgba(37,99,235,0.4)] dark:shadow-[0_0_12px_rgba(96,165,250,0.5)]',
+    ]"
+    :aria-label="ariaLabel"
+  />
+  <span
+    v-else
     class="status-dot"
     :class="[sizeClass, statusClass, blinkClass]"
     :aria-label="ariaLabel"

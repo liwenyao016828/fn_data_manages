@@ -30,7 +30,7 @@ export const SelectTrigger = defineComponent({
   setup(props, { slots }) {
     return () => h(RekaSelectTrigger, {
       class: cn(
-        'flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground shadow-sm ring-offset-background placeholder:text-helper focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
+        'flex h-11 w-full items-center justify-between whitespace-nowrap rounded-xl border border-transparent dark:border-zinc-800/80 bg-white dark:bg-[#121214] px-4 py-2 text-[14px] font-medium text-slate-900 dark:text-zinc-50 shadow-[0_8px_30px_rgb(15,23,42,0.04),0_4px_12px_rgb(15,23,42,0.02)] dark:shadow-none ring-offset-background placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 cursor-pointer transition-all',
         props.class,
       ),
     }, {
