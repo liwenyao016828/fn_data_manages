@@ -1,38 +1,8 @@
 <template>
   <span
-    v-if="props.status === 'online'"
     class="inline-block rounded-full shrink-0 transition-all duration-200"
-    :class="[
-      sizeClass,
-      'bg-emerald-500 dark:bg-emerald-400',
-      'shadow-[0_0_8px_rgba(16,185,129,0.4)] dark:shadow-[0_0_12px_rgba(16,185,129,0.5)]',
-      'animate-pulse',
-    ]"
-    :aria-label="ariaLabel"
-  />
-  <span
-    v-else-if="props.status === 'offline'"
-    class="inline-block rounded-full shrink-0 transition-all duration-200"
-    :class="[
-      sizeClass,
-      'bg-red-500 dark:bg-red-400',
-    ]"
-    :aria-label="ariaLabel"
-  />
-  <span
-    v-else-if="props.status === 'selected'"
-    class="inline-block rounded-full shrink-0 transition-all duration-200"
-    :class="[
-      sizeClass,
-      'bg-blue-600 dark:bg-blue-400',
-      'shadow-[0_0_8px_rgba(37,99,235,0.4)] dark:shadow-[0_0_12px_rgba(96,165,250,0.5)]',
-    ]"
-    :aria-label="ariaLabel"
-  />
-  <span
-    v-else
-    class="status-dot"
-    :class="[sizeClass, statusClass, blinkClass]"
+    :class="[sizeClass, statusColorClass, glowClass, blinkClass]"
+    :style="glowStyle"
     :aria-label="ariaLabel"
   />
 </template>
@@ -58,7 +28,7 @@ const sizeClass = computed(() => {
   return map[props.size]
 })
 
-const statusClass = computed(() => {
+const statusColorClass = computed(() => {
   const map = {
     online: 'status-dot-online',
     offline: 'status-dot-offline',
@@ -71,8 +41,22 @@ const statusClass = computed(() => {
   return map[props.status] || 'status-dot-default'
 })
 
+const glowClass = computed(() => {
+  return ['online', 'selected'].includes(props.status) ? 'status-dot' : 'status-dot'
+})
+
+const glowStyle = computed(() => {
+  if (props.status === 'online') {
+    return { boxShadow: '0 0 6px color-mix(in srgb, var(--success) 50%, transparent)' }
+  }
+  if (props.status === 'selected') {
+    return { boxShadow: '0 0 6px color-mix(in srgb, var(--accent) 50%, transparent)' }
+  }
+  return {}
+})
+
 const blinkClass = computed(() => {
-  return props.status === 'online' || props.status === 'checking' ? 'blink-dot' : ''
+  return props.status === 'checking' ? 'blink-dot' : ''
 })
 
 const ariaLabel = computed(() => {

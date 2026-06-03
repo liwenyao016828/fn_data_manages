@@ -1,213 +1,214 @@
 <template>
   <div class="page-padding h-full flex flex-col overflow-hidden">
-    <div class="content-card flex flex-col flex-1 min-h-0">
-      <div class="content-header shrink-0">
-        <div class="flex items-start justify-between">
-          <div>
-            <h2 class="text-[15px] font-semibold text-foreground">日志中心</h2>
-            <p class="text-[13px] text-muted-foreground mt-0.5">查看系统运行日志与数据库日志</p>
-          </div>
-        </div>
+    <!-- Page Header -->
+    <div class="flex items-center justify-between section-gap shrink-0">
+      <div>
+        <h2 class="text-[17px] font-semibold text-[var(--text-primary)]">日志中心</h2>
+        <p class="text-[13px] text-[var(--text-tertiary)] mt-0.5">查看系统运行日志与数据库日志</p>
       </div>
+      <div class="flex items-center gap-2">
+        <button class="btn-secondary h-[32px] text-[13px]" @click="activeTab === 'system' ? exportSystemLogs('txt') : exportLogs('txt')">
+          <Download class="h-3.5 w-3.5 mr-1.5" />导出
+        </button>
+        <button v-if="activeTab === 'system' && selectedInst" class="btn-danger h-[32px] text-[13px]" @click="confirmClearSystemLogs">
+          <Trash2 class="h-3.5 w-3.5 mr-1.5" />清空
+        </button>
+      </div>
+    </div>
 
+    <div class="content-card flex flex-col flex-1 min-h-0">
       <template v-if="selectedInst">
-        <div class="border-t border-border section-padding shrink-0">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <button
-                :class="[
-                  'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
-                  activeTab === 'system'
-                    ? 'tab-active shadow-lg shadow-blue-500/20'
-                    : 'tab-inactive'
-                ]"
-                @click="activeTab = 'system'"
-              >
-                <FileText class="h-4 w-4" />系统日志
-                <span v-if="activeTab === 'system'" class="absolute inset-0 bg-white/10 animate-pulse pointer-events-none"></span>
-              </button>
-              <button
-                v-if="selectedInst.type === 'mysql' || selectedInst.type === 'redis'"
-                :class="[
-                  'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
-                  activeTab === 'database'
-                    ? 'tab-active shadow-lg shadow-blue-500/20'
-                    : 'tab-inactive'
-                ]"
-                @click="activeTab = 'database'"
-              >
-                <Database v-if="selectedInst.type === 'mysql'" class="h-4 w-4" />
-                <Server v-else class="h-4 w-4" />数据库日志
-                <span v-if="activeTab === 'database'" class="absolute inset-0 bg-white/10 animate-pulse pointer-events-none"></span>
-              </button>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <div class="flex h-[32px] items-center rounded-lg border border-border bg-card px-2 gap-1">
-                <Search class="h-3.5 w-3.5 text-muted-foreground" />
-                <Input v-model="searchKeyword" placeholder="搜索日志..." class="border-0 shadow-none h-[28px] text-[13px] w-[140px] bg-transparent" />
-              </div>
-              <Select v-model="logDate" @update:model-value="onDateChange">
-                <SelectTrigger class="h-[32px] w-[120px] text-[13px] border-border">
-                  <Clock class="h-3.5 w-3.5 mr-1" />
-                  <SelectValue placeholder="今天" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部</SelectItem>
-                  <SelectItem v-for="d in availableDates" :key="d.value" :value="d.value">{{ d.label }}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select v-if="activeTab === 'database'" v-model="levelFilter">
-                <SelectTrigger class="h-[32px] w-[80px] text-[13px] border-border">
-                  <SelectValue placeholder="全部" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部</SelectItem>
-                  <SelectItem value="error">错误</SelectItem>
-                  <SelectItem value="warning">警告</SelectItem>
-                  <SelectItem value="info">信息</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button v-if="activeTab === 'system'" variant="destructive" size="sm" class="h-[32px] text-[13px]" @click="confirmClearSystemLogs">
-                <Trash2 class="h-3.5 w-3.5 mr-1.5" />清空
-              </Button>
-              <Button variant="outline" size="sm" class="h-[32px] text-[13px]" @click="activeTab === 'system' ? loadSystemLogs() : loadLogs()">
-                <RefreshCw class="h-3.5 w-3.5 mr-1.5" />刷新
-              </Button>
-            </div>
+        <!-- Tab Switcher -->
+        <div class="flex items-center justify-between px-5 pt-4 pb-0 shrink-0">
+          <div class="inline-flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)]">
+            <button
+              :class="activeTab === 'system' ? 'tab-active px-4 py-1.5 text-[13px]' : 'tab-inactive px-4 py-1.5 text-[13px]'"
+              @click="activeTab = 'system'"
+            >系统日志
+            </button>
+            <button
+              v-if="selectedInst.type === 'mysql' || selectedInst.type === 'redis'"
+              :class="activeTab === 'database' ? 'tab-active px-4 py-1.5 text-[13px]' : 'tab-inactive px-4 py-1.5 text-[13px]'"
+              @click="activeTab = 'database'"
+            >数据库日志
+            </button>
           </div>
         </div>
 
-        <div v-if="activeTab === 'database'" class="border-t border-border section-padding shrink-0">
-          <div class="flex items-center gap-3">
-            <div class="flex gap-1.5 flex-1 overflow-x-auto">
-              <div
-                v-for="inst in allInstances"
-                :key="(inst.isRemote ? 'r:' : 'l:') + inst.id"
-                :class="[
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer transition-all duration-200 text-xs whitespace-nowrap',
-                  selectedInstId === instanceUid(inst)
-                    ? 'border-primary/40 bg-primary/8 shadow-sm shadow-primary/10'
-                    : 'border-border bg-card hover:border-primary/30 hover:shadow-sm',
-                ]"
-                @click="selectInstance(inst)"
-              >
-                <StatusDot :status="selectedInstId === instanceUid(inst) ? 'selected' : onlineStatus[instanceUid(inst)] ? 'online' : 'default'" size="xs" />
-                <span class="font-medium text-foreground">{{ inst.name }}</span>
-                <span v-if="inst.isRemote" class="text-[9px] text-orange-400 bg-orange-500/5 px-1 rounded">远程</span>
-              </div>
-            </div>
+        <!-- Instance Selector (database tab) -->
+        <div v-if="activeTab === 'database'" class="px-5 pt-3 pb-0 shrink-0">
+          <div class="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+            <button
+              v-for="inst in allInstances"
+              :key="(inst.isRemote ? 'r:' : 'l:') + inst.id"
+              :class="selectedInstId === instanceUid(inst) ? 'pill pill-active' : 'pill pill-default'"
+              @click="selectInstance(inst)"
+            >
+              <StatusDot :status="selectedInstId === instanceUid(inst) ? 'selected' : onlineStatus[instanceUid(inst)] ? 'online' : 'default'" size="xs" />
+              <span>{{ inst.name }}</span>
+              <span v-if="inst.isRemote" class="text-[9px] text-orange-400 bg-orange-500/10 px-1 rounded ml-0.5">远程</span>
+            </button>
           </div>
         </div>
 
-        <div v-if="activeTab === 'system'" class="border-t border-border section-padding shrink-0"></div>
-        <div class="flex-1 min-h-0" style="padding: 0 var(--section-padding-x) var(--section-padding-y)">
+        <!-- Filter Bar -->
+        <div class="flex items-center gap-2 px-5 pt-3 pb-2 shrink-0 flex-wrap">
+          <Select v-model="logDate" @update:model-value="onDateChange">
+            <SelectTrigger class="h-[32px] w-[120px] text-[13px] border-[var(--border)]">
+              <Clock class="h-3.5 w-3.5 mr-1" />
+              <SelectValue placeholder="今天" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部</SelectItem>
+              <SelectItem v-for="d in availableDates" :key="d.value" :value="d.value">{{ d.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-if="activeTab === 'database'" v-model="levelFilter">
+            <SelectTrigger class="h-[32px] w-[80px] text-[13px] border-[var(--border)]">
+              <SelectValue placeholder="全部" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部</SelectItem>
+              <SelectItem value="error">错误</SelectItem>
+              <SelectItem value="warning">警告</SelectItem>
+              <SelectItem value="info">信息</SelectItem>
+            </SelectContent>
+          </Select>
+          <div class="flex h-[32px] items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 gap-1.5">
+            <Search class="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+            <Input v-model="searchKeyword" placeholder="搜索日志..." class="border-0 shadow-none h-[28px] text-[13px] w-[140px] bg-transparent" />
+          </div>
+          <div class="flex items-center gap-1.5 ml-auto">
+            <button class="btn-ghost h-[30px] text-[12px]" @click="activeTab === 'system' ? loadSystemLogs() : loadLogs()">
+              <RefreshCw class="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <!-- System Log Level Filter -->
+        <div v-if="activeTab === 'system'" class="flex items-center gap-1 px-5 pb-2 shrink-0">
+          <button
+            v-for="t in systemLogLevels" :key="t.value"
+            :class="selectedSystemLogLevel === t.value ? 'pill pill-active' : 'pill pill-default'"
+            @click="selectedSystemLogLevel = t.value"
+          >
+            {{ t.label }}
+          </button>
+        </div>
+
+        <!-- MySQL Log Type Filter -->
+        <div v-if="activeTab === 'database' && selectedInst.type === 'mysql'" class="flex items-center gap-1 px-5 pb-2 shrink-0">
+          <button
+            v-for="t in mysqlLogTypes" :key="t.value"
+            :class="selectedMysqlLogType === t.value ? 'pill pill-active' : 'pill pill-default'"
+            @click="selectedMysqlLogType = t.value; loadLogs()"
+          >
+            {{ t.label }}
+          </button>
+        </div>
+
+        <!-- Log Content -->
+        <div class="flex-1 min-h-0 px-5 pb-4">
+          <!-- System Logs -->
           <div v-if="activeTab === 'system'" class="h-full flex flex-col">
-            <div class="mb-2 flex items-center gap-2 shrink-0">
-              <span class="text-[12px] text-muted-foreground">日志级别：</span>
-              <Button v-for="t in systemLogLevels" :key="t.value" variant="ghost" size="sm"
-                :class="[selectedSystemLogLevel === t.value ? 'tab-active' : 'text-muted-foreground hover:bg-muted', 'h-[28px] text-[12px]']"
-                @click="selectedSystemLogLevel = t.value">
-                {{ t.label }}
-              </Button>
-            </div>
-            <div class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-3 font-mono text-[12px] leading-5">
+            <div class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-4 font-mono text-[12px] leading-5">
+              <!-- Loading -->
               <div v-if="loadingLogs" class="flex items-center justify-center py-16">
-                <Loader2 class="h-5 w-5 text-primary animate-spin mr-2" />
-                <span class="text-[13px] text-primary">加载中...</span>
+                <Loader2 class="h-5 w-5 text-[var(--accent)] animate-spin mr-2" />
+                <span class="text-[13px] text-[var(--text-secondary)]">加载中...</span>
               </div>
-              <div v-else-if="filteredSystemLogs.length === 0" class="flex items-center justify-center py-16">
-                <FileText class="h-8 w-8 text-muted-foreground/40 mr-2" />
-                <span class="text-[13px] text-muted-foreground">暂无系统日志</span>
+              <!-- Empty -->
+              <div v-else-if="filteredSystemLogs.length === 0" class="empty-state">
+                <div class="empty-state-icon"><FileText class="h-8 w-8" /></div>
+                <p class="empty-state-text">暂无系统日志</p>
               </div>
+              <!-- Log Lines -->
               <div v-else>
-                <div v-for="(log, idx) in filteredSystemLogs" :key="idx" class="flex items-start gap-2 py-0.5">
-                  <span class="text-gray-500/60 shrink-0 text-[12px]">{{ formatLogTime(log.time) }}</span>
-                  <span class="shrink-0 min-w-[56px] text-center" :class="systemLogLevelClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
-                  <span class="text-primary shrink-0 min-w-[80px] text-[12px]">[{{ log.source || 'SYSTEM' }}]</span>
-                  <span class="log-viewer-text break-all flex-1">{{ log.message }}</span>
+                <div v-for="(log, idx) in filteredSystemLogs" :key="idx" class="flex items-start gap-2 py-1 px-2 -mx-2 rounded-md hover:bg-[var(--surface)] transition-colors">
+                  <span class="text-[var(--text-tertiary)] shrink-0 text-[12px] font-mono-data">{{ formatLogTime(log.time) }}</span>
+                  <span class="shrink-0 min-w-[56px] text-center" :class="systemLogLevelBadgeClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
+                  <span class="text-[var(--accent)] shrink-0 min-w-[80px] text-[12px] font-mono-data">[{{ log.source || 'SYSTEM' }}]</span>
+                  <span class="log-viewer-text break-all flex-1 text-[var(--text-primary)]">{{ log.message }}</span>
                 </div>
               </div>
             </div>
-            <div v-if="filteredSystemLogs.length > 0" class="flex items-center justify-between mt-2 shrink-0">
-              <span class="text-[12px] text-muted-foreground">共 {{ filteredSystemLogs.length }} 条</span>
+            <div v-if="filteredSystemLogs.length > 0" class="flex items-center justify-between pt-3 shrink-0">
+              <span class="text-[12px] text-[var(--text-tertiary)]">共 {{ filteredSystemLogs.length }} 条</span>
               <div class="flex items-center gap-2">
-                <Button variant="outline" size="sm" class="h-[28px] text-[12px]" @click="exportSystemLogs('txt')">
-                  <Download class="h-3.5 w-3.5 mr-1" />导出TXT
-                </Button>
-                <Button variant="outline" size="sm" class="h-[28px] text-[12px]" @click="exportSystemLogs('json')">
-                  <Download class="h-3.5 w-3.5 mr-1" />导出JSON
-                </Button>
+                <button class="btn-ghost h-[28px] text-[12px] gap-1" @click="exportSystemLogs('txt')">
+                  <Download class="h-3.5 w-3.5" />TXT
+                </button>
+                <button class="btn-ghost h-[28px] text-[12px] gap-1" @click="exportSystemLogs('json')">
+                  <Download class="h-3.5 w-3.5" />JSON
+                </button>
               </div>
             </div>
           </div>
 
+          <!-- Database Logs -->
           <div v-if="activeTab === 'database'" class="h-full flex flex-col">
-            <div v-if="selectedInst.type === 'mysql'" class="mb-2 flex items-center gap-2 shrink-0">
-              <span class="text-[12px] text-muted-foreground">日志类型：</span>
-              <Button v-for="t in mysqlLogTypes" :key="t.value" variant="ghost" size="sm"
-                :class="[selectedMysqlLogType === t.value ? 'tab-active' : 'text-muted-foreground hover:bg-muted', 'h-[28px] text-[12px]']"
-                @click="selectedMysqlLogType = t.value; loadLogs()">
-                {{ t.label }}
-              </Button>
-            </div>
-            <div class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-3 font-mono text-[12px] leading-5">
+            <div class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-4 font-mono text-[12px] leading-5">
+              <!-- Loading -->
               <div v-if="loadingLogs" class="flex items-center justify-center py-16">
-                <Loader2 class="h-5 w-5 text-emerald-400 animate-spin mr-2" />
-                <span class="text-[13px] text-emerald-400">加载中...</span>
+                <Loader2 class="h-5 w-5 text-[var(--accent)] animate-spin mr-2" />
+                <span class="text-[13px] text-[var(--text-secondary)]">加载中...</span>
               </div>
-              <div v-else-if="filteredLogs.length === 0" class="flex items-center justify-center py-16">
-                <FileText class="h-8 w-8 text-muted-foreground/40 mr-2" />
-                <span class="text-[13px] text-muted-foreground">暂无日志数据</span>
+              <!-- Empty -->
+              <div v-else-if="filteredLogs.length === 0" class="empty-state">
+                <div class="empty-state-icon"><FileText class="h-8 w-8" /></div>
+                <p class="empty-state-text">暂无日志数据</p>
               </div>
+              <!-- Log Lines -->
               <div v-else>
-                <div v-for="(log, idx) in filteredLogs" :key="idx" class="flex items-start gap-2 py-0.5">
-                  <span class="text-gray-500/60 shrink-0 text-[12px]">{{ formatLogTime(log.time) }}</span>
-                  <span class="shrink-0 min-w-[56px] text-center" :class="logLevelClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
-                  <span class="log-viewer-text break-all flex-1">{{ log.message }}</span>
+                <div v-for="(log, idx) in filteredLogs" :key="idx" class="flex items-start gap-2 py-1 px-2 -mx-2 rounded-md hover:bg-[var(--surface)] transition-colors">
+                  <span class="text-[var(--text-tertiary)] shrink-0 text-[12px] font-mono-data">{{ formatLogTime(log.time) }}</span>
+                  <span class="shrink-0 min-w-[56px] text-center" :class="dbLogLevelBadgeClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
+                  <span class="log-viewer-text break-all flex-1 text-[var(--text-primary)]">{{ log.message }}</span>
                 </div>
               </div>
             </div>
-            <div v-if="filteredLogs.length > 0" class="flex items-center justify-between mt-2 shrink-0">
-              <span class="text-[12px] text-muted-foreground">共 {{ filteredLogs.length }} 条</span>
+            <div v-if="filteredLogs.length > 0" class="flex items-center justify-between pt-3 shrink-0">
+              <span class="text-[12px] text-[var(--text-tertiary)]">共 {{ filteredLogs.length }} 条</span>
               <div class="flex items-center gap-2">
-                <Button variant="outline" size="sm" class="h-[28px] text-[12px]" @click="exportLogs('txt')">
-                  <Download class="h-3.5 w-3.5 mr-1" />导出TXT
-                </Button>
-                <Button variant="outline" size="sm" class="h-[28px] text-[12px]" @click="exportLogs('json')">
-                  <Download class="h-3.5 w-3.5 mr-1" />导出JSON
-                </Button>
+                <button class="btn-ghost h-[28px] text-[12px] gap-1" @click="exportLogs('txt')">
+                  <Download class="h-3.5 w-3.5" />TXT
+                </button>
+                <button class="btn-ghost h-[28px] text-[12px] gap-1" @click="exportLogs('json')">
+                  <Download class="h-3.5 w-3.5" />JSON
+                </button>
               </div>
             </div>
           </div>
         </div>
       </template>
 
+      <!-- No Instance Selected -->
       <div v-else class="flex items-center justify-center flex-1">
-        <div class="flex flex-col items-center text-muted-foreground">
-          <FileText class="h-16 w-16 mb-3 opacity-30" />
-          <p class="text-sm">请先在左下角选择一个数据库实例</p>
+        <div class="empty-state">
+          <div class="empty-state-icon"><FileText class="h-12 w-12" /></div>
+          <p class="empty-state-text">请先在左下角选择一个数据库实例</p>
         </div>
       </div>
     </div>
 
   <Dialog v-model:open="showLogConfigDialog">
     <DialogContent class="sm:max-w-[460px]">
-      <DialogTitle class="text-[16px] font-semibold">日志管理</DialogTitle>
-      <DialogDescription class="text-[13px] text-muted-foreground">配置日志存储路径、保留策略和功能开关</DialogDescription>
+      <DialogTitle class="text-[16px] font-semibold text-[var(--text-primary)]">日志管理</DialogTitle>
+      <DialogDescription class="text-[13px] text-[var(--text-secondary)]">配置日志存储路径、保留策略和功能开关</DialogDescription>
       <div class="grid gap-4 py-4">
         <div>
-          <label class="text-[13px] font-medium text-foreground mb-1.5 block">日志存储路径</label>
+          <label class="text-[13px] font-medium text-[var(--text-primary)] mb-1.5 block">日志存储路径</label>
           <div class="flex gap-2">
-            <Input v-model="logStoragePath" placeholder="选择日志存储路径..." class="text-[13px] flex-1" />
-            <Button variant="outline" class="h-[32px] px-3 shrink-0" @click="openFolderBrowser">
+            <Input v-model="logStoragePath" placeholder="选择日志存储路径..." class="text-[13px] flex-1 border-[var(--border)]" />
+            <button class="btn-secondary h-[32px] px-3 shrink-0" @click="openFolderBrowser">
               <FolderOpen class="h-3.5 w-3.5 mr-1" />浏览
-            </Button>
+            </button>
           </div>
         </div>
         <div>
-          <label class="text-[13px] font-medium text-foreground mb-1.5 block">日志保留天数</label>
+          <label class="text-[13px] font-medium text-[var(--text-primary)] mb-1.5 block">日志保留天数</label>
           <Select v-model="logRetentionDays">
-            <SelectTrigger class="text-[13px]">
+            <SelectTrigger class="text-[13px] border-[var(--border)]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -221,8 +222,8 @@
         </div>
       </div>
       <div class="flex justify-end gap-2">
-        <Button variant="outline" class="h-[32px] text-[13px]" @click="showLogConfigDialog = false">取消</Button>
-        <Button variant="primary" class="h-[32px] text-[13px]" @click="saveLogConfig">保存</Button>
+        <button class="btn-secondary h-[32px] text-[13px]" @click="showLogConfigDialog = false">取消</button>
+        <button class="btn-primary h-[32px] text-[13px]" @click="saveLogConfig">保存</button>
       </div>
     </DialogContent>
   </Dialog>
@@ -230,56 +231,56 @@
   <Dialog v-model:open="showClearLogDialog">
     <DialogContent class="sm:max-w-[425px]">
       <div class="flex flex-col gap-y-1.5 text-center sm:text-left">
-        <DialogTitle class="text-[15px] text-foreground">清空系统日志确认</DialogTitle>
-        <DialogDescription class="text-[13px] text-muted-foreground">确定要清空系统日志吗？此操作不可撤销。</DialogDescription>
+        <DialogTitle class="text-[15px] text-[var(--text-primary)]">清空系统日志确认</DialogTitle>
+        <DialogDescription class="text-[13px] text-[var(--text-secondary)]">确定要清空系统日志吗？此操作不可撤销。</DialogDescription>
       </div>
       <div class="flex justify-end gap-2 mt-4">
-        <Button variant="outline" class="h-[32px] text-[13px]" @click="showClearLogDialog = false">取消</Button>
-        <Button variant="destructive" class="h-[32px] text-[13px]" @click="doClearLogs">确定清空</Button>
+        <button class="btn-secondary h-[32px] text-[13px]" @click="showClearLogDialog = false">取消</button>
+        <button class="btn-danger h-[32px] text-[13px]" @click="doClearLogs">确定清空</button>
       </div>
     </DialogContent>
   </Dialog>
 
   <Dialog v-model:open="showFolderBrowser">
     <DialogContent class="sm:max-w-[480px]">
-      <DialogTitle class="text-[15px] font-semibold">选择目录</DialogTitle>
-      <DialogDescription class="text-[13px] text-muted-foreground truncate">{{ browsePath || '/' }}</DialogDescription>
-      <div class="border border-border rounded-lg overflow-hidden">
+      <DialogTitle class="text-[15px] font-semibold text-[var(--text-primary)]">选择目录</DialogTitle>
+      <DialogDescription class="text-[13px] text-[var(--text-secondary)] truncate">{{ browsePath || '/' }}</DialogDescription>
+      <div class="border border-[var(--border)] rounded-lg overflow-hidden">
         <div class="max-h-[320px] overflow-y-auto">
           <div
             v-if="browseParent !== '' && browseParent !== browsePath && !browseIsRoot"
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-border"
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--surface)] border-b border-[var(--border-subtle)]"
             @click="navigateFolder(browseParent)"
           >
-            <ArrowUp class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span class="text-[13px] text-muted-foreground">上级目录</span>
+            <ArrowUp class="h-3.5 w-3.5 text-[var(--text-tertiary)] shrink-0" />
+            <span class="text-[13px] text-[var(--text-tertiary)]">上级目录</span>
           </div>
           <div
             v-for="d in browseDirs"
             :key="d.path"
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted border-b border-border last:border-b-0"
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[var(--surface)] border-b border-[var(--border-subtle)] last:border-b-0"
             @click="navigateFolder(d.path)"
             @dblclick="selectFolder(d.path)"
           >
-            <HardDrive v-if="d.drive" class="h-3.5 w-3.5 text-primary shrink-0" />
-            <FolderOpen v-else class="h-3.5 w-3.5 icon-special-color shrink-0" />
-            <span class="text-[13px] text-foreground flex-1 truncate">{{ d.name }}</span>
-            <ChevronRight class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <HardDrive v-if="d.drive" class="h-3.5 w-3.5 text-[var(--accent)] shrink-0" />
+            <FolderOpen v-else class="h-3.5 w-3.5 text-amber-500 shrink-0" />
+            <span class="text-[13px] text-[var(--text-primary)] flex-1 truncate">{{ d.name }}</span>
+            <ChevronRight class="h-3.5 w-3.5 text-[var(--text-tertiary)] shrink-0" />
           </div>
-          <div v-if="browseDirs.length === 0" class="flex items-center justify-center py-8 text-[13px] text-muted-foreground">
+          <div v-if="browseDirs.length === 0" class="flex items-center justify-center py-8 text-[13px] text-[var(--text-tertiary)]">
             此目录没有子目录
           </div>
         </div>
       </div>
       <div class="flex justify-between gap-2 mt-2">
         <div class="flex-1 min-w-0">
-          <Input v-model="browsePath" class="text-[13px] h-[32px]" placeholder="输入路径..." />
+          <Input v-model="browsePath" class="text-[13px] h-[32px] border-[var(--border)]" placeholder="输入路径..." />
         </div>
-        <Button variant="outline" class="h-[32px] text-[13px] shrink-0" @click="navigateFolder(browsePath)">前往</Button>
+        <button class="btn-secondary h-[32px] text-[13px] shrink-0" @click="navigateFolder(browsePath)">前往</button>
       </div>
       <div class="flex justify-end gap-2 mt-2">
-        <Button variant="outline" class="h-[32px] text-[13px]" @click="showFolderBrowser = false">取消</Button>
-        <Button variant="primary" class="h-[32px] text-[13px]" @click="selectFolder(browsePath)">选择此目录</Button>
+        <button class="btn-secondary h-[32px] text-[13px]" @click="showFolderBrowser = false">取消</button>
+        <button class="btn-primary h-[32px] text-[13px]" @click="selectFolder(browsePath)">选择此目录</button>
       </div>
     </DialogContent>
   </Dialog>
@@ -478,6 +479,21 @@ const logLevelClass = (level) => {
 const systemLogLevelClass = (level) => {
   const map = { info: 'text-blue-400', warning: 'text-amber-400', error: 'text-red-400', debug: 'text-muted-foreground' }
   return map[(level || '').toLowerCase()] || 'text-blue-400'
+}
+
+// Badge classes using the design system
+const systemLogLevelBadgeClass = (level) => {
+  const l = (level || '').toLowerCase()
+  if (l === 'error') return 'badge-status badge-status-error'
+  if (l === 'warning') return 'badge-status badge-status-warning'
+  return 'badge-status badge-status-info'
+}
+
+const dbLogLevelBadgeClass = (level) => {
+  const l = (level || '').toLowerCase()
+  if (l === 'error' || level === 'ERROR') return 'badge-status badge-status-error'
+  if (l === 'warning' || level === 'Warning') return 'badge-status badge-status-warning'
+  return 'badge-status badge-status-info'
 }
 
 const loadSystemLogs = () => {

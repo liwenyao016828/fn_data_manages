@@ -10,19 +10,19 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[0_1px_2px_rgba(37,99,235,0.1),0_4px_12px_rgba(37,99,235,0.15)] hover:bg-primary/90 hover:shadow-[0_2px_4px_rgba(37,99,235,0.12),0_8px_20px_rgba(37,99,235,0.2)]",
+          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]",
         destructive:
-          "bg-destructive text-white shadow-[0_1px_2px_rgba(220,38,38,0.1),0_4px_12px_rgba(220,38,38,0.15)] hover:bg-destructive/90 hover:shadow-[0_2px_4px_rgba(220,38,38,0.12),0_8px_20px_rgba(220,38,38,0.2)] focus-visible:ring-destructive/20",
+          "bg-destructive text-white hover:bg-destructive/90 shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] focus-visible:ring-destructive/20",
         outline:
-          "border border-primary/30 bg-white text-primary shadow-none hover:bg-primary/5 hover:border-primary/50",
+          "border border-border bg-transparent text-foreground hover:bg-muted hover:border-border-strong",
         secondary:
-          "bg-indigo-50 text-indigo-700 shadow-none hover:bg-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:bg-indigo-950/50",
-        ghost: "text-primary hover:bg-primary/5 hover:text-primary shadow-none",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "text-foreground hover:bg-muted shadow-none",
         link: "text-primary underline-offset-4 hover:underline shadow-none",
         primary:
-          "bg-primary text-primary-foreground shadow-[0_1px_2px_rgba(37,99,235,0.1),0_4px_12px_rgba(37,99,235,0.15)] hover:bg-primary/90 hover:shadow-[0_2px_4px_rgba(37,99,235,0.12),0_8px_20px_rgba(37,99,235,0.2)]",
+          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]",
         accent:
-          "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.1),0_4px_12px_rgba(37,99,235,0.15)] hover:from-blue-700 hover:to-indigo-700 hover:shadow-[0_2px_4px_rgba(37,99,235,0.12),0_8px_20px_rgba(37,99,235,0.2)]",
+          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]",
       },
       size: {
         default: "h-9 px-4 py-2 text-sm rounded-[var(--btn-radius)]",

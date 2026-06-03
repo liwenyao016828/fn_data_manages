@@ -1,227 +1,295 @@
 <template>
   <div class="page-padding overflow-y-auto h-full">
-    <div v-if="!connectionId" class="content-card">
-      <div class="content-header">
-        <div class="flex items-start justify-between">
-          <div>
-            <h2 class="text-[15px] font-semibold text-foreground">数据管理</h2>
-            <p class="text-[13px] text-muted-foreground mt-0.5">选择一个实例开始浏览和管理数据</p>
-          </div>
-          <Button variant="primary" size="sm" class="h-[32px] text-[13px]" @click="addInstance">
-            <Plus class="h-3.5 w-3.5 mr-1.5" />
-            添加实例
-          </Button>
-        </div>
-      </div>
-
-      <div class="content-body">
-        <div
-          v-for="inst in deduplicatedInstances"
-          :key="(inst.isRemote ? 'r' : 'l') + inst.id"
-          class="group p-3.5 rounded-lg content-card-interactive cursor-pointer transition-all duration-200 mb-2"
-          :class="connectionId === instanceUid(inst) ? 'border-primary bg-primary/[0.04] shadow-[0_0_0_1px_rgba(79,172,254,0.3)]' : ''"
-          @click="selectInstance(inst)"
-        >
-          <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" :style="{ background: getInstanceColor(inst) }">
-              <Database class="h-[18px] w-[18px] text-white" />
-            </div>
-            <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-              <div class="flex items-center gap-1.5">
-                <span class="text-[13px] font-medium text-foreground truncate">{{ inst.name }}</span>
-                <Badge v-if="inst.isRemote" variant="outline" class="bg-orange-500/5 text-orange-400 border-orange-500/20 text-[10px] h-[18px] shrink-0">远程</Badge>
-              </div>
-              <div class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <StatusDot :status="connectionId === instanceUid(inst) ? 'selected' : (onlineStatus[instanceUid(inst)] !== false ? 'online' : 'offline')" size="xs" />
-                {{ inst.type === 'mysql' ? 'MySQL' : inst.type }}
-                <span class="ml-auto font-mono-data">{{ inst.host || 'localhost' }}:{{ inst.port || 3306 }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center justify-between mt-2 pl-[42px]">
-            <span class="text-[11px] text-muted-foreground">{{ inst.version || '—' }}</span>
-            <div class="flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100" @click.stop>
-              <Button variant="link" size="sm" class="h-auto p-0 text-xs text-primary hover:bg-primary/10" @click="editInstance(inst)">编辑</Button>
-              <Button variant="link" size="sm" class="h-auto p-0 text-xs text-red-400 hover:bg-red-500/5" @click="confirmDeleteInstance(inst)">删除</Button>
-            </div>
-          </div>
-        </div>
-        <div v-if="deduplicatedInstances.length === 0" class="flex flex-col items-center justify-center py-10 text-muted-foreground">
-          <Inbox class="h-12 w-12 mb-2 opacity-40" />
-          <span class="text-sm">暂无实例</span>
-        </div>
-      </div>
-    </div>
-
-    <div v-else class="flex flex-col gap-4">
+    <!-- ═══════════════════════════════════════════════════════════
+         No Instance Selected — Instance List
+         ═══════════════════════════════════════════════════════════ -->
+    <div v-if="!connectionId" class="fade-up">
       <div class="content-card">
         <div class="content-header">
           <div class="flex items-start justify-between">
             <div>
-              <div class="flex items-center gap-1.5 text-sm flex-wrap">
-                <span class="text-primary cursor-pointer px-1.5 py-0.5 rounded-md transition-colors hover:bg-primary/10 font-medium" @click="backToDatabases">
-                  {{ currentInst?.name }}
-                </span>
-                <template v-if="isRedis && selectedRedisKey">
-                  <ChevronRight class="h-4 w-4 text-muted-foreground" />
-                  <span class="text-foreground font-medium px-1.5 py-0.5">{{ selectedRedisKey }}</span>
-                </template>
-                <template v-if="!isRedis && selectedDatabase">
-                  <ChevronRight class="h-4 w-4 text-muted-foreground" />
-                  <span class="text-primary cursor-pointer px-1.5 py-0.5 rounded-md transition-colors hover:bg-primary/10" @click="backToTables">{{ selectedDatabase }}</span>
-                </template>
-                <template v-if="!isRedis && selectedTable">
-                  <ChevronRight class="h-4 w-4 text-muted-foreground" />
-                  <span class="text-foreground font-medium px-1.5 py-0.5">{{ selectedTable }}</span>
-                </template>
+              <h2 class="text-[15px] font-semibold" style="color: var(--text-primary)">数据管理</h2>
+              <p class="text-[13px] mt-0.5" style="color: var(--text-tertiary)">选择一个实例开始浏览和管理数据</p>
+            </div>
+            <button class="btn-primary" @click="addInstance">
+              <Plus class="h-3.5 w-3.5" />
+              添加实例
+            </button>
+          </div>
+        </div>
+
+        <div class="content-body">
+          <div
+            v-for="inst in deduplicatedInstances"
+            :key="(inst.isRemote ? 'r' : 'l') + inst.id"
+            class="instance-card group"
+            :class="{ 'instance-card--active': connectionId === instanceUid(inst) }"
+            @click="selectInstance(inst)"
+          >
+            <div class="flex items-center gap-3">
+              <div class="instance-icon" :style="{ background: getInstanceColor(inst) }">
+                <Database class="h-[18px] w-[18px] text-white" />
               </div>
-              <p class="text-[13px] text-muted-foreground mt-0.5">
+              <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[13px] font-medium truncate" style="color: var(--text-primary)">{{ inst.name }}</span>
+                  <span v-if="inst.isRemote" class="badge-status badge-status-warning">远程</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-[11px]" style="color: var(--text-tertiary)">
+                  <StatusDot :status="connectionId === instanceUid(inst) ? 'selected' : (onlineStatus[instanceUid(inst)] !== false ? 'online' : 'offline')" size="xs" />
+                  {{ inst.type === 'mysql' ? 'MySQL' : inst.type }}
+                  <span class="ml-auto font-mono-data">{{ inst.host || 'localhost' }}:{{ inst.port || 3306 }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="instance-actions">
+              <span class="text-[11px]" style="color: var(--text-tertiary)">{{ inst.version || '—' }}</span>
+              <div class="flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100" @click.stop>
+                <button class="btn-ghost" @click="editInstance(inst)">编辑</button>
+                <button class="btn-ghost-danger" @click="confirmDeleteInstance(inst)">删除</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="deduplicatedInstances.length === 0" class="empty-state py-10">
+            <Inbox class="h-12 w-12 empty-state-icon" />
+            <span class="empty-state-text">暂无实例</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         Instance Selected — Main Content
+         ═══════════════════════════════════════════════════════════ -->
+    <div v-else class="flex flex-col gap-4">
+      <!-- Header Card with Breadcrumb -->
+      <div class="content-card fade-up">
+        <div class="content-header">
+          <div class="flex items-start justify-between">
+            <div>
+              <!-- Breadcrumb Navigation -->
+              <nav class="breadcrumb-nav">
+                <span
+                  class="breadcrumb-item breadcrumb-item--active"
+                  @click="backToDatabases"
+                >{{ currentInst?.name }}</span>
+
+                <template v-if="isRedis && selectedRedisKey">
+                  <ChevronRight class="breadcrumb-sep" />
+                  <span class="breadcrumb-item breadcrumb-item--current">{{ selectedRedisKey }}</span>
+                </template>
+
+                <template v-if="!isRedis && selectedDatabase">
+                  <ChevronRight class="breadcrumb-sep" />
+                  <span
+                    class="breadcrumb-item breadcrumb-item--active"
+                    @click="backToTables"
+                  >{{ selectedDatabase }}</span>
+                </template>
+
+                <template v-if="!isRedis && selectedTable">
+                  <ChevronRight class="breadcrumb-sep" />
+                  <span class="breadcrumb-item breadcrumb-item--current">{{ selectedTable }}</span>
+                </template>
+              </nav>
+              <p class="text-[13px] mt-0.5" style="color: var(--text-tertiary)">
                 {{ isRedis ? 'Redis' : 'MySQL' }} · {{ currentInst?.host }}:{{ currentInst?.port }}
               </p>
             </div>
             <div class="flex items-center gap-2 shrink-0 flex-wrap">
-              <Button v-if="!isRedis && !selectedDatabase" variant="primary" size="sm" class="h-[32px] text-[13px]" @click="openCreateDbDialog">
-                <Plus class="h-3.5 w-3.5 mr-1.5" />
+              <button v-if="!isRedis && !selectedDatabase" class="btn-primary" @click="openCreateDbDialog">
+                <Plus class="h-3.5 w-3.5" />
                 创建数据库
-              </Button>
-              <Button variant="outline" size="sm" class="h-[32px] text-[13px]" @click="refreshData">
-                <RefreshCw class="h-3.5 w-3.5 mr-1.5" />
+              </button>
+              <button class="btn-secondary" @click="refreshData">
+                <RefreshCw class="h-3.5 w-3.5" />
                 刷新
-              </Button>
-              <Button v-if="selectedTable && !isRedis" variant="primary" size="sm" class="h-[32px] text-[13px]" @click="showInsertDialog = true">
-                <Plus class="h-3.5 w-3.5 mr-1.5" />
+              </button>
+              <button v-if="selectedTable && !isRedis" class="btn-primary" @click="showInsertDialog = true">
+                <Plus class="h-3.5 w-3.5" />
                 插入
-              </Button>
-              <Button v-if="selectedTable && !isRedis" variant="outline" size="sm" class="h-[32px] text-[13px]" @click="exportData(false)">
-                <Download class="h-3.5 w-3.5 mr-1.5" />
+              </button>
+              <button v-if="selectedTable && !isRedis" class="btn-secondary" @click="exportData(false)">
+                <Download class="h-3.5 w-3.5" />
                 导出
-              </Button>
-              <Button v-if="selectedTable && !isRedis" variant="outline" size="sm" class="h-[32px] text-[13px]" @click="exportData(true)">
-                <Download class="h-3.5 w-3.5 mr-1.5" />
+              </button>
+              <button v-if="selectedTable && !isRedis" class="btn-secondary" @click="exportData(true)">
+                <Download class="h-3.5 w-3.5" />
                 全量导出
-              </Button>
+              </button>
             </div>
           </div>
         </div>
 
-        <div v-if="isRedis && !selectedRedisKey" class="content-body">
-          <div class="flex gap-3 flex-wrap rounded-xl border border-border bg-card section-padding mb-3">
-            <div class="flex flex-col gap-0.5 min-w-[100px]">
-              <span class="text-[11px] text-muted-foreground">版本</span>
-              <span class="text-sm font-semibold text-foreground">{{ redisInfo.redis_version || '—' }}</span>
+        <!-- ── Redis: Key List View ── -->
+        <div v-if="isRedis && !selectedRedisKey" class="content-body fade-up">
+          <!-- Redis Stats -->
+          <div class="redis-stats">
+            <div class="stat-card">
+              <div class="stat-icon" style="background: var(--accent-soft); color: var(--accent)">
+                <Database class="h-4 w-4" />
+              </div>
+              <div>
+                <div class="stat-value">{{ redisInfo.redis_version || '—' }}</div>
+                <div class="stat-label">版本</div>
+              </div>
             </div>
-            <div class="flex flex-col gap-0.5 min-w-[100px]">
-              <span class="text-[11px] text-muted-foreground">运行时间</span>
-              <span class="text-sm font-semibold text-foreground">{{ redisInfo.uptime_in_days ? redisInfo.uptime_in_days + ' 天' : '—' }}</span>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: var(--success-soft); color: var(--success)">
+                <RefreshCw class="h-4 w-4" />
+              </div>
+              <div>
+                <div class="stat-value">{{ redisInfo.uptime_in_days ? redisInfo.uptime_in_days + ' 天' : '—' }}</div>
+                <div class="stat-label">运行时间</div>
+              </div>
             </div>
-            <div class="flex flex-col gap-0.5 min-w-[100px]">
-              <span class="text-[11px] text-muted-foreground">已用内存</span>
-              <span class="text-sm font-semibold text-foreground">{{ redisInfo.used_memory_human || '—' }}</span>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: var(--warning-soft); color: var(--warning)">
+                <Database class="h-4 w-4" />
+              </div>
+              <div>
+                <div class="stat-value">{{ redisInfo.used_memory_human || '—' }}</div>
+                <div class="stat-label">已用内存</div>
+              </div>
             </div>
-            <div class="flex flex-col gap-0.5 min-w-[100px]">
-              <span class="text-[11px] text-muted-foreground">Key数量</span>
-              <span class="text-sm font-semibold text-foreground">{{ redisInfo._totalKeys || '—' }}</span>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: var(--accent-soft); color: var(--accent)">
+                <Database class="h-4 w-4" />
+              </div>
+              <div>
+                <div class="stat-value">{{ redisInfo._totalKeys || '—' }}</div>
+                <div class="stat-label">Key数量</div>
+              </div>
             </div>
-            <div class="flex flex-col gap-0.5 min-w-[100px]">
-              <span class="text-[11px] text-muted-foreground">命中率</span>
-              <span class="text-sm font-semibold text-foreground">
-                {{ redisInfo.keyspace_hits && redisInfo.keyspace_misses ?
-                  (parseInt(redisInfo.keyspace_hits) * 100 / (parseInt(redisInfo.keyspace_hits) + parseInt(redisInfo.keyspace_misses))).toFixed(1) + '%'
-                  : '—' }}
-              </span>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: var(--success-soft); color: var(--success)">
+                <Database class="h-4 w-4" />
+              </div>
+              <div>
+                <div class="stat-value">
+                  {{ redisInfo.keyspace_hits && redisInfo.keyspace_misses ?
+                    (parseInt(redisInfo.keyspace_hits) * 100 / (parseInt(redisInfo.keyspace_hits) + parseInt(redisInfo.keyspace_misses))).toFixed(1) + '%'
+                    : '—' }}
+                </div>
+                <div class="stat-label">命中率</div>
+              </div>
             </div>
           </div>
 
-          <div class="flex gap-2 items-center mb-3">
-            <div class="flex flex-1 max-w-[400px]">
-              <span class="inline-flex items-center rounded-l-md border border-r-0 border-border bg-muted px-3 text-xs font-mono text-muted-foreground">SCAN</span>
-              <Input v-model="redisPattern" placeholder="Key 匹配模式 (如 user:* )" class="rounded-l-none h-8 text-xs border-border" @keyup.enter="searchRedisKeys" />
+          <!-- Redis Search Bar -->
+          <div class="redis-search-bar">
+            <div class="redis-search-input">
+              <span class="redis-search-prefix font-mono-data">SCAN</span>
+              <Input v-model="redisPattern" placeholder="Key 匹配模式 (如 user:* )" class="redis-search-field" @keyup.enter="searchRedisKeys" />
             </div>
-            <Button variant="primary" size="sm" class="h-8 text-[13px]" @click="searchRedisKeys" :disabled="loadingRedisKeys">
+            <button class="btn-primary" @click="searchRedisKeys" :disabled="loadingRedisKeys">
               <Search class="h-4 w-4" />
               搜索
-            </Button>
+            </button>
           </div>
 
-          <div class="rounded-xl border border-border overflow-hidden relative">
-            <div v-if="loadingRedisKeys" class="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
-              <Loader2 class="h-6 w-6 animate-spin text-primary" />
+          <!-- Redis Key List -->
+          <div class="redis-key-list">
+            <div v-if="loadingRedisKeys" class="redis-key-loading">
+              <Loader2 class="h-6 w-6 animate-spin" style="color: var(--accent)" />
             </div>
-            <div v-if="redisKeys.length === 0 && !loadingRedisKeys" class="flex flex-col items-center justify-center py-10 text-muted-foreground">
-              <Inbox class="h-10 w-10 mb-2 opacity-40" />
-              <span class="text-sm">暂无Key</span>
+            <div v-if="redisKeys.length === 0 && !loadingRedisKeys" class="empty-state py-10">
+              <Inbox class="h-10 w-10 empty-state-icon" />
+              <span class="empty-state-text">暂无Key</span>
             </div>
             <div
               v-for="rk in redisKeys"
               :key="rk.key"
-              class="flex justify-between items-center px-4 py-2.5 cursor-pointer transition-colors border-b border-border last:border-b-0 hover:bg-primary/[0.06]"
+              class="redis-key-item"
               @click="selectRedisKey(rk.key)"
             >
               <div class="flex items-center gap-2 min-w-0 flex-1">
-                <Badge :variant="getKeyTypeBadge(rk.type)" class="shrink-0 text-[10px] px-1.5 py-0 rounded-full">{{ rk.type }}</Badge>
-                <span class="font-mono text-[13px] text-foreground truncate">{{ rk.key }}</span>
+                <span
+                  class="badge-status"
+                  :class="{
+                    'badge-status-info': rk.type === 'string',
+                    'badge-status-success': rk.type === 'list' || rk.type === 'set',
+                    'badge-status-warning': rk.type === 'hash',
+                    'badge-status-error': rk.type === 'zset',
+                    'badge-status-neutral': !['string','list','set','hash','zset'].includes(rk.type)
+                  }"
+                >{{ rk.type }}</span>
+                <span class="font-mono-data text-[13px] truncate" style="color: var(--text-primary)">{{ rk.key }}</span>
               </div>
               <div class="flex items-center gap-3 shrink-0">
-                <span class="text-[11px] text-muted-foreground">{{ formatKeySize(rk.type, rk.size) }}</span>
-                <span v-if="rk.ttl > 0" class="text-[11px] text-amber-400">TTL: {{ rk.ttl }}s</span>
-                <span v-else-if="rk.ttl === -1" class="text-[11px] text-emerald-400">永不过期</span>
+                <span class="text-[11px]" style="color: var(--text-tertiary)">{{ formatKeySize(rk.type, rk.size) }}</span>
+                <span v-if="rk.ttl > 0" class="badge-status badge-status-warning">TTL: {{ rk.ttl }}s</span>
+                <span v-else-if="rk.ttl === -1" class="badge-status badge-status-success">永不过期</span>
               </div>
             </div>
-            <div v-if="redisCursor !== '0'" class="text-center py-2 border-t border-border">
-              <Button variant="link" size="sm" class="text-primary" @click="loadMoreRedisKeys" :disabled="loadingRedisKeys">加载更多</Button>
+            <div v-if="redisCursor !== '0'" class="redis-key-more">
+              <button class="btn-ghost" @click="loadMoreRedisKeys" :disabled="loadingRedisKeys">加载更多</button>
             </div>
           </div>
 
-          <div class="mt-3 rounded-xl border border-border px-4 py-3">
-            <div class="text-[13px] font-medium text-muted-foreground mb-2">Redis 命令</div>
-            <div class="flex gap-2">
-              <Input v-model="redisCmd" placeholder="输入 Redis 命令，如 KEYS *" class="flex-1 h-8 text-xs border-border" @keyup.enter="executeRedisCmd" />
-              <Button variant="primary" size="sm" class="h-8 text-[13px]" @click="executeRedisCmd">执行</Button>
+          <!-- Redis Command Console -->
+          <div class="redis-console">
+            <div class="redis-console-header">
+              <span class="text-[13px] font-medium" style="color: var(--text-secondary)">Redis 命令</span>
             </div>
-            <div v-if="redisCmdResult" class="mt-2 bg-muted rounded-lg p-2 max-h-[120px] overflow-auto">
-              <pre class="m-0 font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">{{ redisCmdResult }}</pre>
+            <div class="flex gap-2">
+              <Input v-model="redisCmd" placeholder="输入 Redis 命令，如 KEYS *" class="flex-1 h-8 text-xs" style="border-color: var(--border)" @keyup.enter="executeRedisCmd" />
+              <button class="btn-primary" @click="executeRedisCmd">执行</button>
+            </div>
+            <div v-if="redisCmdResult" class="redis-console-result code-editor">
+              <pre class="m-0 font-mono-data text-xs whitespace-pre-wrap break-all" style="color: var(--text-secondary)">{{ redisCmdResult }}</pre>
             </div>
           </div>
         </div>
 
-        <div v-else-if="isRedis && selectedRedisKey" class="content-body">
-          <div class="flex justify-between items-center mb-3">
+        <!-- ── Redis: Key Detail View ── -->
+        <div v-else-if="isRedis && selectedRedisKey" class="content-body fade-up">
+          <div class="flex justify-between items-center mb-4">
             <div class="flex items-center gap-2">
-              <Badge :variant="getKeyTypeBadge(selectedRedisKeyData?.type)" class="rounded-full">{{ selectedRedisKeyData?.type }}</Badge>
-              <span class="font-mono text-[15px] font-semibold text-foreground">{{ selectedRedisKey }}</span>
+              <span
+                class="badge-status"
+                :class="{
+                  'badge-status-info': selectedRedisKeyData?.type === 'string',
+                  'badge-status-success': selectedRedisKeyData?.type === 'list' || selectedRedisKeyData?.type === 'set',
+                  'badge-status-warning': selectedRedisKeyData?.type === 'hash',
+                  'badge-status-error': selectedRedisKeyData?.type === 'zset',
+                  'badge-status-neutral': !['string','list','set','hash','zset'].includes(selectedRedisKeyData?.type)
+                }"
+              >{{ selectedRedisKeyData?.type }}</span>
+              <span class="font-mono-data text-[15px] font-semibold" style="color: var(--text-primary)">{{ selectedRedisKey }}</span>
             </div>
-            <div class="text-xs text-muted-foreground">
-              <span v-if="selectedRedisKeyData?.ttl > 0">TTL: {{ selectedRedisKeyData.ttl }}s</span>
-              <span v-else-if="selectedRedisKeyData?.ttl === -1">永不过期</span>
+            <div class="text-xs" style="color: var(--text-tertiary)">
+              <span v-if="selectedRedisKeyData?.ttl > 0" class="badge-status badge-status-warning">TTL: {{ selectedRedisKeyData.ttl }}s</span>
+              <span v-else-if="selectedRedisKeyData?.ttl === -1" class="badge-status badge-status-success">永不过期</span>
             </div>
           </div>
-          <div class="overflow-auto rounded-xl border border-border p-3">
+          <div class="redis-value-panel">
             <div v-if="selectedRedisKeyData?.type === 'string'">
-              <Textarea :model-value="selectedRedisKeyData?.value" readonly rows="6" class="font-mono text-sm bg-muted border-border" />
+              <Textarea :model-value="selectedRedisKeyData?.value" readonly rows="6" class="font-mono text-sm code-editor" />
             </div>
             <div v-else-if="selectedRedisKeyData?.type === 'list'">
-              <div v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="flex items-center gap-2 px-2 py-1.5 border-b border-border last:border-b-0 font-mono text-[13px]">
-                <span class="text-muted-foreground min-w-[30px] text-[11px]">{{ idx }}</span>
-                <span class="text-foreground">{{ item }}</span>
+              <div v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="redis-value-row">
+                <span class="redis-value-idx">{{ idx }}</span>
+                <span style="color: var(--text-primary)">{{ item }}</span>
               </div>
             </div>
             <div v-else-if="selectedRedisKeyData?.type === 'set'">
-              <div v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="flex items-center gap-2 px-2 py-1.5 border-b border-border last:border-b-0 font-mono text-[13px]">
-                <span class="text-foreground">{{ item }}</span>
+              <div v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="redis-value-row">
+                <span style="color: var(--text-primary)">{{ item }}</span>
               </div>
             </div>
             <div v-else-if="selectedRedisKeyData?.type === 'hash'">
               <Table>
                 <TableHeader>
-                  <TableRow class="hover:bg-transparent border-b border-border">
-                    <TableHead class="min-w-[200px] text-[12px] font-normal text-muted-foreground">Field</TableHead>
-                  <TableHead class="min-w-[300px] text-[12px] font-normal text-muted-foreground">Value</TableHead>
+                  <TableRow class="hover:bg-transparent" style="border-bottom: 1px solid var(--border-subtle)">
+                    <TableHead class="min-w-[200px] text-[12px] font-normal" style="color: var(--text-tertiary)">Field</TableHead>
+                    <TableHead class="min-w-[300px] text-[12px] font-normal" style="color: var(--text-tertiary)">Value</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow v-for="entry in hashEntries" :key="entry.field" class="hover:bg-muted border-b border-border">
-                    <TableCell class="font-mono text-sm truncate max-w-[200px] text-foreground">{{ entry.field }}</TableCell>
-                    <TableCell class="font-mono text-sm truncate max-w-[300px] text-foreground">{{ entry.value }}</TableCell>
+                  <TableRow v-for="entry in hashEntries" :key="entry.field" class="hover:bg-muted" style="border-bottom: 1px solid var(--border-subtle)">
+                    <TableCell class="font-mono-data text-sm truncate max-w-[200px]" style="color: var(--text-primary)">{{ entry.field }}</TableCell>
+                    <TableCell class="font-mono-data text-sm truncate max-w-[300px]" style="color: var(--text-primary)">{{ entry.value }}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -229,144 +297,169 @@
             <div v-else-if="selectedRedisKeyData?.type === 'zset'">
               <Table>
                 <TableHeader>
-                  <TableRow class="hover:bg-transparent border-b border-border">
-                    <TableHead class="min-w-[200px] text-[12px] font-normal text-muted-foreground">Member</TableHead>
-                  <TableHead class="w-[120px] text-[12px] font-normal text-muted-foreground">Score</TableHead>
+                  <TableRow class="hover:bg-transparent" style="border-bottom: 1px solid var(--border-subtle)">
+                    <TableHead class="min-w-[200px] text-[12px] font-normal" style="color: var(--text-tertiary)">Member</TableHead>
+                    <TableHead class="w-[120px] text-[12px] font-normal" style="color: var(--text-tertiary)">Score</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="hover:bg-muted border-b border-border">
-                    <TableCell class="font-mono text-sm truncate max-w-[200px] text-foreground">{{ item.member }}</TableCell>
-                    <TableCell class="text-foreground">{{ item.score }}</TableCell>
+                  <TableRow v-for="(item, idx) in selectedRedisKeyData?.value" :key="idx" class="hover:bg-muted" style="border-bottom: 1px solid var(--border-subtle)">
+                    <TableCell class="font-mono-data text-sm truncate max-w-[200px]" style="color: var(--text-primary)">{{ item.member }}</TableCell>
+                    <TableCell style="color: var(--text-primary)">{{ item.score }}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
             </div>
             <div v-else>
-              <pre class="m-0 font-mono text-[13px] whitespace-pre-wrap break-all text-foreground">{{ JSON.stringify(selectedRedisKeyData?.value, null, 2) }}</pre>
+              <pre class="m-0 font-mono-data text-[13px] whitespace-pre-wrap break-all" style="color: var(--text-primary)">{{ JSON.stringify(selectedRedisKeyData?.value, null, 2) }}</pre>
             </div>
           </div>
         </div>
 
-        <div v-if="!isRedis && !selectedDatabase" class="content-body">
-          <div class="text-sm font-medium text-muted-foreground mb-3">选择数据库</div>
-          <div v-if="loadingDatabases" class="flex items-center gap-2 py-6 text-[13px] text-muted-foreground">
+        <!-- ── MySQL: Database Grid ── -->
+        <div v-if="!isRedis && !selectedDatabase" class="content-body fade-up">
+          <div class="section-label" style="color: var(--text-secondary)">选择数据库</div>
+          <div v-if="loadingDatabases" class="flex items-center gap-2 py-6 text-[13px]" style="color: var(--text-tertiary)">
             <Loader2 class="h-4 w-4 animate-spin" />
             正在加载数据库列表...
           </div>
-          <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+          <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] grid-gap">
             <div
               v-for="db in databases"
               :key="db"
-              class="group relative flex items-center gap-2.5 px-4 py-3 border rounded-xl cursor-pointer transition-all duration-200 bg-card hover:border-primary/40 hover:shadow-sm hover:-translate-y-px"
+              class="grid-card group"
               @click="selectDatabase(db)"
             >
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary">
+              <div class="grid-card-icon" style="background: var(--accent-soft); color: var(--accent)">
                 <Database class="h-4 w-4" />
               </div>
-              <span class="text-[13px] font-medium text-foreground truncate flex-1">{{ db }}</span>
+              <div class="grid-card-info">
+                <span class="grid-card-name">{{ db }}</span>
+              </div>
               <button
-                class="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/5 transition-all duration-150"
+                class="grid-card-delete"
                 title="删除数据库"
                 @click.stop="openDeleteDbDialog(db)"
               >
-                <Trash2 class="h-3.5 w-3.5 text-red-400 hover:text-red-400" />
+                <Trash2 class="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
-          <div v-if="!loadingDatabases && databases.length === 0" class="flex flex-col items-center justify-center py-10 text-muted-foreground">
-            <Inbox class="h-10 w-10 mb-2 opacity-40" />
-            <span class="text-sm">暂无数据库</span>
+          <div v-if="!loadingDatabases && databases.length === 0" class="empty-state py-10">
+            <Inbox class="h-10 w-10 empty-state-icon" />
+            <span class="empty-state-text">暂无数据库</span>
           </div>
         </div>
 
-        <div v-else-if="!isRedis && !selectedTable" class="content-body">
+        <!-- ── MySQL: Table Grid ── -->
+        <div v-else-if="!isRedis && !selectedTable" class="content-body fade-up">
           <div class="flex items-center justify-between mb-3">
-            <div class="text-sm font-medium text-muted-foreground">选择数据表</div>
+            <div class="section-label" style="color: var(--text-secondary)">选择数据表</div>
             <div class="flex items-center gap-2">
-              <Button size="sm" variant="outline" class="h-[28px] text-[12px]" @click="openCreateTableDialog">
-                <Plus class="h-3 w-3 mr-1" />
+              <button class="btn-secondary" @click="openCreateTableDialog">
+                <Plus class="h-3 w-3" />
                 新建表
-              </Button>
-              <Button size="sm" variant="outline" class="h-[28px] text-[12px]" @click="loadTables">
+              </button>
+              <button class="btn-secondary" @click="loadTables">
                 <RefreshCw class="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-          <div v-if="loadingTables" class="flex items-center gap-2 py-6 text-[13px] text-muted-foreground">
-            <Loader2 class="h-4 w-4 animate-spin" />
-            正在加载表列表...
-          </div>
-          <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-            <div
-              v-for="tbl in tables"
-              :key="tbl"
-              class="group relative flex items-center gap-2.5 px-4 py-3 border rounded-xl cursor-pointer transition-all duration-200 bg-card hover:border-emerald-500/40 hover:shadow-sm hover:-translate-y-px"
-              @click="selectTable(tbl)"
-            >
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-400">
-                <Table2 class="h-4 w-4" />
-              </div>
-              <span class="text-[13px] font-medium text-foreground truncate flex-1">{{ tbl }}</span>
-              <button
-                class="absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/5 transition-all duration-150"
-                title="删除表"
-                @click.stop="confirmDeleteTable(tbl)"
-              >
-                <Trash2 class="h-3.5 w-3.5 text-red-400 hover:text-red-400" />
               </button>
             </div>
           </div>
-          <div v-if="!loadingTables && tables.length === 0 && tableLoadError" class="flex items-center gap-2 py-6 text-[13px] text-red-400">
+          <div v-if="loadingTables" class="flex items-center gap-2 py-6 text-[13px]" style="color: var(--text-tertiary)">
+            <Loader2 class="h-4 w-4 animate-spin" />
+            正在加载表列表...
+          </div>
+          <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] grid-gap">
+            <div
+              v-for="tbl in tables"
+              :key="tbl"
+              class="grid-card group"
+              style="--card-accent: var(--success); --card-accent-soft: var(--success-soft)"
+              @click="selectTable(tbl)"
+            >
+              <div class="grid-card-icon" style="background: var(--success-soft); color: var(--success)">
+                <Table2 class="h-4 w-4" />
+              </div>
+              <div class="grid-card-info">
+                <span class="grid-card-name">{{ tbl }}</span>
+              </div>
+              <button
+                class="grid-card-delete"
+                title="删除表"
+                @click.stop="confirmDeleteTable(tbl)"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <div v-if="!loadingTables && tables.length === 0 && tableLoadError" class="flex items-center gap-2 py-6 text-[13px]" style="color: var(--danger)">
             <AlertTriangle class="h-4 w-4" />
             <span>加载失败</span>
-            <Button variant="link" size="sm" class="h-auto p-0 text-xs text-primary" @click="loadTables()">重试</Button>
+            <button class="btn-ghost" @click="loadTables()">重试</button>
           </div>
-          <div v-else-if="!loadingTables && tables.length === 0" class="flex flex-col items-center justify-center py-10 text-muted-foreground">
-            <Inbox class="h-10 w-10 mb-2 opacity-40" />
-            <span class="text-sm">暂无数据表</span>
+          <div v-else-if="!loadingTables && tables.length === 0" class="empty-state py-10">
+            <Inbox class="h-10 w-10 empty-state-icon" />
+            <span class="empty-state-text">暂无数据表</span>
           </div>
         </div>
       </div>
 
-      <div v-if="!isRedis && selectedTable" class="content-card">
-        <div class="flex justify-between items-center section-padding border-b border-border">
-          <span class="text-[13px] text-muted-foreground">共 {{ totalRows }} 行数据</span>
+      <!-- ── MySQL: Data Table Card ── -->
+      <div v-if="!isRedis && selectedTable" class="content-card fade-up">
+        <!-- Pagination Bar -->
+        <div class="data-table-pagination">
+          <span class="text-[13px]" style="color: var(--text-tertiary)">共 {{ totalRows }} 行数据</span>
           <div class="flex items-center gap-2">
-            <Button variant="outline" size="icon" class="h-7 w-7" :disabled="page <= 1" @click="page--; onPageChange()">
+            <button
+              class="pagination-btn"
+              :disabled="page <= 1"
+              @click="page--; onPageChange()"
+            >
               <ChevronLeft class="h-3.5 w-3.5" />
-            </Button>
-            <span class="text-xs text-muted-foreground min-w-[60px] text-center">{{ page }} / {{ totalPages }}</span>
-            <Button variant="outline" size="icon" class="h-7 w-7" :disabled="page >= totalPages" @click="page++; onPageChange()">
+            </button>
+            <span class="text-xs font-mono-data min-w-[60px] text-center" style="color: var(--text-tertiary)">{{ page }} / {{ totalPages }}</span>
+            <button
+              class="pagination-btn"
+              :disabled="page >= totalPages"
+              @click="page++; onPageChange()"
+            >
               <ChevronRight class="h-3.5 w-3.5" />
-            </Button>
+            </button>
           </div>
         </div>
 
+        <!-- Table Content -->
         <div class="relative overflow-hidden" :style="{ height: tableHeight }">
-          <div v-if="loadingData" class="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
-            <Loader2 class="h-6 w-6 animate-spin text-primary" />
+          <div v-if="loadingData" class="data-table-loading">
+            <Loader2 class="h-6 w-6 animate-spin" style="color: var(--accent)" />
           </div>
           <Table class="h-full">
             <TableHeader>
-              <TableRow class="hover:bg-transparent border-b border-border">
-                <TableHead v-for="col in columns" :key="col.name" class="min-w-[120px] text-[12px] font-normal text-muted-foreground">
+              <TableRow class="hover:bg-transparent" style="border-bottom: 1px solid var(--border-subtle)">
+                <TableHead v-for="col in columns" :key="col.name" class="min-w-[120px] text-[12px] font-normal" style="color: var(--text-tertiary)">
                   {{ col.name }}
                 </TableHead>
-                <TableHead class="text-center w-[100px] sticky right-0 bg-card text-[12px] font-normal text-muted-foreground">操作</TableHead>
+                <TableHead class="data-table-action-col text-[12px] font-normal" style="color: var(--text-tertiary)">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="(row, idx) in tableData" :key="idx" class="hover:bg-muted border-b border-border">
+              <TableRow
+                v-for="(row, idx) in tableData"
+                :key="idx"
+                class="data-table-row"
+              >
                 <TableCell v-for="col in columns" :key="col.name" class="max-w-[300px]">
-                  <span :class="row[col.name] === null ? 'text-muted-foreground italic' : 'font-mono text-[13px] text-foreground'">
+                  <span
+                    :class="row[col.name] === null ? 'data-table-null' : 'font-mono-data text-[13px]'"
+                    :style="row[col.name] !== null ? 'color: var(--text-primary)' : ''"
+                  >
                     {{ row[col.name] !== null ? row[col.name] : 'NULL' }}
                   </span>
                 </TableCell>
-                <TableCell class="sticky right-0 bg-card">
-                  <div class="flex gap-1">
-                    <Button variant="link" size="sm" class="h-auto p-0 text-xs text-primary hover:bg-primary/10" @click="editRow(row)" :disabled="!columns.some(c => c.key === 'PRI')">编辑</Button>
-                    <Button variant="link" size="sm" class="h-auto p-0 text-xs text-red-400 hover:bg-red-500/5" @click="confirmDeleteRow(row)" :disabled="!columns.some(c => c.key === 'PRI')">删除</Button>
+                <TableCell class="data-table-action-col">
+                  <div class="data-table-row-actions">
+                    <button class="btn-ghost" @click="editRow(row)" :disabled="!columns.some(c => c.key === 'PRI')">编辑</button>
+                    <button class="btn-ghost-danger" @click="confirmDeleteRow(row)" :disabled="!columns.some(c => c.key === 'PRI')">删除</button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -374,59 +467,62 @@
           </Table>
         </div>
 
-        <div class="section-padding border-t border-border">
+        <!-- Bottom Panel: Structure & SQL -->
+        <div class="data-table-bottom-panel">
           <Tabs v-model="activeTab">
-            <TabsList class="bg-muted">
-              <TabsTrigger value="structure" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">表结构</TabsTrigger>
-              <TabsTrigger value="sql" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">SQL</TabsTrigger>
+            <TabsList style="background: var(--muted)">
+              <TabsTrigger value="structure" class="text-[12px]" :class="activeTab === 'structure' ? 'tab-active' : 'tab-inactive'">表结构</TabsTrigger>
+              <TabsTrigger value="sql" class="text-[12px]" :class="activeTab === 'sql' ? 'tab-active' : 'tab-inactive'">SQL</TabsTrigger>
             </TabsList>
             <TabsContent value="structure">
               <Table>
                 <TableHeader>
-                  <TableRow class="hover:bg-transparent border-b border-border">
-                    <TableHead class="min-w-[120px] text-[12px] font-normal text-muted-foreground">字段名</TableHead>
-                    <TableHead class="min-w-[140px] text-[12px] font-normal text-muted-foreground">类型</TableHead>
-                    <TableHead class="w-[80px] text-[12px] font-normal text-muted-foreground">键</TableHead>
-                    <TableHead class="min-w-[120px] text-[12px] font-normal text-muted-foreground">默认值</TableHead>
-                    <TableHead class="min-w-[120px] text-[12px] font-normal text-muted-foreground">额外</TableHead>
+                  <TableRow class="hover:bg-transparent" style="border-bottom: 1px solid var(--border-subtle)">
+                    <TableHead class="min-w-[120px] text-[12px] font-normal" style="color: var(--text-tertiary)">字段名</TableHead>
+                    <TableHead class="min-w-[140px] text-[12px] font-normal" style="color: var(--text-tertiary)">类型</TableHead>
+                    <TableHead class="w-[80px] text-[12px] font-normal" style="color: var(--text-tertiary)">键</TableHead>
+                    <TableHead class="min-w-[120px] text-[12px] font-normal" style="color: var(--text-tertiary)">默认值</TableHead>
+                    <TableHead class="min-w-[120px] text-[12px] font-normal" style="color: var(--text-tertiary)">额外</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow v-for="col in columns" :key="col.name" class="hover:bg-muted border-b border-border">
-                    <TableCell class="font-mono text-foreground">{{ col.name }}</TableCell>
-                    <TableCell class="text-foreground">{{ col.type }}</TableCell>
-                    <TableCell class="text-foreground">{{ col.key }}</TableCell>
-                    <TableCell class="text-foreground">{{ col.default }}</TableCell>
-                    <TableCell class="text-foreground">{{ col.extra }}</TableCell>
+                  <TableRow v-for="col in columns" :key="col.name" class="hover:bg-muted" style="border-bottom: 1px solid var(--border-subtle)">
+                    <TableCell class="font-mono-data" style="color: var(--text-primary)">{{ col.name }}</TableCell>
+                    <TableCell style="color: var(--text-primary)">{{ col.type }}</TableCell>
+                    <TableCell style="color: var(--text-primary)">{{ col.key }}</TableCell>
+                    <TableCell style="color: var(--text-primary)">{{ col.default }}</TableCell>
+                    <TableCell style="color: var(--text-primary)">{{ col.extra }}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
             </TabsContent>
             <TabsContent value="sql">
-              <Textarea v-model="sqlQuery" :rows="5" placeholder="输入SQL查询语句..." class="font-mono text-sm mb-3 border-border" />
-              <div class="flex justify-end mb-3">
-                <Button variant="primary" size="sm" class="h-8 text-[13px]" @click="executeSql" :disabled="sqlResultLoading">
-                  {{ sqlResultLoading ? '执行中...' : '执行' }}
-                </Button>
-              </div>
-              <div v-if="sqlResult" class="mt-2">
-                <div v-if="sqlResult.type === 'rows'" class="border border-border rounded-md overflow-auto max-h-[400px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead v-for="col in sqlResult.columns" :key="col" class="text-xs">{{ col }}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow v-for="(row, idx) in sqlResult.data" :key="idx">
-                        <TableCell v-for="col in sqlResult.columns" :key="col" class="text-xs font-mono">{{ row[col] ?? 'NULL' }}</TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                  <div class="text-xs text-muted-foreground px-3 py-2 border-t border-border">共 {{ sqlResult.data.length }} 行</div>
+              <div class="sql-console">
+                <Textarea v-model="sqlQuery" :rows="5" placeholder="输入SQL查询语句..." class="font-mono text-sm mb-3 code-editor" style="border-color: var(--border)" />
+                <div class="flex justify-end mb-3">
+                  <button class="btn-primary" @click="executeSql" :disabled="sqlResultLoading">
+                    {{ sqlResultLoading ? '执行中...' : '执行' }}
+                  </button>
                 </div>
-                <div v-else-if="sqlResult.type === 'message'" class="p-3 bg-emerald-500/15 border border-green-500/20 rounded-md text-sm text-green-600">{{ sqlResult.data }}</div>
-                <div v-else-if="sqlResult.type === 'error'" class="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">{{ sqlResult.data }}</div>
+                <div v-if="sqlResult" class="mt-2">
+                  <div v-if="sqlResult.type === 'rows'" class="sql-result-table">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead v-for="col in sqlResult.columns" :key="col" class="text-xs">{{ col }}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow v-for="(row, idx) in sqlResult.data" :key="idx">
+                          <TableCell v-for="col in sqlResult.columns" :key="col" class="text-xs font-mono-data">{{ row[col] ?? 'NULL' }}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                    <div class="sql-result-footer" style="color: var(--text-tertiary)">共 {{ sqlResult.data.length }} 行</div>
+                  </div>
+                  <div v-else-if="sqlResult.type === 'message'" class="sql-result-msg sql-result-msg--success">{{ sqlResult.data }}</div>
+                  <div v-else-if="sqlResult.type === 'error'" class="sql-result-msg sql-result-msg--error">{{ sqlResult.data }}</div>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
@@ -434,6 +530,9 @@
       </div>
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════════
+         Dialogs (unchanged logic, updated styling)
+         ═══════════════════════════════════════════════════════════ -->
     <Dialog v-model:open="showInsertDialog">
       <DialogPortal>
         <DialogOverlay />
@@ -442,7 +541,7 @@
           <DialogDescription />
           <div class="grid gap-4 py-4">
             <div v-for="col in columns" :key="col.name" class="grid gap-1.5">
-              <label class="text-sm font-medium leading-none">{{ col.name }}</label>
+              <label class="text-sm font-medium leading-none" style="color: var(--text-primary)">{{ col.name }}</label>
               <Input v-if="isNumericType(col.type)" type="number" v-model="insertForm[col.name]" :placeholder="`请输入 ${col.name}`" class="w-full" />
               <Switch v-else-if="isBooleanType(col.type)" v-model:checked="insertForm[col.name]" />
               <Input v-else-if="isDateType(col.type)" :type="getDateInputType(col.type)" v-model="insertForm[col.name]" :placeholder="`请选择 ${col.name}`" class="w-full" />
@@ -451,8 +550,8 @@
             </div>
           </div>
           <div class="flex justify-end gap-2 flex-wrap">
-            <Button variant="outline" @click="showInsertDialog = false">取消</Button>
-            <Button @click="insertData">确认插入</Button>
+            <button class="btn-secondary" @click="showInsertDialog = false">取消</button>
+            <button class="btn-primary" @click="insertData">确认插入</button>
           </div>
         </DialogContent>
       </DialogPortal>
@@ -466,7 +565,7 @@
           <DialogDescription />
           <div class="grid gap-4 py-4">
             <div v-for="col in columns" :key="col.name" class="grid gap-1.5">
-              <label class="text-sm font-medium leading-none">{{ col.name }}</label>
+              <label class="text-sm font-medium leading-none" style="color: var(--text-primary)">{{ col.name }}</label>
               <Input v-if="isNumericType(col.type)" type="number" v-model="editForm[col.name]" :placeholder="`请输入 ${col.name}`" class="w-full" />
               <Switch v-else-if="isBooleanType(col.type)" v-model:checked="editForm[col.name]" />
               <Input v-else-if="isDateType(col.type)" :type="getDateInputType(col.type)" v-model="editForm[col.name]" :placeholder="`请选择 ${col.name}`" class="w-full" />
@@ -475,8 +574,8 @@
             </div>
           </div>
           <div class="flex justify-end gap-2 flex-wrap">
-            <Button variant="outline" @click="showEditDialog = false">取消</Button>
-            <Button @click="updateData">保存修改</Button>
+            <button class="btn-secondary" @click="showEditDialog = false">取消</button>
+            <button class="btn-primary" @click="updateData">保存修改</button>
           </div>
         </DialogContent>
       </DialogPortal>
@@ -489,8 +588,11 @@
           <DialogTitle>{{ confirmState.title }}</DialogTitle>
           <DialogDescription>{{ confirmState.description }}</DialogDescription>
           <div class="flex justify-end gap-2 mt-4 flex-wrap">
-            <Button variant="outline" @click="confirmState.open = false">取消</Button>
-            <Button :variant="confirmState.variant === 'destructive' ? 'destructive' : 'default'" @click="handleConfirm">确认</Button>
+            <button class="btn-secondary" @click="confirmState.open = false">取消</button>
+            <button
+              :class="confirmState.variant === 'destructive' ? 'btn-danger' : 'btn-primary'"
+              @click="handleConfirm"
+            >确认</button>
           </div>
         </DialogContent>
       </DialogPortal>
@@ -504,19 +606,19 @@
           <DialogDescription />
           <div class="grid gap-4 py-4">
             <div class="grid gap-1.5">
-              <label class="text-sm font-medium leading-none">数据库名称 <span class="text-red-400">*</span></label>
+              <label class="text-sm font-medium leading-none" style="color: var(--text-primary)">数据库名称 <span style="color: var(--danger)">*</span></label>
               <Input v-model="createDbForm.name" placeholder="请输入数据库名称" class="w-full" />
             </div>
             <div class="grid gap-1.5">
-              <label class="text-sm font-medium leading-none">用户密码 <span class="text-muted-foreground text-xs font-normal">(可选，将创建同名用户并授权)</span></label>
+              <label class="text-sm font-medium leading-none" style="color: var(--text-primary)">用户密码 <span class="text-xs font-normal" style="color: var(--text-tertiary)">(可选，将创建同名用户并授权)</span></label>
               <Input v-model="createDbForm.password" type="password" placeholder="请输入用户密码" class="w-full" />
             </div>
             <div class="grid gap-1.5">
-              <label class="text-sm font-medium leading-none">确认密码 <span class="text-muted-foreground text-xs font-normal">(如填写密码则需再次输入)</span></label>
+              <label class="text-sm font-medium leading-none" style="color: var(--text-primary)">确认密码 <span class="text-xs font-normal" style="color: var(--text-tertiary)">(如填写密码则需再次输入)</span></label>
               <Input v-model="createDbForm.confirmPassword" type="password" placeholder="请再次输入密码" class="w-full" />
             </div>
             <div class="grid gap-1.5">
-              <label class="text-sm font-medium leading-none">字符集</label>
+              <label class="text-sm font-medium leading-none" style="color: var(--text-primary)">字符集</label>
               <Select v-model="createDbForm.charset">
                 <SelectTrigger class="w-full">
                   <SelectValue placeholder="选择字符集" />
@@ -535,10 +637,10 @@
               </Select>
             </div>
           </div>
-          <div v-if="createDbError" class="text-[13px] text-red-400 bg-red-500/5 rounded-lg px-3 py-2">{{ createDbError }}</div>
+          <div v-if="createDbError" class="text-[13px] rounded-lg px-3 py-2" style="color: var(--danger); background: var(--danger-soft)">{{ createDbError }}</div>
           <div class="flex justify-end gap-2 flex-wrap">
-            <Button variant="outline" @click="showCreateDbDialog = false">取消</Button>
-            <Button :disabled="!createDbForm.name.trim() || (createDbForm.password && createDbForm.password !== createDbForm.confirmPassword)" @click="createDatabase">创建</Button>
+            <button class="btn-secondary" @click="showCreateDbDialog = false">取消</button>
+            <button class="btn-primary" :disabled="!createDbForm.name.trim() || (createDbForm.password && createDbForm.password !== createDbForm.confirmPassword)" @click="createDatabase">创建</button>
           </div>
         </DialogContent>
       </DialogPortal>
@@ -554,43 +656,43 @@
           </div>
           <div class="flex flex-col gap-4 py-2">
             <div class="flex flex-col gap-1.5">
-              <label class="text-sm font-medium text-foreground">表名 <span class="text-red-400">*</span></label>
-              <Input v-model="createTableForm.name" placeholder="例如: users" class="border-border shadow-none" />
+              <label class="text-sm font-medium" style="color: var(--text-primary)">表名 <span style="color: var(--danger)">*</span></label>
+              <Input v-model="createTableForm.name" placeholder="例如: users" style="border-color: var(--border); box-shadow: none" />
             </div>
             <div class="flex flex-col gap-1.5">
               <div class="flex items-center justify-between">
-                <label class="text-sm font-medium text-foreground">字段列表</label>
-                <Button size="sm" variant="outline" class="h-[28px] text-[12px]" @click="addColumn">
-                  <Plus class="h-3 w-3 mr-1" />
+                <label class="text-sm font-medium" style="color: var(--text-primary)">字段列表</label>
+                <button class="btn-secondary" @click="addColumn">
+                  <Plus class="h-3 w-3" />
                   添加字段
-                </Button>
+                </button>
               </div>
-              <div v-if="createTableForm.columns.length === 0" class="text-[13px] text-muted-foreground py-4 text-center border-2 border-dashed border-border rounded-lg">
+              <div v-if="createTableForm.columns.length === 0" class="text-[13px] py-4 text-center border-2 border-dashed rounded-lg" style="color: var(--text-tertiary); border-color: var(--border)">
                 请添加至少一个字段
               </div>
-              <div v-for="(col, idx) in createTableForm.columns" :key="idx" class="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted">
+              <div v-for="(col, idx) in createTableForm.columns" :key="idx" class="flex items-center gap-2 p-3 rounded-lg" style="border: 1px solid var(--border); background: var(--muted)">
                 <div class="flex flex-col gap-0.5 flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <Input v-model="col.name" placeholder="字段名" class="flex-1 border-border shadow-none h-[32px] text-[13px]" />
-                    <select v-model="col.type" class="h-[32px] px-2 rounded-md border border-border text-[13px] bg-card outline-none focus:border-primary">
+                    <Input v-model="col.name" placeholder="字段名" class="flex-1 h-[32px] text-[13px]" style="border-color: var(--border); box-shadow: none" />
+                    <select v-model="col.type" class="h-[32px] px-2 rounded-md text-[13px] outline-none" style="border: 1px solid var(--border); background: var(--surface); color: var(--text-primary)">
                       <option v-for="t in columnTypes" :key="t" :value="t">{{ t }}</option>
                     </select>
-                    <Input v-model="col.length" placeholder="长度" class="w-[70px] border-border shadow-none h-[32px] text-[13px]" />
+                    <Input v-model="col.length" placeholder="长度" class="w-[70px] h-[32px] text-[13px]" style="border-color: var(--border); box-shadow: none" />
                   </div>
                   <div class="flex items-center gap-4 mt-1">
                     <label class="flex items-center gap-1.5 text-[12px] cursor-pointer select-none">
-                      <input type="checkbox" v-model="col.notNull" class="accent-primary" />
-                      <span class="text-muted-foreground">NOT NULL</span>
+                      <input type="checkbox" v-model="col.notNull" style="accent-color: var(--accent)" />
+                      <span style="color: var(--text-tertiary)">NOT NULL</span>
                     </label>
                     <label class="flex items-center gap-1.5 text-[12px] cursor-pointer select-none">
-                      <input type="checkbox" v-model="col.autoIncrement" class="accent-primary" />
-                      <span class="text-muted-foreground">AUTO_INCREMENT</span>
+                      <input type="checkbox" v-model="col.autoIncrement" style="accent-color: var(--accent)" />
+                      <span style="color: var(--text-tertiary)">AUTO_INCREMENT</span>
                     </label>
                     <label class="flex items-center gap-1.5 text-[12px] cursor-pointer select-none">
-                      <span class="text-muted-foreground">默认值:</span>
-                      <Input v-model="col.defaultValue" placeholder="NULL" class="w-[100px] border-border shadow-none h-[24px] text-[12px]" />
+                      <span style="color: var(--text-tertiary)">默认值:</span>
+                      <Input v-model="col.defaultValue" placeholder="NULL" class="w-[100px] h-[24px] text-[12px]" style="border-color: var(--border); box-shadow: none" />
                     </label>
-                    <select v-model="col.keyType" class="h-[24px] px-1.5 rounded border border-border text-[12px] bg-card outline-none focus:border-primary">
+                    <select v-model="col.keyType" class="h-[24px] px-1.5 rounded text-[12px] outline-none" style="border: 1px solid var(--border); background: var(--surface); color: var(--text-primary)">
                       <option value="">无</option>
                       <option value="PRI">主键</option>
                       <option value="UNI">唯一键</option>
@@ -598,16 +700,16 @@
                     </select>
                   </div>
                 </div>
-                <button class="w-7 h-7 rounded-md flex items-center justify-center hover:bg-red-500/5 shrink-0 transition-colors" @click="removeColumn(idx)">
-                  <X class="h-3.5 w-3.5 text-red-400" />
+                <button class="w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors" style="color: var(--danger)" @click="removeColumn(idx)">
+                  <X class="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
           </div>
-          <div v-if="createTableError" class="text-[13px] text-red-400 bg-red-500/5 rounded-lg px-3 py-2">{{ createTableError }}</div>
+          <div v-if="createTableError" class="text-[13px] rounded-lg px-3 py-2" style="color: var(--danger); background: var(--danger-soft)">{{ createTableError }}</div>
           <div class="flex justify-end gap-2 mt-1 flex-wrap">
-            <Button variant="outline" @click="showCreateTableDialog = false">取消</Button>
-            <Button variant="primary" :disabled="!createTableForm.name.trim() || createTableForm.columns.length === 0" @click="createTable">创建表</Button>
+            <button class="btn-secondary" @click="showCreateTableDialog = false">取消</button>
+            <button class="btn-primary" :disabled="!createTableForm.name.trim() || createTableForm.columns.length === 0" @click="createTable">创建表</button>
           </div>
         </DialogContent>
       </DialogPortal>
@@ -619,11 +721,11 @@
         <DialogContent class="sm:max-w-[400px]">
           <div class="flex flex-col gap-y-1.5">
             <DialogTitle>删除数据表</DialogTitle>
-            <DialogDescription>确定要删除表 <strong class="text-red-400">{{ deleteTableName }}</strong> 吗？此操作不可撤销，所有数据将永久丢失。</DialogDescription>
+            <DialogDescription>确定要删除表 <strong style="color: var(--danger)">{{ deleteTableName }}</strong> 吗？此操作不可撤销，所有数据将永久丢失。</DialogDescription>
           </div>
           <div class="flex justify-end gap-2 flex-wrap">
-            <Button variant="outline" @click="showDeleteTableDialog = false">取消</Button>
-            <Button variant="destructive" @click="deleteTable">确认删除</Button>
+            <button class="btn-secondary" @click="showDeleteTableDialog = false">取消</button>
+            <button class="btn-danger" @click="deleteTable">确认删除</button>
           </div>
         </DialogContent>
       </DialogPortal>
@@ -636,16 +738,16 @@
           <div class="flex flex-col gap-y-1.5">
             <DialogTitle>删除数据库</DialogTitle>
             <DialogDescription>
-              此操作将永久删除数据库 <strong class="text-red-400">{{ deleteDbName }}</strong> 及其所有数据，且不可恢复。
+              此操作将永久删除数据库 <strong style="color: var(--danger)">{{ deleteDbName }}</strong> 及其所有数据，且不可恢复。
             </DialogDescription>
           </div>
           <div class="flex flex-col gap-1.5 mt-3">
-            <label class="text-sm text-foreground">请输入数据库名称 <strong class="text-red-400">{{ deleteDbName }}</strong> 以确认删除</label>
-            <Input v-model="deleteDbConfirmInput" :placeholder="deleteDbName" class="border-border shadow-none" />
+            <label class="text-sm" style="color: var(--text-primary)">请输入数据库名称 <strong style="color: var(--danger)">{{ deleteDbName }}</strong> 以确认删除</label>
+            <Input v-model="deleteDbConfirmInput" :placeholder="deleteDbName" style="border-color: var(--border); box-shadow: none" />
           </div>
           <div class="flex justify-end gap-2 mt-3 flex-wrap">
-            <Button variant="outline" @click="showDeleteDbDialog = false">取消</Button>
-            <Button variant="destructive" :disabled="deleteDbConfirmInput !== deleteDbName" @click="doDeleteDatabase">确认删除</Button>
+            <button class="btn-secondary" @click="showDeleteDbDialog = false">取消</button>
+            <button class="btn-danger" :disabled="deleteDbConfirmInput !== deleteDbName" @click="doDeleteDatabase">确认删除</button>
           </div>
         </DialogContent>
       </DialogPortal>
@@ -1381,3 +1483,376 @@ watch(() => props.navRequest, (val) => { if (val) processNavRequest() })
 onMounted(() => { loadInstances() })
 onActivated(() => { loadInstances() })
 </script>
+
+<style scoped>
+/* ── Instance Cards ── */
+.instance-card {
+  padding: 0.875rem;
+  border-radius: var(--card-radius);
+  border: var(--card-border);
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  margin-bottom: 0.5rem;
+}
+.instance-card:hover {
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--border));
+}
+.instance-card:active {
+  transform: translateY(0);
+  box-shadow: var(--card-shadow);
+}
+.instance-card--active {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.instance-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.instance-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  padding-left: 2.75rem;
+}
+
+/* ── Breadcrumb Navigation ── */
+.breadcrumb-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.9375rem;
+  flex-wrap: wrap;
+}
+.breadcrumb-item {
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.375rem;
+  transition: all var(--transition-fast);
+  cursor: default;
+}
+.breadcrumb-item--active {
+  color: var(--text-primary);
+  font-weight: 500;
+  cursor: pointer;
+}
+.breadcrumb-item--active:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.breadcrumb-item--current {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.breadcrumb-sep {
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* ── Section Labels ── */
+.section-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Grid Cards (Database / Table) ── */
+.grid-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--card-radius);
+  border: var(--card-border);
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+.grid-card:hover {
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+}
+.grid-card:active {
+  transform: translateY(0);
+  box-shadow: var(--card-shadow);
+}
+.grid-card-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.grid-card-info {
+  flex: 1;
+  min-width: 0;
+}
+.grid-card-name {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grid-card-delete {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all var(--transition-fast);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--danger);
+}
+.grid-card:hover .grid-card-delete {
+  opacity: 1;
+}
+.grid-card-delete:hover {
+  background: var(--danger-soft);
+}
+
+/* ── Redis Stats Grid ── */
+.redis-stats {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Redis Search ── */
+.redis-search-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.redis-search-input {
+  display: flex;
+  flex: 1;
+  max-width: 400px;
+}
+.redis-search-prefix {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.5rem 0 0 0.5rem;
+  border: 1px solid var(--border);
+  border-right: none;
+  padding: 0 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  background: var(--muted);
+}
+.redis-search-field {
+  border-radius: 0 0.5rem 0.5rem 0 !important;
+  height: 2rem;
+  font-size: 0.75rem;
+}
+
+/* ── Redis Key List ── */
+.redis-key-list {
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+}
+.redis-key-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--background) 60%, transparent);
+  z-index: 10;
+}
+.redis-key-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.625rem 1rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.redis-key-item:last-child {
+  border-bottom: none;
+}
+.redis-key-item:hover {
+  background: var(--accent-soft);
+}
+.redis-key-more {
+  text-align: center;
+  padding: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Redis Console ── */
+.redis-console {
+  margin-top: 0.75rem;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+}
+.redis-console-header {
+  margin-bottom: 0.5rem;
+}
+.redis-console-result {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  max-height: 120px;
+  overflow: auto;
+}
+
+/* ── Redis Value Panel ── */
+.redis-value-panel {
+  overflow: auto;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+}
+.redis-value-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.8125rem;
+}
+.redis-value-row:last-child {
+  border-bottom: none;
+}
+.redis-value-idx {
+  color: var(--text-tertiary);
+  min-width: 30px;
+  font-size: 0.6875rem;
+}
+
+/* ── Data Table ── */
+.data-table-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--section-padding-y) var(--section-padding-x);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  width: 1.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.pagination-btn:hover:not(:disabled) {
+  background: var(--muted);
+  border-color: var(--border-strong);
+}
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.data-table-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--background) 60%, transparent);
+  z-index: 10;
+}
+.data-table-row {
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.data-table-row:hover {
+  background: var(--muted);
+}
+.data-table-action-col {
+  text-align: center;
+  width: 100px;
+  position: sticky;
+  right: 0;
+  background: var(--surface);
+}
+.data-table-row-actions {
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.data-table-row:hover .data-table-row-actions {
+  opacity: 1;
+}
+.data-table-null {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* ── Bottom Panel ── */
+.data-table-bottom-panel {
+  padding: var(--section-padding-y) var(--section-padding-x);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ── SQL Console ── */
+.sql-console {
+  /* wrapper for SQL editor area */
+}
+.sql-result-table {
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  overflow: auto;
+  max-height: 400px;
+}
+.sql-result-footer {
+  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.sql-result-msg {
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+.sql-result-msg--success {
+  background: var(--success-soft);
+  border: 1px solid color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
+}
+.sql-result-msg--error {
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
+  color: var(--danger);
+}
+</style>

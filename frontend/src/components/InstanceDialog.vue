@@ -8,93 +8,102 @@
       <div class="flex flex-col gap-4">
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium">名称 <span class="text-destructive">*</span></label>
+            <label class="text-[12px] font-medium" style="color: var(--text-secondary)">名称 <span style="color: var(--danger)">*</span></label>
             <Input v-model="form.name" placeholder="实例名称" />
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium">类型 <span class="text-destructive">*</span></label>
-            <Select v-model="form.type">
-              <SelectTrigger class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mysql">MySQL</SelectItem>
-                <SelectItem value="redis">Redis</SelectItem>
-              </SelectContent>
-            </Select>
+            <label class="text-[12px] font-medium" style="color: var(--text-secondary)">类型 <span style="color: var(--danger)">*</span></label>
+            <div class="flex gap-1">
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.type === 'mysql' ? 'tab-active' : 'tab-inactive'"
+                @click="form.type = 'mysql'"
+              >
+                MySQL
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.type === 'redis' ? 'tab-active' : 'tab-inactive'"
+                @click="form.type = 'redis'"
+              >
+                Redis
+              </button>
+            </div>
           </div>
         </div>
 
         <div class="grid grid-cols-3 gap-4">
           <div class="col-span-2 flex flex-col gap-1.5">
-            <label class="text-sm font-medium">主机地址 <span class="text-destructive">*</span></label>
+            <label class="text-[12px] font-medium" style="color: var(--text-secondary)">主机地址 <span style="color: var(--danger)">*</span></label>
             <Input v-model="form.host" placeholder="localhost" />
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium">端口 <span class="text-destructive">*</span></label>
+            <label class="text-[12px] font-medium" style="color: var(--text-secondary)">端口 <span style="color: var(--danger)">*</span></label>
             <Input v-model="form.port" type="number" :min="1" :max="65535" />
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium">用户名 <span class="text-destructive">*</span></label>
+            <label class="text-[12px] font-medium" style="color: var(--text-secondary)">用户名 <span style="color: var(--danger)">*</span></label>
             <Input v-model="form.username" placeholder="用户名" />
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium">密码</label>
+            <label class="text-[12px] font-medium" style="color: var(--text-secondary)">密码</label>
             <Input v-model="form.password" type="password" placeholder="密码" />
           </div>
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">数据库名</label>
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">数据库名</label>
           <Input v-model="form.database" placeholder="默认与实例名相同" />
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">描述</label>
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">描述</label>
           <Textarea v-model="form.description" :rows="2" placeholder="可选" />
         </div>
       </div>
 
-      <div v-if="duplicateInstance" class="mt-3 p-3 rounded-lg border border-amber-200 bg-amber-50">
+      <div v-if="duplicateInstance" class="mt-3 p-3 rounded-xl" style="background: var(--warning-soft); border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent)">
         <div class="flex items-start gap-2">
-          <AlertTriangle class="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+          <AlertTriangle class="h-4 w-4 shrink-0 mt-0.5" style="color: var(--warning)" />
           <div class="flex-1 min-w-0">
-            <p class="text-sm text-amber-500 font-medium">连接已存在</p>
-            <p class="text-xs text-amber-500 mt-0.5">
+            <p class="text-[12px] font-medium" style="color: var(--warning)">连接已存在</p>
+            <p class="text-[11px] mt-0.5" style="color: var(--warning)">
               该主机({{ form.host }})、用户名({{ form.username }})和端口({{ form.port }})的数据库连接已存在
             </p>
             <div class="flex items-center gap-2 mt-2">
-              <span class="text-xs text-amber-500">{{ duplicateInstance.name }}</span>
-              <Badge v-if="duplicateInstance.isRemote" variant="outline" class="bg-orange-50 text-orange-500 border-orange-200 text-[10px] h-[16px]">远程</Badge>
-              <span class="text-xs text-amber-500 font-mono-data">{{ duplicateInstance.type === 'mysql' ? 'MySQL' : 'Redis' }}</span>
+              <span class="text-[11px]" style="color: var(--warning)">{{ duplicateInstance.name }}</span>
+              <Badge v-if="duplicateInstance.isRemote" variant="outline" class="badge-status badge-status-warning text-[10px] h-[16px]">远程</Badge>
+              <span class="text-[11px] font-mono-data" style="color: var(--warning)">{{ duplicateInstance.type === 'mysql' ? 'MySQL' : 'Redis' }}</span>
             </div>
-            <Button variant="link" size="sm" class="h-auto p-0 mt-1 text-xs text-amber-500 hover:text-amber-500" @click="goToDuplicate">
+            <button class="btn-ghost mt-1 text-[11px]" style="color: var(--warning)" @click="goToDuplicate">
               跳转到该连接 →
-            </Button>
+            </button>
           </div>
         </div>
       </div>
 
       <div class="flex justify-between items-center mt-4">
         <div class="flex items-center gap-2">
-          <Button variant="outline" @click="testConnection" :disabled="testLoading" class="text-primary border-primary/40 hover:bg-primary/10">
+          <button class="btn-secondary" @click="testConnection" :disabled="testLoading">
             <Loader2 v-if="testLoading" class="h-4 w-4 animate-spin" />
             <Zap v-else class="h-4 w-4" />
             测试连接
-          </Button>
-          <span v-if="testResult !== null" :class="testResult ? 'text-emerald-400' : 'text-red-400'" class="text-xs font-medium">
+          </button>
+          <span v-if="testResult !== null" class="text-[11px] font-medium" :style="{ color: testResult ? 'var(--success)' : 'var(--danger)' }">
             {{ testResult ? '连接成功' : '连接失败' }}
           </span>
         </div>
         <div class="flex gap-2">
-          <Button variant="outline" @click="handleClose">取消</Button>
-          <Button @click="handleSubmit" :disabled="loading || !!duplicateInstance">
+          <button class="btn-ghost" @click="handleClose">取消</button>
+          <button class="btn-primary" @click="handleSubmit" :disabled="loading || !!duplicateInstance">
             <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />
             确认
-          </Button>
+          </button>
         </div>
       </div>
     </DialogContent>
@@ -154,7 +163,7 @@ const duplicateInstance = computed(() => {
     const instHost = String(inst.host || 'localhost').trim()
     const instUsername = String(inst.username || '').trim()
     const instPort = Number(inst.port || 3306)
-    
+
     return instHost === formHost
       && instUsername === formUsername
       && instPort === formPort

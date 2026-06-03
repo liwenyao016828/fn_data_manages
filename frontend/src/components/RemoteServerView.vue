@@ -1,68 +1,58 @@
 <template>
   <div class="page-padding h-full overflow-y-auto">
-    <div class="content-card">
-      <div class="content-header">
-        <div class="flex items-start justify-between">
-          <div>
-            <h2 class="text-[15px] font-semibold text-foreground">远程服务器</h2>
-            <p class="text-[13px] text-muted-foreground mt-0.5">管理所有远程数据库服务器连接</p>
-          </div>
-          <Button variant="primary" size="sm" class="h-[32px] text-[13px]" @click="handleAdd">
-            <Plus class="h-3.5 w-3.5 mr-1.5" />添加远程服务器
-          </Button>
+    <!-- Page Header -->
+    <div class="flex items-start justify-between mb-6">
+      <div>
+        <h2 class="text-[15px] font-semibold" style="color: var(--text-primary)">远程服务器</h2>
+        <p class="text-[12px] mt-0.5" style="color: var(--text-tertiary)">管理所有远程数据库服务器连接</p>
+      </div>
+      <Button variant="primary" size="sm" class="h-[32px] text-[13px]" @click="handleAdd">
+        <Plus class="h-3.5 w-3.5 mr-1.5" />添加远程服务器
+      </Button>
+    </div>
+
+    <!-- Server Cards Grid -->
+    <div v-if="serverList.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 grid-gap">
+      <div
+        v-for="row in serverList"
+        :key="row.id"
+        class="content-card-interactive hover-lift group p-5 flex flex-col gap-3"
+      >
+        <!-- Name + Type Badge -->
+        <div class="flex items-center justify-between">
+          <span class="text-[14px] font-semibold truncate" style="color: var(--text-primary)">{{ row.name }}</span>
+          <span class="pill pill-active text-[10px] shrink-0 ml-2">{{ row.type === 'mysql' ? 'MySQL' : row.type === 'redis' ? 'Redis' : row.type || 'MySQL' }}</span>
+        </div>
+
+        <!-- Host:Port -->
+        <div class="font-mono-data text-[13px]" style="color: var(--text-secondary)">{{ row.host }}:{{ row.port }}</div>
+
+        <!-- Username -->
+        <div class="text-[12px]" style="color: var(--text-tertiary)">
+          <span>用户: </span><span style="color: var(--text-secondary)">{{ row.username }}</span>
+        </div>
+
+        <!-- Description -->
+        <div v-if="row.description" class="text-[12px] truncate" style="color: var(--text-tertiary)">{{ row.description }}</div>
+
+        <!-- Action Buttons (visible on hover) -->
+        <div class="flex items-center gap-2 mt-auto pt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style="border-top: 1px solid var(--border-subtle)">
+          <Button variant="ghost" size="xs" class="btn-ghost" @click="handleTest(row)">测试</Button>
+          <Button variant="ghost" size="xs" class="btn-ghost" @click="handleEdit(row)">编辑</Button>
+          <Button variant="ghost" size="xs" class="btn-ghost-danger" @click="openDeleteDialog(row)">删除</Button>
         </div>
       </div>
+    </div>
 
-      <div class="border-t border-border section-padding overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow class="hover:bg-transparent border-b border-border">
-              <TableHead class="min-w-[150px] text-[12px] font-normal text-muted-foreground h-10">名称</TableHead>
-              <TableHead class="w-[80px] text-[12px] font-normal text-muted-foreground h-10">类型</TableHead>
-              <TableHead class="min-w-[180px] text-[12px] font-normal text-muted-foreground h-10">数据库地址</TableHead>
-              <TableHead class="w-[64px] text-[12px] font-normal text-muted-foreground h-10">端口</TableHead>
-              <TableHead class="w-[100px] text-[12px] font-normal text-muted-foreground h-10">用户名</TableHead>
-              <TableHead class="w-[90px] text-[12px] font-normal text-muted-foreground h-10">密码</TableHead>
-              <TableHead class="min-w-[150px] text-[12px] font-normal text-muted-foreground h-10">描述信息</TableHead>
-              <TableHead class="text-center w-[180px] text-[12px] font-normal text-muted-foreground h-10">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <template v-if="serverList.length === 0">
-              <TableRow>
-                <TableCell colspan="8" class="h-64 text-center">
-                  <div class="flex flex-col items-center justify-center text-muted-foreground">
-                    <Inbox class="h-10 w-10 mb-2 opacity-30" />
-                    <p class="text-[13px]">暂无远程服务器</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </template>
-            <template v-for="row in serverList" :key="row.id">
-              <TableRow class="hover:bg-muted transition-colors duration-150 border-b border-border">
-                <TableCell><span class="text-[13px] text-foreground">{{ row.name }}</span></TableCell>
-                <TableCell>
-                  <Badge :variant="row.type === 'mysql' ? 'default' : 'secondary'" class="rounded-full text-[10px] py-0">
-                    {{ row.type === 'mysql' ? 'MySQL' : row.type === 'redis' ? 'Redis' : row.type || 'MySQL' }}
-                  </Badge>
-                </TableCell>
-                <TableCell><span class="text-[13px] text-secondary-foreground">{{ row.host }}</span></TableCell>
-                <TableCell><span class="text-[13px] text-muted-foreground">{{ row.port }}</span></TableCell>
-                <TableCell><span class="text-[13px] text-muted-foreground">{{ row.username }}</span></TableCell>
-                <TableCell><span class="text-[13px] text-muted-foreground">••••••••</span></TableCell>
-                <TableCell><span class="text-[13px] text-muted-foreground">{{ row.description || '-' }}</span></TableCell>
-                <TableCell>
-                  <div class="flex items-center gap-0.5">
-                    <Button variant="ghost" size="xs" class="text-primary hover:bg-primary/10" @click="handleTest(row)">连接测试</Button>
-                    <Button variant="ghost" size="xs" class="text-primary hover:bg-primary/10" @click="handleEdit(row)">编辑</Button>
-                    <Button variant="ghost" size="xs" class="text-destructive hover:bg-destructive/10" @click="openDeleteDialog(row)">删除</Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </template>
-          </TableBody>
-        </Table>
+    <!-- Empty State -->
+    <div v-else class="empty-state mt-16">
+      <div class="empty-state-icon">
+        <Inbox class="h-12 w-12" />
       </div>
+      <div class="empty-state-text">暂无远程服务器</div>
+      <Button variant="primary" size="sm" class="h-[32px] text-[13px] mt-4" @click="handleAdd">
+        <Plus class="h-3.5 w-3.5 mr-1.5" />添加远程服务器
+      </Button>
     </div>
 
     <RemoteServerDialog v-model="dialogVisible" :type="dialogType" :data="currentServer" @success="loadServers" />
@@ -71,7 +61,7 @@
       <DialogContent class="sm:max-w-[425px] rounded-xl">
         <div class="flex flex-col gap-y-1.5 text-center sm:text-left">
           <DialogTitle class="text-[15px]">删除确认</DialogTitle>
-          <DialogDescription class="text-[13px] text-muted-foreground">
+          <DialogDescription class="text-[13px]" style="color: var(--text-tertiary)">
             确定要删除服务器 "{{ deleteTarget?.name }}" 吗？此操作不可恢复。
           </DialogDescription>
         </div>
