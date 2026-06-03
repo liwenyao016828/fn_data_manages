@@ -1,394 +1,464 @@
 <template>
-  <div class="h-full overflow-y-auto bg-background flex flex-col page-padding">
-    <div class="flex items-center gap-2 flex-wrap section-gap shrink-0">
-      <div class="flex gap-1.5 flex-wrap flex-1">
+  <div class="h-full overflow-y-auto flex flex-col page-padding" style="background: var(--background)">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between mb-5 shrink-0 fade-up" style="animation-delay: 0ms">
+      <div>
+        <h1 class="text-xl font-semibold tracking-tight" style="color: var(--text-primary)">仪表盘</h1>
+        <p class="text-[13px] mt-0.5" style="color: var(--text-tertiary)">实时数据库监控与性能指标</p>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <!-- Auto-refresh with progress ring -->
+        <span
+          :class="[
+            'flex items-center gap-2 text-xs cursor-pointer select-none px-2.5 py-1.5 rounded-lg transition-colors duration-200',
+          ]"
+          :style="polling
+            ? 'color: var(--success); background: var(--success-soft)'
+            : 'color: var(--text-tertiary); background: var(--muted)'"
+          @click="togglePolling"
+        >
+          <svg v-if="polling" class="refresh-ring" width="16" height="16" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="6" fill="none" stroke="var(--border-subtle)" stroke-width="1.5" />
+            <circle
+              cx="8" cy="8" r="6" fill="none"
+              :stroke="'var(--success)'"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              :stroke-dasharray="37.7"
+              :stroke-dashoffset="37.7 * (1 - countdown / Math.max(getRefreshIntervalMs() / 1000, 1))"
+              class="refresh-ring-progress"
+            />
+          </svg>
+          <span v-else class="w-1.5 h-1.5 rounded-sm" style="background: var(--text-tertiary)" />
+          {{ polling ? `${countdown}s` : '已暂停' }}
+        </span>
+        <!-- Time Range Selector -->
+        <div class="flex items-center gap-1 p-0.5 rounded-full" style="background: var(--muted)">
+          <button
+            v-for="r in timeRanges"
+            :key="r.value"
+            :class="timeRange === r.value ? 'pill pill-active' : 'pill pill-default'"
+            style="border-radius: 9999px; padding: 4px 10px; font-size: 11px; border: none;"
+            @click="timeRange = r.value"
+          >
+            {{ r.label }}
+          </button>
+        </div>
+        <Loader2 v-if="reloadingHistory" :size="14" class="animate-spin" style="color: var(--accent)" />
+      </div>
+    </div>
+
+    <!-- Instance Selector -->
+    <div class="section-gap shrink-0 fade-up" style="animation-delay: 60ms">
+      <div class="instance-scroll flex gap-2 overflow-x-auto pb-1" style="scrollbar-width: thin;">
         <div
           v-for="db in sortedDatabases"
           :key="instanceUid(db)"
-          :class="[
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer transition-all duration-200 text-xs',
-            selectedUid === instanceUid(db)
-              ? 'border-primary/40 bg-primary/10 shadow-sm shadow-primary/10'
-              : 'border-border bg-card hover:border-primary/30 hover:shadow-sm',
-          ]"
+          :class="['instance-card', selectedUid === instanceUid(db) ? 'instance-card-active' : 'instance-card-default']"
           @click="selectInstance(db)"
         >
           <StatusDot :status="selectedUid === instanceUid(db) ? 'selected' : (onlineStatus[instanceUid(db)] !== false ? 'online' : 'offline')" size="xs" />
-          <span class="font-medium text-foreground">{{ db.name }}</span>
-          <span class="text-muted-foreground text-[11px] font-mono-data">{{ db.host }}:{{ db.port }}</span>
-        </div>
-      </div>
-      <div class="flex items-center gap-3 shrink-0">
-        <span
-          :class="[
-            'flex items-center gap-1.5 text-xs cursor-pointer select-none px-2 py-1 rounded-md transition-colors duration-200',
-            polling ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-muted-foreground hover:bg-muted',
-          ]"
-          @click="togglePolling"
-        >
-          <span v-if="polling" class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span v-else class="w-1.5 h-1.5 rounded-sm bg-muted-foreground" />
-          {{ polling ? `自动刷新 ${countdown}s` : '已暂停 · 点击恢复' }}
-        </span>
-        <div class="flex items-center gap-1.5">
-          <Button v-for="r in timeRanges" :key="r.value" variant="ghost" size="sm"
-            :class="[timeRange === r.value ? 'bg-cta text-cta-foreground hover:bg-cta/90' : 'text-secondary-foreground hover:bg-muted', 'h-[28px] text-[12px]']"
-            @click="timeRange = r.value">
-            {{ r.label }}
-          </Button>
-          <Loader2 v-if="reloadingHistory" :size="14" class="animate-spin text-primary ml-1" />
+          <span class="font-medium text-[13px]" style="color: var(--text-primary)">{{ db.name }}</span>
+          <span class="instance-type-badge">{{ db.type }}</span>
+          <span class="text-[11px] font-mono-data" style="color: var(--text-tertiary)">{{ db.host }}:{{ db.port }}</span>
         </div>
       </div>
     </div>
 
-    <div v-if="!metrics && !loadError" class="empty-state">
-      <div class="flex flex-col items-center gap-3 text-muted-foreground">
+    <!-- Empty State -->
+    <div v-if="!metrics && !loadError" class="empty-state flex-1 py-20">
+      <div class="flex flex-col items-center gap-3" style="color: var(--text-tertiary)">
         <Gauge :size="56" class="empty-state-icon" />
         <span class="empty-state-text">选择一个数据库实例查看实时指标</span>
       </div>
     </div>
 
-    <div v-if="loadError" class="flex items-center gap-2 px-3 py-2 mb-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs shrink-0">
+    <!-- Error Banner -->
+    <div v-if="loadError" class="flex items-center gap-2 px-4 py-2.5 mb-4 rounded-xl fade-up" style="background: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); font-size: 12px;">
       <CircleX class="h-4 w-4 shrink-0" />
       <span>{{ loadError }}</span>
-      <Button size="sm" variant="ghost" class="ml-auto text-red-400 hover:text-red-300 h-auto px-2 py-0.5 text-xs" @click="loadError = ''; fetchMetrics()">重试</Button>
+      <Button size="sm" variant="ghost" class="ml-auto h-auto px-2 py-0.5 text-xs" style="color: var(--danger)" @click="loadError = ''; fetchMetrics()">重试</Button>
     </div>
 
-    <div v-if="switching" class="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground text-sm">
-      <Loader2 :size="32" class="animate-spin text-primary" />
+    <!-- Switching Loader -->
+    <div v-if="switching" class="flex flex-col items-center justify-center gap-3 py-16 fade-up" style="color: var(--text-tertiary); font-size: 13px;">
+      <Loader2 :size="32" class="animate-spin" style="color: var(--accent)" />
       <span>正在加载 {{ switchingName }} 的指标...</span>
     </div>
 
     <template v-if="metrics">
-      <div v-if="metrics.online === false" class="flex items-center gap-2 px-3 py-2 mb-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs shrink-0">
+      <!-- Offline Banner -->
+      <div v-if="metrics.online === false" class="flex items-center gap-2 px-4 py-2.5 mb-4 rounded-xl fade-up" style="background: var(--warning-soft); border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent); color: var(--warning); font-size: 12px;">
         <CircleX class="h-4 w-4 shrink-0" />
         <span>该数据库实例已离线，图表显示历史数据</span>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 grid-gap section-gap shrink-0 fade-slide-in">
-        <div class="content-card-interactive flex items-center gap-3 stat-padding shadow-sm hover:shadow-md transition-shadow duration-200">
-          <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary">
-            <Monitor class="h-4 w-4" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[11px] text-muted-foreground mb-0.5">当前实例</div>
-            <div class="text-sm font-semibold text-foreground truncate">{{ instanceName }}</div>
-            <div class="text-[11px] text-muted-foreground font-mono-data">{{ metrics.host }}:{{ metrics.port }}</div>
+
+      <!-- Stat Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 grid-gap section-gap shrink-0 fade-up" style="animation-delay: 120ms">
+        <!-- Instance Card -->
+        <div class="content-card hover-lift stat-padding">
+          <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+              <div class="stat-label">当前实例</div>
+              <div class="stat-value text-base truncate" style="color: var(--text-primary)">{{ instanceName }}</div>
+              <div class="text-[11px] font-mono-data mt-0.5" style="color: var(--text-tertiary)">{{ metrics.host }}:{{ metrics.port }}</div>
+            </div>
+            <div class="stat-icon" style="background: var(--accent-soft); color: var(--accent)">
+              <Monitor class="h-4 w-4" />
+            </div>
           </div>
         </div>
 
-        <div class="content-card-interactive flex items-center gap-3 stat-padding shadow-sm hover:shadow-md transition-shadow duration-200">
-          <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-400">
-            <Clock class="h-4 w-4" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[11px] text-muted-foreground mb-0.5">运行时间</div>
-            <div class="text-sm font-semibold text-foreground truncate">{{ metrics.uptime_display || '-' }}</div>
+        <!-- Uptime Card -->
+        <div class="content-card hover-lift stat-padding">
+          <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+              <div class="stat-label">运行时间</div>
+              <div class="stat-value text-base truncate" style="color: var(--text-primary)">{{ metrics.uptime_display || '-' }}</div>
+            </div>
+            <div class="stat-icon" style="background: var(--success-soft); color: var(--success)">
+              <Clock class="h-4 w-4" />
+            </div>
           </div>
         </div>
 
+        <!-- Connections Card -->
         <div
           :class="[
-            'content-card-interactive flex items-center gap-3 stat-padding transition-shadow duration-200 cursor-pointer',
-            connStatusClass === 'danger' ? 'border-red-500/30 bg-red-500/5 hover:shadow-md' :
-            connStatusClass === 'warn' ? 'border-amber-500/30 bg-amber-500/5 hover:shadow-md' :
-            'hover:shadow-md',
+            'content-card hover-lift stat-padding cursor-pointer',
           ]"
+          :style="connStatusClass === 'danger'
+            ? 'border-color: color-mix(in srgb, var(--danger) 30%, transparent); background: var(--danger-soft)'
+            : connStatusClass === 'warn'
+            ? 'border-color: color-mix(in srgb, var(--warning) 30%, transparent); background: var(--warning-soft)'
+            : ''"
           @click="showProcessPanel = !showProcessPanel"
         >
-          <div :class="[
-            'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
-            connStatusClass === 'danger' ? 'bg-red-500/15 text-red-400' :
-            connStatusClass === 'warn' ? 'bg-amber-500/15 text-amber-400' :
-            'bg-emerald-500/15 text-emerald-400',
-          ]">
-            <Link class="h-4 w-4" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[11px] text-muted-foreground mb-0.5">
-              当前连接 <span class="text-[10px] text-muted-foreground ml-0.5">{{ showProcessPanel ? '▲' : '▼' }}</span>
-            </div>
-            <div class="text-sm font-semibold text-foreground truncate font-mono-data">{{ connCurrent }} / {{ metrics.max_connections || '-' }}</div>
-            <div class="flex items-center gap-2 mt-1">
-              <div class="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-                <div
-                  class="h-full rounded-full transition-all duration-500"
-                  :class="connStatusClass === 'danger' ? 'bg-red-400' : connStatusClass === 'warn' ? 'bg-amber-400' : 'bg-emerald-400'"
-                  :style="{ width: connUsageNum + '%' }"
-                />
+          <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+              <div class="stat-label">
+                当前连接
+                <span class="text-[10px] ml-0.5" style="color: var(--text-tertiary)">{{ showProcessPanel ? '▲' : '▼' }}</span>
               </div>
-              <span class="text-[11px] text-muted-foreground shrink-0 font-mono-data leading-[16px]">{{ metrics.connection_usage }}%</span>
+              <div class="stat-value text-base truncate font-mono-data" style="color: var(--text-primary)">{{ connCurrent }} / {{ metrics.max_connections || '-' }}</div>
+              <div class="flex items-center gap-2 mt-1.5">
+                <div class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--border-subtle)">
+                  <div
+                    class="h-full rounded-full transition-all duration-500"
+                    :style="{
+                      width: connUsageNum + '%',
+                      background: connStatusClass === 'danger' ? 'var(--danger)' : connStatusClass === 'warn' ? 'var(--warning)' : 'var(--success)'
+                    }"
+                  />
+                </div>
+                <span class="text-[11px] font-mono-data shrink-0 leading-[16px]" style="color: var(--text-tertiary)">{{ metrics.connection_usage }}%</span>
+              </div>
+            </div>
+            <div
+              class="stat-icon"
+              :style="connStatusClass === 'danger'
+                ? 'background: var(--danger-soft); color: var(--danger)'
+                : connStatusClass === 'warn'
+                ? 'background: var(--warning-soft); color: var(--warning)'
+                : 'background: var(--success-soft); color: var(--success)'"
+            >
+              <Link class="h-4 w-4" />
             </div>
           </div>
         </div>
 
-        <div class="content-card-interactive flex items-center gap-3 stat-padding shadow-sm hover:shadow-md transition-shadow duration-200">
-          <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-400">
-            <TrendingUp class="h-4 w-4" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[11px] text-muted-foreground mb-0.5">{{ metrics.type === 'redis' ? '每秒操作' : 'QPS' }}</div>
-            <div class="text-sm font-semibold text-foreground truncate font-mono-data">{{ metrics.qps || metrics.ops_per_sec || '-' }}</div>
+        <!-- QPS Card -->
+        <div class="content-card hover-lift stat-padding">
+          <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+              <div class="stat-label">{{ metrics.type === 'redis' ? '每秒操作' : 'QPS' }}</div>
+              <div class="stat-value text-base truncate font-mono-data" style="color: var(--text-primary)">{{ metrics.qps || metrics.ops_per_sec || '-' }}</div>
+            </div>
+            <div class="stat-icon" style="background: var(--warning-soft); color: var(--warning)">
+              <TrendingUp class="h-4 w-4" />
+            </div>
           </div>
         </div>
       </div>
 
-
-
-      <div v-if="showProcessPanel && metrics.type === 'mysql' && metrics.processlist" class="section-gap shrink-0">
-        <div class="content-card stat-padding shadow-sm">
-          <div class="flex items-center gap-2 text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">
+      <!-- Process Panel -->
+      <div v-if="showProcessPanel && metrics.type === 'mysql' && metrics.processlist" class="section-gap shrink-0 fade-up" style="animation-delay: 180ms">
+        <div class="content-card stat-padding">
+          <div class="flex items-center gap-2 text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">
             当前连接
-            <span class="text-[11px] font-normal text-muted-foreground">{{ metrics.processlist.length }} 个</span>
+            <span class="text-[11px] font-normal" style="color: var(--text-tertiary)">{{ metrics.processlist.length }} 个</span>
           </div>
           <Table>
             <TableHeader>
-              <TableRow class="hover:bg-transparent border-b border-border">
-                <TableHead class="text-[11px] text-muted-foreground font-normal">用户</TableHead>
-                <TableHead class="text-[11px] text-muted-foreground font-normal">来源</TableHead>
-                <TableHead class="text-[11px] text-muted-foreground font-normal">数据库</TableHead>
-                <TableHead class="text-[11px] text-muted-foreground font-normal">命令</TableHead>
-                <TableHead class="text-[11px] text-muted-foreground font-normal">时长</TableHead>
-                <TableHead class="text-[11px] text-muted-foreground font-normal">状态</TableHead>
-                <TableHead class="text-[11px] text-muted-foreground font-normal max-w-[200px]">信息</TableHead>
+              <TableRow class="hover:bg-transparent" style="border-bottom: 1px solid var(--border-subtle)">
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">用户</TableHead>
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">来源</TableHead>
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">数据库</TableHead>
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">命令</TableHead>
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">时长</TableHead>
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">状态</TableHead>
+                <TableHead class="text-[11px] font-normal max-w-[200px]" style="color: var(--text-tertiary)">信息</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="p in metrics.processlist" :key="p.id" :class="p.time > 10 ? 'bg-red-500/5' : 'hover:bg-muted'" class="border-b border-border">
+              <TableRow
+                v-for="p in metrics.processlist"
+                :key="p.id"
+                :class="p.time > 10 ? 'process-row-danger' : 'process-row-normal'"
+                style="border-bottom: 1px solid var(--border-subtle)"
+              >
                 <TableCell>
-                  <Badge variant="secondary" class="text-[11px] font-medium bg-muted text-foreground">{{ p.user }}</Badge>
+                  <Badge variant="secondary" class="text-[11px] font-medium" style="background: var(--muted); color: var(--text-primary)">{{ p.user }}</Badge>
                 </TableCell>
-                <TableCell class="font-mono-data text-[11px] text-secondary-foreground">{{ p.host }}</TableCell>
-                <TableCell class="text-xs text-foreground">{{ p.db || '-' }}</TableCell>
+                <TableCell class="font-mono-data text-[11px]" style="color: var(--text-secondary)">{{ p.host }}</TableCell>
+                <TableCell class="text-xs" style="color: var(--text-primary)">{{ p.db || '-' }}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" class="text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border-emerald-500/30 rounded-full">{{ p.command }}</Badge>
+                  <span class="badge-status badge-status-success text-[10px] font-semibold rounded-full">{{ p.command }}</span>
                 </TableCell>
-                <TableCell :class="['font-mono-data text-[11px] text-foreground', p.time > 10 && 'text-red-500 font-semibold']">{{ p.time }}s</TableCell>
-                <TableCell class="text-xs text-foreground max-w-[100px] truncate">{{ p.state || '-' }}</TableCell>
-                <TableCell class="text-xs text-foreground max-w-[200px] truncate" :title="p.info">{{ p.info || '-' }}</TableCell>
+                <TableCell :class="['font-mono-data text-[11px]', p.time > 10 ? 'font-semibold' : '']" :style="p.time > 10 ? 'color: var(--danger)' : 'color: var(--text-primary)'">{{ p.time }}s</TableCell>
+                <TableCell class="text-xs max-w-[100px] truncate" style="color: var(--text-primary)">{{ p.state || '-' }}</TableCell>
+                <TableCell class="text-xs max-w-[200px] truncate" style="color: var(--text-primary)" :title="p.info">{{ p.info || '-' }}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 grid-gap section-gap shrink-0">
-        <div class="content-card stat-padding shadow-sm">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-xs font-semibold text-foreground">网络</span>
+      <!-- Chart Cards -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 grid-gap section-gap shrink-0 fade-up" style="animation-delay: 240ms">
+        <div class="content-card stat-padding">
+          <div class="flex justify-between items-center mb-3">
+            <span class="text-xs font-semibold" style="color: var(--text-primary)">网络</span>
           </div>
           <v-chart style="height: 180px; width: 100%" :option="netChartOption" autoresize />
         </div>
 
-        <div class="content-card stat-padding shadow-sm">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-xs font-semibold text-foreground">{{ metrics.type === 'redis' ? 'Ops/sec 趋势' : 'QPS/TPS 双驱趋势' }}</span>
+        <div class="content-card stat-padding">
+          <div class="flex justify-between items-center mb-3">
+            <span class="text-xs font-semibold" style="color: var(--text-primary)">{{ metrics.type === 'redis' ? 'Ops/sec 趋势' : 'QPS/TPS 双驱趋势' }}</span>
           </div>
           <v-chart style="height: 180px; width: 100%" :option="qpsTpsChartOption" autoresize />
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 grid-gap shrink-0" v-if="metrics.type === 'mysql'">
-        <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">线程</div>
-          <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">运行中</span>
-              <span class="text-xs font-semibold text-primary font-mono-data">{{ metrics.threads_running }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">已连接</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.threads_connected }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">缓存中</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.threads_cached }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">历史最大连接</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.max_used_connection }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">连接数趋势</div>
-          <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">当前</span>
-              <span class="text-xs font-semibold text-primary font-mono-data">{{ connCurrent }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">最大</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.max_used_connection }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">使用率</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.connection_usage }}%</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="content-card stat-padding shadow-sm">
-          <div class="flex justify-between items-center mb-2 pb-1.5 border-b border-border"><span class="text-xs font-semibold text-foreground">查询分布</span></div>
+      <!-- MySQL Detail Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 grid-gap shrink-0 fade-up" style="animation-delay: 300ms" v-if="metrics.type === 'mysql'">
+        <!-- Threads -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">线程</div>
           <div class="flex flex-col gap-2">
-            <div class="flex items-center gap-2">
-              <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">SELECT</span>
-              <div class="flex-1 h-[18px] rounded overflow-hidden" style="background: var(--muted)">
-                <div class="h-full rounded transition-all duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComSelect : metrics.com_select), background: 'linear-gradient(to right, #3b82f6, #22d3ee)' }" />
-              </div>
-              <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComSelect : metrics.com_select) }}</span>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">运行中</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--accent)">{{ metrics.threads_running }}</span>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">INSERT</span>
-              <div class="flex-1 h-[18px] rounded overflow-hidden" style="background: var(--muted)">
-                <div class="h-full rounded transition-all duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComInsert : metrics.com_insert, 'INSERT'), background: 'linear-gradient(to right, #10b981, #6ee7b7)' }" />
-              </div>
-              <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComInsert : metrics.com_insert) }}</span>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">已连接</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.threads_connected }}</span>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">UPDATE</span>
-              <div class="flex-1 h-[18px] rounded overflow-hidden" style="background: var(--muted)">
-                <div class="h-full rounded transition-all duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComUpdate : metrics.com_update, 'UPDATE'), background: 'linear-gradient(to right, #e6a23c, #f59e0b)' }" />
-              </div>
-              <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComUpdate : metrics.com_update) }}</span>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">缓存中</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.threads_cached }}</span>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="w-[52px] text-[11px] font-semibold text-muted-foreground text-right shrink-0">DELETE</span>
-              <div class="flex-1 h-[18px] rounded overflow-hidden" style="background: var(--muted)">
-                <div class="h-full rounded transition-all duration-500" :style="{ width: queryBarWidth(rangeStatsAvailable ? rangeStats.deltaComDelete : metrics.com_delete, 'DELETE'), background: 'linear-gradient(to right, #ef4444, #f97316)' }" />
-              </div>
-              <span class="w-[52px] text-xs font-mono-data text-foreground text-right shrink-0">{{ formatNum(rangeStatsAvailable ? rangeStats.deltaComDelete : metrics.com_delete) }}</span>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">历史最大连接</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.max_used_connection }}</span>
             </div>
           </div>
         </div>
 
-        <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">InnoDB 缓冲池</div>
-          <div class="flex flex-col gap-1.5">
+        <!-- Connection Trend -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">连接数趋势</div>
+          <div class="flex flex-col gap-2">
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">命中率</span>
-              <span :class="['text-xs font-semibold font-mono-data', parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'text-emerald-400' : 'text-amber-400']">
+              <span class="text-xs" style="color: var(--text-secondary)">当前</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--accent)">{{ connCurrent }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">最大</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.max_used_connection }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">使用率</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.connection_usage }}%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Query Distribution -->
+        <div v-if="metrics" class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">查询分布</div>
+          <div v-if="queryTotal > 0" class="flex items-center gap-4">
+            <!-- Donut Chart -->
+            <div class="relative shrink-0" style="width: 100px; height: 100px;">
+              <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
+                <circle cx="18" cy="18" r="14" fill="none" stroke="var(--border-subtle)" stroke-width="4" />
+                <circle v-for="(seg, i) in queryDonutSegments" :key="i"
+                  cx="18" cy="18" r="14" fill="none"
+                  :stroke="seg.color" stroke-width="4"
+                  :stroke-dasharray="`${seg.arc} ${seg.gap}`"
+                  :stroke-dashoffset="seg.offset"
+                  stroke-linecap="round"
+                  class="transition-all duration-500"
+                />
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <span class="text-[13px] font-bold font-mono-data" style="color: var(--text-primary)">{{ formatNum(queryTotal) }}</span>
+                <span class="text-[9px]" style="color: var(--text-tertiary)">总数</span>
+              </div>
+            </div>
+            <!-- Legend -->
+            <div class="flex-1 flex flex-col gap-2">
+              <div v-for="item in queryLegend" :key="item.label" class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: item.color }" />
+                <span class="text-[11px] font-semibold shrink-0 w-[48px]" style="color: var(--text-secondary)">{{ item.label }}</span>
+                <div class="flex-1" />
+                <span class="text-[11px] font-mono-data shrink-0" style="color: var(--text-primary)">{{ formatNum(item.value) }}</span>
+                <span class="text-[10px] font-mono-data shrink-0 w-[36px] text-right" style="color: var(--text-tertiary)">{{ item.pct }}%</span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="flex items-center justify-center py-4 text-[12px]" style="color: var(--text-tertiary)">
+            暂无查询数据
+          </div>
+        </div>
+
+        <!-- InnoDB Buffer Pool -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">InnoDB 缓冲池</div>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">命中率</span>
+              <span :class="['text-xs font-semibold font-mono-data']" :style="parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'color: var(--success)' : 'color: var(--warning)'">
                 {{ metrics.innodb_buffer_pool_hit_rate }}%
               </span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">空闲页</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.innodb_buffer_pool_pages_free }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">空闲页</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.innodb_buffer_pool_pages_free }}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">总页数</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.innodb_buffer_pool_pages_total }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">总页数</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.innodb_buffer_pool_pages_total }}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">脏页</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.innodb_buffer_pool_pages_dirty }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">脏页</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.innodb_buffer_pool_pages_dirty }}</span>
             </div>
           </div>
-          <div class="mt-2 px-1">
-            <div class="h-2 rounded-full bg-muted overflow-hidden">
+          <div class="mt-3">
+            <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--border-subtle)">
               <div
                 class="h-full rounded-full transition-all"
-                :class="parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'bg-emerald-400' : 'bg-amber-400'"
-                :style="{ width: Math.min(parseFloat(metrics.innodb_buffer_pool_hit_rate) || 0, 100) + '%' }"
+                :style="{
+                  width: Math.min(parseFloat(metrics.innodb_buffer_pool_hit_rate) || 0, 100) + '%',
+                  background: parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'var(--success)' : 'var(--warning)'
+                }"
               />
             </div>
           </div>
         </div>
 
-        <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">效率指标</div>
-          <div class="flex flex-col gap-1.5">
+        <!-- Efficiency Metrics -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">效率指标</div>
+          <div class="flex flex-col gap-2">
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">慢查询</span>
-              <span :class="['text-xs font-semibold font-mono-data', parseInt(metrics.slow_queries) > 0 ? 'text-amber-500' : 'text-foreground']">
+              <span class="text-xs" style="color: var(--text-secondary)">慢查询</span>
+              <span :class="['text-xs font-semibold font-mono-data']" :style="parseInt(metrics.slow_queries) > 0 ? 'color: var(--warning)' : 'color: var(--text-primary)'">
                 {{ metrics.slow_queries }}
               </span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">表锁等待</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.table_locks_waited }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">表锁等待</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.table_locks_waited }}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">磁盘临时表</span>
-              <span :class="['text-xs font-semibold font-mono-data', parseInt(metrics.tmp_table_disk) > 500 ? 'text-orange-500' : 'text-foreground']">{{ metrics.tmp_table_disk }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">磁盘临时表</span>
+              <span :class="['text-xs font-semibold font-mono-data']" :style="parseInt(metrics.tmp_table_disk) > 500 ? 'color: var(--warning)' : 'color: var(--text-primary)'">{{ metrics.tmp_table_disk }}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">中断连接</span>
-              <span :class="['text-xs font-semibold font-mono-data', parseInt(metrics.aborted_connects) > 10 ? 'text-orange-500' : 'text-foreground']">{{ metrics.aborted_connects }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">中断连接</span>
+              <span :class="['text-xs font-semibold font-mono-data']" :style="parseInt(metrics.aborted_connects) > 10 ? 'color: var(--warning)' : 'color: var(--text-primary)'">{{ metrics.aborted_connects }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 grid-gap shrink-0" v-if="metrics.type === 'redis'">
-        <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">内存</div>
-          <div class="flex flex-col gap-1.5">
+      <!-- Redis Detail Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 grid-gap shrink-0 fade-up" style="animation-delay: 300ms" v-if="metrics.type === 'redis'">
+        <!-- Memory -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">内存</div>
+          <div class="flex flex-col gap-2">
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">当前使用</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.used_memory }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">当前使用</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.used_memory }}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">峰值</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.used_memory_peak }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">峰值</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.used_memory_peak }}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">碎片率</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.mem_fragmentation }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">客户端</div>
-          <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">已连接</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.connected_clients }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">阻塞中</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.blocked_clients }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">最大限制</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.maxclients }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">碎片率</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.mem_fragmentation }}</span>
             </div>
           </div>
         </div>
 
-        <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">键空间</div>
-          <div class="flex flex-col gap-1.5">
+        <!-- Clients -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">客户端</div>
+          <div class="flex flex-col gap-2">
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">命中</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.keyspace_hits }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">已连接</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.connected_clients }}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">未命中</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.keyspace_misses }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">阻塞中</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.blocked_clients }}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">命中率</span>
-              <span :class="['text-xs font-semibold font-mono-data', parseFloat(metrics.hit_rate) > 90 ? 'text-emerald-400' : 'text-amber-400']">
+              <span class="text-xs" style="color: var(--text-secondary)">最大限制</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.maxclients }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Keyspace -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">键空间</div>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">命中</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.keyspace_hits }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">未命中</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.keyspace_misses }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">命中率</span>
+              <span :class="['text-xs font-semibold font-mono-data']" :style="parseFloat(metrics.hit_rate) > 90 ? 'color: var(--success)' : 'color: var(--warning)'">
                 {{ metrics.hit_rate }}%
               </span>
             </div>
           </div>
         </div>
 
-        <div class="content-card stat-padding shadow-sm">
-          <div class="text-xs font-semibold text-foreground mb-2 pb-1.5 border-b border-border">持久化</div>
-          <div class="flex flex-col gap-1.5">
+        <!-- Persistence -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">持久化</div>
+          <div class="flex flex-col gap-2">
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">AOF</span>
-              <span :class="['text-xs font-semibold font-mono-data', metrics.aof_enabled === '1' ? 'text-emerald-400' : 'text-foreground']">
+              <span class="text-xs" style="color: var(--text-secondary)">AOF</span>
+              <span :class="['text-xs font-semibold font-mono-data']" :style="metrics.aof_enabled === '1' ? 'color: var(--success)' : 'color: var(--text-primary)'">
                 {{ metrics.aof_enabled === '1' ? '已启用' : '未启用' }}
               </span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-xs text-muted-foreground">RDB 变更数</span>
-              <span class="text-xs font-semibold text-foreground font-mono-data">{{ metrics.rdb_changes }}</span>
+              <span class="text-xs" style="color: var(--text-secondary)">RDB 变更数</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.rdb_changes }}</span>
             </div>
           </div>
         </div>
@@ -534,6 +604,54 @@ const queryBarWidth = (val) => {
   return `${Math.max(width, 1)}%`
 }
 
+const queryValues = computed(() => {
+  const clampZero = (v) => Math.max(parseInt(v) || 0, 0)
+  if (rangeStatsAvailable.value) {
+    const deltas = [
+      clampZero(rangeStats.deltaComSelect),
+      clampZero(rangeStats.deltaComInsert),
+      clampZero(rangeStats.deltaComUpdate),
+      clampZero(rangeStats.deltaComDelete)
+    ]
+    // If all deltas are 0, fall back to cumulative values
+    if (deltas.some(v => v > 0)) return deltas
+  }
+  return [
+    clampZero(metrics.value?.com_select),
+    clampZero(metrics.value?.com_insert),
+    clampZero(metrics.value?.com_update),
+    clampZero(metrics.value?.com_delete)
+  ]
+})
+
+const queryTotal = computed(() => queryValues.value.reduce((a, b) => a + b, 0))
+
+const queryLegend = computed(() => {
+  const labels = ['SELECT', 'INSERT', 'UPDATE', 'DELETE']
+  const colors = ['var(--accent)', 'var(--success)', 'var(--warning)', 'var(--danger)']
+  const total = Math.max(queryTotal.value, 1)
+  return queryValues.value.map((v, i) => ({
+    label: labels[i],
+    color: colors[i],
+    value: v,
+    pct: ((v / total) * 100).toFixed(1)
+  }))
+})
+
+const queryDonutSegments = computed(() => {
+  const total = Math.max(queryTotal.value, 1)
+  const colors = ['var(--accent)', 'var(--success)', 'var(--warning)', 'var(--danger)']
+  const circumference = 2 * Math.PI * 14 // ~87.96
+  let cumulativeOffset = 0
+  return queryValues.value.map((v, i) => {
+    const ratio = v / total
+    const arc = ratio * circumference
+    const seg = { color: colors[i], arc: arc.toFixed(2), gap: (circumference - arc).toFixed(2), offset: (-cumulativeOffset).toFixed(2) }
+    cumulativeOffset += arc
+    return seg
+  })
+})
+
 const connUsageNum = computed(() => {
   return Math.min(parseFloat(metrics.value?.connection_usage) || 0, 100)
 })
@@ -668,7 +786,7 @@ const netChartOption = computed(() => {
   const netData = base.network
   const inData = (netData.series && netData.series[0] && netData.series[0].data) || []
   const outData = (netData.series && netData.series[1] && netData.series[1].data) || []
-  
+
   return {
     animation: true,
     animationDuration: 420,
@@ -690,12 +808,12 @@ const netChartOption = computed(() => {
     },
     grid: gridTemplate,
     xAxis: xAxisOption.value,
-    yAxis: { 
-      type: 'value', 
-      axisLine: { show: false }, 
-      axisTick: { show: false }, 
-      axisLabel: { color: chartAxisColor.value, fontSize: 9, formatter: (v) => formatBytes(v) + '/s' }, 
-      splitLine: { lineStyle: { color: chartGridColor.value } }, 
+    yAxis: {
+      type: 'value',
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: chartAxisColor.value, fontSize: 9, formatter: (v) => formatBytes(v) + '/s' },
+      splitLine: { lineStyle: { color: chartGridColor.value } },
       min: 0,
     },
     series: [
@@ -994,14 +1112,100 @@ const onRefreshIntervalChange = () => {
 </script>
 
 <style scoped>
-.fade-slide-in {
-  animation: fadeSlideIn 0.3s ease-out;
+/* Instance selector cards */
+.instance-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-@keyframes fadeSlideIn {
+.instance-card-default {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+}
+
+.instance-card-default:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.instance-card-active {
+  border-left: 3px solid var(--accent);
+  border-top: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  background: var(--accent-soft);
+}
+
+.instance-type-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--muted);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.instance-card-active .instance-type-badge {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+/* Instance scroll container */
+.instance-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.instance-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.instance-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.instance-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+/* Refresh ring animation */
+.refresh-ring {
+  transform: rotate(-90deg);
+}
+
+.refresh-ring-progress {
+  transition: stroke-dashoffset 1s linear;
+}
+
+/* Process table rows */
+.process-row-danger {
+  background: var(--danger-soft);
+}
+
+.process-row-normal:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+/* Fade-up animation with stagger */
+.fade-up {
+  animation: fadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;

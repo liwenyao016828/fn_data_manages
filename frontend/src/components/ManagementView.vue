@@ -1,220 +1,206 @@
 <template>
   <div class="page-padding h-full overflow-y-auto">
-    <div class="content-card">
-      <div class="content-header">
-        <div class="flex items-start justify-between">
-          <div>
-            <h2 class="text-[15px] font-semibold text-foreground">数据库连接</h2>
-            <p class="text-[13px] text-muted-foreground mt-0.5">管理所有数据库实例连接</p>
+    <!-- Page Header -->
+    <div class="flex items-center justify-between section-gap flex-wrap gap-3">
+      <div>
+        <h2 class="text-lg font-semibold tracking-tight" style="color: var(--text-primary)">连接管理</h2>
+        <p class="text-[13px] mt-0.5" style="color: var(--text-tertiary)">管理所有数据库实例连接</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" size="sm" class="h-[32px] text-[13px]" @click="showDetectDialog = true">
+          <Search class="h-3.5 w-3.5 mr-1.5" />检测
+        </Button>
+        <Button variant="primary" size="sm" class="h-[32px] text-[13px]" @click="showCreateDialog = true">
+          <Plus class="h-3.5 w-3.5 mr-1.5" />添加
+        </Button>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-3 gap-3 section-gap">
+      <div class="stat-card">
+        <div class="stat-icon" style="background: var(--accent-soft); color: var(--accent)">
+          <Database class="h-4 w-4" />
+        </div>
+        <div class="flex flex-col">
+          <span class="stat-value">{{ stats.mysql }}</span>
+          <span class="stat-label">MySQL</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: var(--warning-soft); color: var(--warning)">
+          <Server class="h-4 w-4" />
+        </div>
+        <div class="flex flex-col">
+          <span class="stat-value">{{ stats.redis }}</span>
+          <span class="stat-label">Redis</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: var(--success-soft); color: var(--success)">
+          <BarChart3 class="h-4 w-4" />
+        </div>
+        <div class="flex flex-col">
+          <span class="stat-value">{{ stats.total }}</span>
+          <span class="stat-label">总计</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="flex items-center gap-3 section-gap flex-wrap">
+      <div class="flex items-center rounded-xl border px-3 gap-1.5 h-[34px]" style="border-color: var(--border); background: var(--surface)">
+        <Search class="h-3.5 w-3.5 shrink-0" style="color: var(--text-tertiary)" />
+        <Input v-model="searchKeyword" placeholder="搜索实例..." class="border-0 shadow-none h-[28px] text-[13px] w-[180px] bg-transparent" @input="handleSearch" />
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span
+          :class="['pill', activeTab === 'all' ? 'pill-active' : 'pill-default']"
+          @click="activeTab = 'all'"
+        >全部</span>
+        <span
+          :class="['pill', activeTab === 'mysql' ? 'pill-active' : 'pill-default']"
+          @click="activeTab = 'mysql'"
+        >MySQL</span>
+        <span
+          :class="['pill', activeTab === 'redis' ? 'pill-active' : 'pill-default']"
+          @click="activeTab = 'redis'"
+        >Redis</span>
+      </div>
+    </div>
+
+    <!-- Connection Cards Grid -->
+    <div v-if="tableData.length === 0" class="empty-state py-20">
+      <Inbox class="h-10 w-10 empty-state-icon" />
+      <p class="empty-state-text">暂无数据</p>
+      <Button variant="outline" size="sm" class="mt-3 h-[32px] text-[13px]" @click="showCreateDialog = true">
+        <Plus class="h-3.5 w-3.5 mr-1.5" />添加连接
+      </Button>
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 grid-gap section-gap">
+      <div
+        v-for="row in tableData"
+        :key="instanceUid(row)"
+        class="content-card-interactive conn-card"
+        :class="{ 'conn-card-selected': connectionId === instanceUid(row) }"
+        @click="selectConnection(row)"
+      >
+        <!-- Top: Name + Type Badge + Status Dot -->
+        <div class="flex items-center justify-between gap-2 mb-2.5">
+          <div class="flex items-center gap-2 min-w-0">
+            <StatusDot :status="connectionId === instanceUid(row) ? 'selected' : (onlineStatus[instanceUid(row)] ? 'online' : 'default')" />
+            <span class="text-[13px] font-semibold truncate" style="color: var(--text-primary)">{{ row.name }}</span>
+            <span
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0"
+              :style="{
+                background: row.type === 'mysql' ? 'var(--accent-soft)' : 'var(--warning-soft)',
+                color: row.type === 'mysql' ? 'var(--accent)' : 'var(--warning)',
+              }"
+            >{{ row.type === 'mysql' ? 'MySQL' : 'Redis' }}</span>
+            <span
+              v-if="row.isRemote"
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0"
+              style="background: var(--warning-soft); color: var(--warning)"
+            >远程</span>
+            <span
+              v-else
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0"
+              style="background: var(--accent-soft); color: var(--accent)"
+            >本地</span>
           </div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <div class="flex h-[32px] items-center rounded-lg border border-border bg-card px-2 gap-1">
-              <Search class="h-3.5 w-3.5 text-muted-foreground" />
-              <Input v-model="searchKeyword" placeholder="搜索实例..." class="border-0 shadow-none h-[28px] text-[13px] w-[180px] bg-transparent" @input="handleSearch" />
+          <div class="flex items-center gap-1.5 shrink-0">
+            <StatusDot :status="onlineStatus[instanceUid(row)] ? 'online' : 'offline'" size="xs" />
+            <span class="text-[11px]" :style="{ color: onlineStatus[instanceUid(row)] ? 'var(--success)' : 'var(--text-tertiary)' }">
+              {{ onlineStatus[instanceUid(row)] ? '在线' : '离线' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Middle: Host:port, username, description -->
+        <div class="flex flex-col gap-1 mb-1">
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="text-[12px] font-mono-data truncate" style="color: var(--text-secondary)">{{ row.host }}</span>
+            <span class="text-[11px] font-mono-data shrink-0" style="color: var(--text-tertiary)">:{{ row.port }}</span>
+          </div>
+          <span class="text-[12px] truncate" style="color: var(--text-tertiary)">{{ row.username }}</span>
+          <span v-if="row.description" class="text-[12px] truncate" style="color: var(--text-tertiary)">{{ row.description }}</span>
+        </div>
+
+        <!-- Duplicate Badge -->
+        <div v-if="isDuplicate(row)" class="mb-1.5">
+          <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-medium" style="background: var(--warning-soft); color: var(--warning); border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent)">
+            重复连接
+          </span>
+        </div>
+
+        <!-- Bottom: Action buttons (shown on hover) -->
+        <div class="conn-card-actions mt-auto pt-2">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button class="btn-ghost" @click.stop="navigateTo('data', row)">数据</button>
+            <button class="btn-ghost" @click.stop="navigateTo('backup', row)">备份</button>
+            <button v-if="logEnabled" class="btn-ghost" @click.stop="navigateTo('logs', row)">日志</button>
+            <div class="flex-1" />
+            <button class="btn-ghost" @click.stop="handleEdit(row)">编辑</button>
+            <button class="btn-ghost-danger" @click.stop="handleDelete(row)">删除</button>
+          </div>
+        </div>
+
+        <!-- Expanded Detail Overlay (right half, shown on hover) -->
+        <div class="conn-card-overlay" @click.stop="selectConnection(row)">
+          <div class="flex flex-wrap gap-x-5 gap-y-2 w-full">
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px]" style="color: var(--text-tertiary)">描述</span>
+                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.description || '无' }}</span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px]" style="color: var(--text-tertiary)">权限</span>
+                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.permission || '%' }}</span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px]" style="color: var(--text-tertiary)">SSL</span>
+                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.ssl ? '开启' : '关闭' }}</span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px]" style="color: var(--text-tertiary)">版本</span>
+                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.version || '-' }}</span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px]" style="color: var(--text-tertiary)">磁盘</span>
+                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.disk || '-' }}</span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px]" style="color: var(--text-tertiary)">创建时间</span>
+                <span class="text-[12px]" style="color: var(--text-primary)">{{ formatLogTime(row.createdAt) || '-' }}</span>
+              </div>
             </div>
-            <Button variant="outline" size="sm" class="h-[32px] text-[13px]" @click="showDetectDialog = true">
-              <Search class="h-3.5 w-3.5 mr-1.5" />自动检测
-            </Button>
-            <Button variant="primary" size="sm" class="h-[32px] text-[13px]" @click="showCreateDialog = true">
-              <Plus class="h-3.5 w-3.5 mr-1.5" />新建连接
-            </Button>
           </div>
         </div>
       </div>
 
-      <!-- Stats -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 content-body">
-        <div class="flex items-center gap-3 rounded-lg bg-muted p-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/5 text-blue-400">
-            <Database class="h-4 w-4" />
-          </div>
-          <div class="flex flex-col">
-            <span class="text-lg font-bold text-foreground leading-tight">{{ stats.mysql }}</span>
-            <span class="text-[11px] text-muted-foreground">MySQL</span>
-          </div>
-        </div>
-        <div class="flex items-center gap-3 rounded-lg bg-muted p-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/5 text-orange-400">
-            <Server class="h-4 w-4" />
-          </div>
-          <div class="flex flex-col">
-            <span class="text-lg font-bold text-foreground leading-tight">{{ stats.redis }}</span>
-            <span class="text-[11px] text-muted-foreground">Redis</span>
-          </div>
-        </div>
-        <div class="flex items-center gap-3 rounded-lg bg-muted p-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/5 text-emerald-400">
-            <BarChart3 class="h-4 w-4" />
-          </div>
-          <div class="flex flex-col">
-            <span class="text-lg font-bold text-foreground leading-tight">{{ stats.total }}</span>
-            <span class="text-[11px] text-muted-foreground">总计</span>
-          </div>
-        </div>
-        <div class="flex items-center gap-3 rounded-lg bg-muted p-3">
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/5 text-blue-400">
-            <Activity class="h-4 w-4" />
-          </div>
-          <div class="flex flex-col">
-            <span class="text-lg font-bold text-foreground leading-tight">{{ stats.running }}</span>
-            <span class="text-[11px] text-muted-foreground">运行中</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tabs -->
-      <div class="px-5 pb-3">
-        <Tabs v-model="activeTab" class="w-full">
-          <TabsList class="bg-muted">
-            <TabsTrigger value="all" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">所有实例</TabsTrigger>
-            <TabsTrigger value="mysql" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">MySQL</TabsTrigger>
-            <TabsTrigger value="redis" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">Redis</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      <!-- Table -->
-      <div class="border-t border-border">
-        <Table class="w-full">
-          <colgroup>
-            <col class="w-8" />
-            <col />
-            <col class="tbl-col-type" />
-            <col class="tbl-col-host" />
-            <col class="tbl-col-user" />
-            <col class="tbl-col-ver" />
-            <col class="tbl-col-disk" />
-            <col class="tbl-col-status" />
-            <col class="tbl-col-action" />
-          </colgroup>
-          <TableHeader>
-            <TableRow class="hover:bg-transparent border-b border-border">
-              <TableHead class="text-[12px] font-normal text-muted-foreground h-10" />
-              <TableHead class="text-[12px] font-normal text-muted-foreground h-10">名称</TableHead>
-              <TableHead class="text-[12px] font-normal text-muted-foreground h-10">类型</TableHead>
-              <TableHead class="text-[12px] font-normal text-muted-foreground h-10">主机</TableHead>
-              <TableHead class="text-[12px] font-normal text-muted-foreground h-10">用户名</TableHead>
-              <TableHead class="text-[12px] font-normal text-muted-foreground h-10">版本</TableHead>
-              <TableHead class="text-[12px] font-normal text-muted-foreground h-10">磁盘</TableHead>
-              <TableHead class="text-[12px] font-normal text-muted-foreground h-10">状态</TableHead>
-              <TableHead class="text-center text-[12px] font-normal text-muted-foreground h-10">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <template v-if="tableData.length === 0">
-              <TableRow>
-                <TableCell colspan="10" class="h-64 text-center">
-                  <div class="flex flex-col items-center justify-center text-muted-foreground">
-                    <Inbox class="h-10 w-10 mb-2 opacity-30" />
-                    <p class="text-[13px]">暂无数据</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </template>
-            <template v-for="row in tableData" :key="instanceUid(row)">
-              <TableRow class="cursor-pointer transition-colors duration-150 border-b border-border" :class="[connectionId === instanceUid(row) ? 'bg-primary/[0.04] hover:bg-primary/[0.08]' : 'hover:bg-muted']" @click="toggleExpand(row)">
-                <TableCell class="w-8">
-                  <ChevronRight class="h-4 w-4 text-muted-foreground transition-transform duration-200" :class="{ 'rotate-90': expandedRowUid === instanceUid(row) }" />
-                </TableCell>
-                <TableCell>
-                  <div class="flex items-center gap-2 min-w-0">
-                    <StatusDot :status="connectionId === instanceUid(row) ? 'selected' : (onlineStatus[instanceUid(row)] ? 'online' : 'default')" />
-                    <span class="text-[13px] text-foreground truncate">{{ row.name }}</span>
-                    <Badge :class="row.isRemote ? 'bg-orange-500/5 text-orange-400 border-orange-500/20' : 'bg-blue-500/5 text-blue-400 border-blue-500/20'" variant="outline" class="text-[10px] h-[18px] ml-0.5 shrink-0">
-                      {{ row.isRemote ? '远程' : '本地' }}
-                    </Badge>
-                    <Badge v-if="isDuplicate(row)" variant="outline" class="bg-amber-500/5 text-amber-500 border-amber-500/20 text-[10px] h-[18px] shrink-0">
-                      重复
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge :variant="row.type === 'mysql' ? 'default' : 'secondary'" class="rounded-full text-[10px] py-0">
-                    {{ row.type === 'mysql' ? 'MySQL' : 'Redis' }}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div class="flex items-center gap-1 min-w-0">
-                    <span class="text-[13px] text-secondary-foreground truncate">{{ row.host }}</span>
-                    <span class="text-[11px] text-muted-foreground shrink-0">:{{ row.port }}</span>
-                  </div>
-                </TableCell>
-                <TableCell><span class="text-[13px] text-muted-foreground truncate block">{{ row.username }}</span></TableCell>
-                <TableCell><span class="text-[13px] text-muted-foreground truncate block">{{ row.version || '-' }}</span></TableCell>
-                <TableCell><span class="text-[13px] text-muted-foreground truncate block">{{ row.disk || '-' }}</span></TableCell>
-                <TableCell>
-                  <div class="flex items-center gap-1.5">
-                    <StatusDot :status="onlineStatus[instanceUid(row)] ? 'online' : 'offline'" size="sm" />
-                    <span class="text-[12px]" :class="onlineStatus[instanceUid(row)] ? 'text-emerald-500' : 'text-muted-foreground'">{{ onlineStatus[instanceUid(row)] ? '在线' : '离线' }}</span>
-                  </div>
-                </TableCell>
-                <TableCell @click.stop>
-                  <div class="flex items-center gap-0.5 shrink-0">
-                    <Button variant="ghost" size="xs" class="text-muted-foreground hover:bg-muted min-w-[32px]" @click="handleEdit(row)">编辑</Button>
-                    <Button variant="ghost" size="xs" class="text-destructive hover:bg-destructive/10 min-w-[32px]" @click="handleDelete(row)">删除</Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-              <TableRow v-if="expandedRowUid === instanceUid(row)" @click.stop>
-                <TableCell colspan="10" class="!p-0">
-                  <div class="expand-row">
-                    <div class="expand-row-inner">
-                      <div class="expand-fields">
-                        <div class="expand-field">
-                          <span class="expand-label">描述</span>
-                          <span class="expand-value">{{ row.description || '无' }}</span>
-                        </div>
-                        <div class="expand-field">
-                          <span class="expand-label">权限</span>
-                          <span class="expand-value">{{ row.permission || '%' }}</span>
-                        </div>
-                        <div class="expand-field">
-                          <span class="expand-label">SSL</span>
-                          <span class="expand-value">{{ row.ssl ? '开启' : '关闭' }}</span>
-                        </div>
-                        <div class="expand-field">
-                          <span class="expand-label">创建时间</span>
-                          <span class="expand-value">{{ formatLogTime(row.createdAt) || '-' }}</span>
-                        </div>
-                      </div>
-                      <div class="expand-actions">
-                        <Button variant="outline" size="sm" class="h-[28px] text-[12px]" @click="navigateTo('data', row)">数据管理</Button>
-                        <Button variant="outline" size="sm" class="h-[28px] text-[12px]" @click="navigateTo('backup', row)">备份列表</Button>
-                        <Button variant="outline" size="sm" class="h-[28px] text-[12px]" @click="navigateTo('logs', row)" v-if="logEnabled">查看日志</Button>
-                      </div>
-                    </div>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </template>
-          </TableBody>
-        </Table>
-      </div>
-
-      <!-- Pagination -->
-      <div class="flex items-center justify-between section-padding border-t border-border flex-wrap gap-2">
-        <span class="text-[12px] text-muted-foreground">共 {{ total }} 条</span>
-        <div class="flex items-center gap-2">
-          <Select v-model="pageSize" @update:model-value="onPageSizeChange">
-            <SelectTrigger class="h-[32px] w-[70px] text-[12px] border-border shadow-none">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem :value="10">10</SelectItem>
-              <SelectItem :value="20">20</SelectItem>
-              <SelectItem :value="50">50</SelectItem>
-              <SelectItem :value="100">100</SelectItem>
-            </SelectContent>
-          </Select>
-          <div class="flex items-center gap-1">
-            <Button variant="outline" size="icon" class="h-[32px] w-[32px]" :disabled="page <= 1" @click="page--">
-              <ChevronLeft class="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-            <span class="text-[12px] px-2 text-muted-foreground">{{ page }} / {{ totalPages }}</span>
-            <Button variant="outline" size="icon" class="h-[32px] w-[32px]" :disabled="page >= totalPages" @click="page++">
-              <ChevronRight class="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-          </div>
+    <!-- Pagination -->
+    <div v-if="tableData.length > 0" class="flex items-center justify-between flex-wrap gap-2 pt-4" style="border-top: 1px solid var(--border-subtle)">
+      <span class="text-[12px]" style="color: var(--text-tertiary)">共 {{ total }} 条</span>
+      <div class="flex items-center gap-2">
+        <Select v-model="pageSize" @update:model-value="onPageSizeChange">
+          <SelectTrigger class="h-[32px] w-[70px] text-[12px]" style="border-color: var(--border); box-shadow: none">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem :value="10">10</SelectItem>
+            <SelectItem :value="20">20</SelectItem>
+            <SelectItem :value="50">50</SelectItem>
+            <SelectItem :value="100">100</SelectItem>
+          </SelectContent>
+        </Select>
+        <div class="flex items-center gap-1">
+          <Button variant="outline" size="icon" class="h-[32px] w-[32px]" :disabled="page <= 1" @click="page--">
+            <ChevronLeft class="h-3.5 w-3.5" style="color: var(--text-tertiary)" />
+          </Button>
+          <span class="text-[12px] px-2" style="color: var(--text-tertiary)">{{ page }} / {{ totalPages }}</span>
+          <Button variant="outline" size="icon" class="h-[32px] w-[32px]" :disabled="page >= totalPages" @click="page++">
+            <ChevronRight class="h-3.5 w-3.5" style="color: var(--text-tertiary)" />
+          </Button>
         </div>
       </div>
     </div>
@@ -227,7 +213,7 @@
       <DialogContent class="sm:max-w-[425px] rounded-xl">
         <div class="flex flex-col gap-y-1.5 text-center sm:text-left">
           <DialogTitle class="text-[15px]">删除确认</DialogTitle>
-          <DialogDescription class="text-[13px] text-muted-foreground">
+          <DialogDescription class="text-[13px]" style="color: var(--text-secondary)">
             确定要删除实例 "{{ deleteTarget?.name }}" 吗？此操作不可恢复。
           </DialogDescription>
         </div>
@@ -315,12 +301,12 @@ const duplicateInfo = computed(() => {
     const uid = instanceUid(item)
     // 构建唯一键：主机:端口:用户名（全部小写）
     const key = `${(item.host || '').toLowerCase()}:${item.port}:${(item.username || '').toLowerCase()}`
-    
+
     if (!connectionMap.has(key)) {
       connectionMap.set(key, [])
     }
     connectionMap.get(key).push({ uid, item })
-    
+
     if (connectionMap.get(key).length > 1) {
       connectionMap.get(key).forEach(e => duplicateUids.add(e.uid))
     }
@@ -346,9 +332,16 @@ const tableData = computed(() => {
   return filteredData.value.slice(start, start + pageSize.value)
 })
 
-const toggleExpand = (row) => {
-  const uid = instanceUid(row)
-  expandedRowUid.value = expandedRowUid.value === uid ? null : uid
+const selectConnection = (row) => {
+  store.setContext({
+    connectionId: instanceUid(row),
+    name: row.name,
+    type: row.type,
+    host: row.host,
+    port: row.port,
+    userName: row.username,
+    isRemote: row.isRemote || false,
+  })
 }
 
 const resetPageAndCollapse = () => {
@@ -439,72 +432,97 @@ onActivated(() => { fetchData() })
 </script>
 
 <style scoped>
-.tbl-col-type { width: 68px; min-width: 56px; }
-.tbl-col-host { width: 15%; min-width: 120px; }
-.tbl-col-user { width: 10%; min-width: 72px; }
-.tbl-col-ver { width: 9%; min-width: 64px; }
-.tbl-col-disk { width: 8%; min-width: 52px; }
-.tbl-col-status { width: 68px; min-width: 56px; }
-.tbl-col-action { width: 88px; min-width: 72px; }
-
-.expand-row {
-  background: var(--muted);
-  padding: 12px 20px 12px 44px;
-}
-
-.expand-row-inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 12px 24px;
-}
-
-.expand-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 24px;
-  flex: 1;
-  min-width: 0;
-}
-
-.expand-field {
+.conn-card {
+  padding: 0.75rem 1rem;
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 100px;
+  min-height: 120px;
 }
 
-.expand-label {
-  font-size: 11px;
-  color: var(--muted-foreground);
+.conn-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+  border-radius: 0 3px 3px 0;
+  transition: background var(--transition-normal);
 }
 
-.expand-value {
-  font-size: 13px;
-  color: var(--foreground);
-  word-break: break-all;
+.conn-card-selected::before {
+  background: var(--accent);
 }
 
-.expand-actions {
+.conn-card-selected {
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+}
+
+.conn-card-actions {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+}
+
+.conn-card:hover .conn-card-actions,
+.conn-card-selected .conn-card-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.conn-card-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 50%;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: inherit;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  z-index: 5;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  opacity: 0;
+  transform: translateX(20px);
+  pointer-events: none;
+  transition: opacity 0.25s ease-out, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.conn-card:hover .conn-card-overlay {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+  transition-delay: 0.3s;
+}
+
+.fade-slide-in {
+  animation: fadeSlideIn 0.3s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 640px) {
-  .expand-row {
-    padding: 10px 12px 10px 28px;
-  }
-  .expand-fields {
-    gap: 6px 16px;
-  }
-  .expand-field {
-    min-width: 80px;
-  }
-  .expand-actions {
-    width: 100%;
-    flex-wrap: wrap;
+  .conn-card-actions {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 </style>

@@ -1,355 +1,319 @@
 <template>
-  <div class="page-padding h-full overflow-y-auto flex flex-col gap-3" ref="pageContainer">
-    <div class="content-card">
-      <div class="content-header shrink-0">
-        <div>
-          <h2 class="text-[15px] font-semibold text-foreground">系统设置</h2>
-          <p class="text-[13px] text-muted-foreground mt-0.5">管理系统偏好与数据库实例配置</p>
-        </div>
+  <div class="page-padding h-full overflow-y-auto" ref="pageContainer">
+    <!-- Page Header -->
+    <div class="mb-4">
+      <h2 class="text-[17px] font-semibold" style="color: var(--text-primary)">设置</h2>
+      <p class="text-[13px] mt-0.5" style="color: var(--text-tertiary)">管理系统偏好与数据库实例配置</p>
+    </div>
+
+    <!-- Tab Bars -->
+    <div class="flex flex-col">
+      <!-- Main Tab Bar -->
+      <div class="inline-flex gap-1 p-1 rounded-xl bg-[var(--muted)] self-start">
+        <button
+          :class="activeTab === 'instance' ? 'tab-active' : 'tab-inactive'"
+          class="px-4 py-1.5 text-[13px]"
+          @click="activeTab = 'instance'"
+        >实例管理</button>
+        <button
+          :class="activeTab === 'system' ? 'tab-active' : 'tab-inactive'"
+          class="px-4 py-1.5 text-[13px]"
+          @click="activeTab = 'system'"
+        >系统设置</button>
       </div>
 
-      <div class="border-t border-border section-padding shrink-0">
-        <div class="flex items-center gap-2">
-          <button
-            :class="[
-              'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
-              activeTab === 'instance'
-                ? 'tab-active shadow-lg shadow-blue-500/20'
-                : 'tab-inactive'
-            ]"
-            @click="activeTab = 'instance'"
-          >
-            <Database class="h-4 w-4" />
-            实例管理
-          </button>
-          <button
-            :class="[
-              'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
-              activeTab === 'system'
-                ? 'tab-active shadow-lg shadow-blue-500/20'
-                : 'tab-inactive'
-            ]"
-            @click="activeTab = 'system'"
-          >
-            <Settings class="h-4 w-4" />
-            系统设置
-          </button>
-        </div>
+      <!-- Sub Tab Bar: Instance -->
+      <div v-if="activeTab === 'instance'" class="inline-flex gap-1 p-1 rounded-xl bg-[var(--muted)] mt-2 self-start">
+        <button
+          :class="instanceTab === 'local' ? 'tab-active' : 'tab-inactive'"
+          class="inline-flex items-center gap-1.5 px-4 py-1.5 text-[13px]"
+          @click="instanceTab = 'local'"
+        >
+          本地实例
+          <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold"
+            :class="instanceTab === 'local' ? 'pill-active' : 'pill-default'">
+            {{ localInstances.length }}
+          </span>
+        </button>
+        <button
+          :class="instanceTab === 'remote' ? 'tab-active' : 'tab-inactive'"
+          class="inline-flex items-center gap-1.5 px-4 py-1.5 text-[13px]"
+          @click="instanceTab = 'remote'"
+        >
+          远程服务器
+          <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold"
+            :class="instanceTab === 'remote' ? 'pill-active' : 'pill-default'">
+            {{ remoteInstances.length }}
+          </span>
+        </button>
       </div>
 
-      <!-- 系统设置面板 -->
-      <div v-if="activeTab === 'system'" class="pb-4">
-        <div class="content-section border-t border-border">
-          <Tabs v-model="systemSubTab">
-            <TabsList class="bg-muted">
-              <TabsTrigger value="logs" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
-                <FileText class="h-4 w-4 mr-1.5" />日志中心
-              </TabsTrigger>
-              <TabsTrigger value="interface" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
-                <Palette class="h-4 w-4 mr-1.5" />界面设置
-              </TabsTrigger>
-              <TabsTrigger value="data" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
-                <HardDrive class="h-4 w-4 mr-1.5" />数据设置
-              </TabsTrigger>
-              <TabsTrigger value="health" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
-                <Activity class="h-4 w-4 mr-1.5" />测活配置
-              </TabsTrigger>
-              <TabsTrigger value="about" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
-                <Info class="h-4 w-4 mr-1.5" />关于系统
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+      <!-- Sub Tab Bar: System -->
+      <div v-if="activeTab === 'system'" class="inline-flex gap-1 p-1 rounded-xl bg-[var(--muted)] mt-2 self-start">
+        <button
+          v-for="item in [
+            { key: 'logs', label: '日志中心' },
+            { key: 'interface', label: '界面设置' },
+            { key: 'data', label: '数据设置' },
+            { key: 'health', label: '测活配置' },
+            { key: 'about', label: '关于系统' },
+          ]"
+          :key="item.key"
+          :class="systemSubTab === item.key ? 'tab-active' : 'tab-inactive'"
+          class="px-4 py-1.5 text-[13px]"
+          @click="systemSubTab = item.key"
+        >{{ item.label }}</button>
+      </div>
+    </div>
 
-        <!-- 日志中心设置 -->
-        <div v-if="systemSubTab === 'logs'" class="content-section">
-          <div class="rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
-            <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[13px] font-medium text-foreground">启用日志中心</span>
-                <span class="text-[11px] text-muted-foreground">关闭后侧边栏隐藏日志中心入口</span>
+    <!-- Content Area -->
+    <div>
+
+        <!-- 系统设置面板 -->
+        <div v-if="activeTab === 'system'" class="flex flex-col gap-4 mt-4">
+
+          <!-- 日志中心设置 -->
+          <div v-if="systemSubTab === 'logs'" class="fade-up">
+            <div class="content-card flex flex-col">
+              <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-subtle)">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[13px] font-medium" style="color: var(--text-primary)">启用日志中心</span>
+                  <span class="text-[11px]" style="color: var(--text-tertiary)">关闭后侧边栏隐藏日志中心入口</span>
+                </div>
+                <Switch :model-value="logEnabled" @update:model-value="toggleLogEnabled" />
               </div>
-              <Switch :model-value="logEnabled" @update:model-value="toggleLogEnabled" />
+              <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-subtle)">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[13px] font-medium" style="color: var(--text-primary)">日志存储路径</span>
+                  <span class="text-[11px]" style="color: var(--text-tertiary)">日志文件保存的目录路径</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <Input v-model="logStoragePath" placeholder="存储路径..." class="h-8 text-[13px] w-[180px]" />
+                  <Button size="sm" variant="outline" class="h-8 px-2.5" @click="openFolderBrowser">
+                    <FolderOpen class="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between px-5 py-4">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[13px] font-medium" style="color: var(--text-primary)">日志保留天数</span>
+                  <span class="text-[11px]" style="color: var(--text-tertiary)">超过此天数的旧日志将被自动清理</span>
+                </div>
+                <Select v-model="logRetentionDays" class="w-[140px]" @update:model-value="saveLogConfig">
+                  <SelectTrigger class="h-8 text-[13px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">7 天</SelectItem>
+                    <SelectItem value="15">15 天</SelectItem>
+                    <SelectItem value="30">30 天</SelectItem>
+                    <SelectItem value="60">60 天</SelectItem>
+                    <SelectItem value="90">90 天</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </div>
 
-            <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[13px] font-medium text-foreground">日志存储路径</span>
-                <span class="text-[11px] text-muted-foreground">日志文件保存的目录路径</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <Input v-model="logStoragePath" placeholder="存储路径..." class="h-8 text-[13px] w-[180px]" />
-                <Button size="sm" variant="outline" class="h-8 px-2.5" @click="openFolderBrowser">
-                  <FolderOpen class="h-3.5 w-3.5" />
+          <!-- 界面设置 -->
+          <div v-if="systemSubTab === 'interface'" class="fade-up">
+            <div class="content-card flex flex-col">
+              <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-subtle)">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[13px] font-medium" style="color: var(--text-primary)">侧边栏状态</span>
+                  <span class="text-[11px]" style="color: var(--text-tertiary)">{{ sidebarCollapsed ? '已收起' : '已展开' }}</span>
+                </div>
+                <Button size="sm" variant="outline" class="h-8 text-[13px]" @click="toggleSidebar">
+                  {{ sidebarCollapsed ? '展开侧栏' : '收起侧栏' }}
                 </Button>
               </div>
-            </div>
-
-            <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[13px] font-medium text-foreground">日志保留天数</span>
-                <span class="text-[11px] text-muted-foreground">超过此天数的旧日志将被自动清理</span>
+              <div class="flex items-center justify-between px-5 py-4">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[13px] font-medium" style="color: var(--text-primary)">紧凑模式</span>
+                  <span class="text-[11px]" style="color: var(--text-tertiary)">减少卡片间距，显示更多内容</span>
+                </div>
+                <Switch v-model="compactMode" />
               </div>
-              <Select v-model="logRetentionDays" class="w-[140px]" @update:model-value="saveLogConfig">
-                <SelectTrigger class="h-8 text-[13px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">7 天</SelectItem>
-                  <SelectItem value="15">15 天</SelectItem>
-                  <SelectItem value="30">30 天</SelectItem>
-                  <SelectItem value="60">60 天</SelectItem>
-                  <SelectItem value="90">90 天</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
-        </div>
 
-        <!-- 界面设置 -->
-        <div v-if="systemSubTab === 'interface'" class="content-section">
-          <div class="rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
-            <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[13px] font-medium text-foreground">侧边栏状态</span>
-                <span class="text-[11px] text-muted-foreground">{{ sidebarCollapsed ? '已收起' : '已展开' }}</span>
-              </div>
-              <Button size="sm" variant="outline" class="h-8 text-[13px]" @click="toggleSidebar">
-                {{ sidebarCollapsed ? '展开侧栏' : '收起侧栏' }}
-              </Button>
-            </div>
-
-            <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[13px] font-medium text-foreground">紧凑模式</span>
-                <span class="text-[11px] text-muted-foreground">减少卡片间距，显示更多内容</span>
-              </div>
-              <Switch v-model="compactMode" />
-            </div>
-          </div>
-        </div>
-
-        <!-- 数据设置 -->
-        <div v-if="systemSubTab === 'data'" class="content-section">
-          <div class="rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
-            <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[13px] font-medium text-foreground">自动刷新间隔</span>
-                <span class="text-[11px] text-muted-foreground">控制台页面数据自动轮询间隔</span>
-              </div>
-              <Select v-model="refreshInterval" class="w-[140px]">
-                <SelectTrigger class="h-8 text-[13px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="off">关闭</SelectItem>
-                  <SelectItem value="5000">5 秒</SelectItem>
-                  <SelectItem value="10000">10 秒</SelectItem>
-                  <SelectItem value="30000">30 秒</SelectItem>
-                  <SelectItem value="60000">60 秒</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[13px] font-medium text-foreground">备份文件保留</span>
-                <span class="text-[11px] text-muted-foreground">超过此天数的旧备份将被清理</span>
-              </div>
-              <Select v-model="backupRetentionDays" class="w-[120px]">
-                <SelectTrigger class="h-8 text-[13px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">7 天</SelectItem>
-                  <SelectItem value="15">15 天</SelectItem>
-                  <SelectItem value="30">30 天</SelectItem>
-                  <SelectItem value="90">90 天</SelectItem>
-                  <SelectItem value="never">永不</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        <!-- 关于系统 -->
-        <div v-if="systemSubTab === 'health'" class="content-section">
-          <div class="rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
-            <div class="grid grid-cols-2 gap-3">
-              <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
+          <!-- 数据设置 -->
+          <div v-if="systemSubTab === 'data'" class="fade-up">
+            <div class="content-card flex flex-col">
+              <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-subtle)">
                 <div class="flex flex-col gap-0.5">
-                  <span class="text-[13px] font-medium text-foreground">启用定时测活</span>
-                  <span class="text-[11px] text-muted-foreground">自动检测连接可用性</span>
+                  <span class="text-[13px] font-medium" style="color: var(--text-primary)">自动刷新间隔</span>
+                  <span class="text-[11px]" style="color: var(--text-tertiary)">控制台页面数据自动轮询间隔</span>
                 </div>
-                <Switch v-model="healthConfig.enabled" @update:model-value="saveHealthConfig" />
-              </div>
-
-              <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-                <div class="flex flex-col gap-0.5">
-                  <span class="text-[13px] font-medium text-foreground">异常告警</span>
-                  <span class="text-[11px] text-muted-foreground">状态变更时记录日志</span>
-                </div>
-                <Switch v-model="healthConfig.alertEnabled" @update:model-value="saveHealthConfig" />
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-                <div class="flex flex-col gap-0.5">
-                  <span class="text-[13px] font-medium text-foreground">测活频率</span>
-                  <span class="text-[11px] text-muted-foreground">检测间隔 10-300 秒</span>
-                </div>
-                <Select v-model="healthIntervalSec" class="w-[120px]" @update:model-value="updateHealthInterval">
+                <Select v-model="refreshInterval" class="w-[140px]">
                   <SelectTrigger class="h-8 text-[13px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="10">10 秒</SelectItem>
-                    <SelectItem value="15">15 秒</SelectItem>
-                    <SelectItem value="30">30 秒</SelectItem>
-                    <SelectItem value="60">60 秒</SelectItem>
-                    <SelectItem value="120">120 秒</SelectItem>
-                    <SelectItem value="300">300 秒</SelectItem>
+                    <SelectItem value="off">关闭</SelectItem>
+                    <SelectItem value="5000">5 秒</SelectItem>
+                    <SelectItem value="10000">10 秒</SelectItem>
+                    <SelectItem value="30000">30 秒</SelectItem>
+                    <SelectItem value="60000">60 秒</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
-              <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
+              <div class="flex items-center justify-between px-5 py-4">
                 <div class="flex flex-col gap-0.5">
-                  <span class="text-[13px] font-medium text-foreground">连接超时</span>
-                  <span class="text-[11px] text-muted-foreground">超时时间 1-30 秒</span>
+                  <span class="text-[13px] font-medium" style="color: var(--text-primary)">备份文件保留</span>
+                  <span class="text-[11px]" style="color: var(--text-tertiary)">超过此天数的旧备份将被清理</span>
                 </div>
-                <Select v-model="healthTimeoutSec" class="w-[120px]" @update:model-value="updateHealthTimeout">
+                <Select v-model="backupRetentionDays" class="w-[120px]">
                   <SelectTrigger class="h-8 text-[13px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">1 秒</SelectItem>
-                    <SelectItem value="3">3 秒</SelectItem>
-                    <SelectItem value="5">5 秒</SelectItem>
-                    <SelectItem value="10">10 秒</SelectItem>
-                    <SelectItem value="15">15 秒</SelectItem>
-                    <SelectItem value="30">30 秒</SelectItem>
+                    <SelectItem value="7">7 天</SelectItem>
+                    <SelectItem value="15">15 天</SelectItem>
+                    <SelectItem value="30">30 天</SelectItem>
+                    <SelectItem value="90">90 天</SelectItem>
+                    <SelectItem value="never">永不</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
-            <div class="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[13px] font-medium text-foreground">立即检测</span>
-                <span class="text-[11px] text-muted-foreground">立即对所有数据库连接执行一次测活</span>
-              </div>
-              <Button size="sm" variant="outline" class="h-8 text-[13px]" @click="forceHealthCheck" :disabled="forceChecking">
-                <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': forceChecking }" />
-                {{ forceChecking ? '检测中...' : '立即检测' }}
-              </Button>
-            </div>
           </div>
 
-          <div v-if="healthStore.totalCount > 0" class="mt-3 rounded-xl border border-border bg-card shadow-sm p-4">
-            <div class="flex items-center gap-4 mb-3">
-              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                <span class="h-2 w-2 rounded-full bg-emerald-500" />
-                <span class="text-[12px] font-medium text-emerald-400">在线 {{ healthStore.onlineCount }}</span>
-              </div>
-              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/5 border border-red-500/20">
-                <span class="h-2 w-2 rounded-full bg-red-500" />
-                <span class="text-[12px] font-medium text-red-400">离线 {{ healthStore.offlineCount }}</span>
-              </div>
-              <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
-                <span class="text-[12px] text-muted-foreground">共 {{ healthStore.totalCount }} 个实例</span>
-              </div>
-            </div>
-
-            <div class="max-h-[280px] overflow-y-auto space-y-2">
-              <div
-                v-for="item in healthSortedDetails"
-                :key="item.uid"
-                class="flex items-center gap-3 py-3.5 px-5 rounded-xl transition-colors border"
-                :class="[
-                  item.online
-                    ? 'bg-white dark:bg-[#121214] border-transparent dark:border-zinc-800/80'
-                    : 'bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/40',
-                ]"
-              >
-                <StatusDot :status="item.online ? 'online' : 'offline'" size="sm" />
-                <div class="flex-1 min-w-0">
-                  <div class="text-[12px] font-medium text-foreground truncate">{{ item.name }}</div>
-                  <div class="text-[10px] text-muted-foreground truncate">{{ item.host }}:{{ item.port }}</div>
+          <!-- 测活配置 -->
+          <div v-if="systemSubTab === 'health'" class="fade-up">
+            <div class="content-card">
+              <div class="grid grid-cols-1 md:grid-cols-2">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-r" style="border-color: var(--border-subtle)">
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-[13px] font-medium" style="color: var(--text-primary)">启用定时测活</span>
+                    <span class="text-[11px]" style="color: var(--text-tertiary)">自动检测连接可用性</span>
+                  </div>
+                  <Switch v-model="healthConfig.enabled" @update:model-value="saveHealthConfig" />
                 </div>
-                <span class="text-xs font-mono px-2 py-0.5 rounded-md font-medium"
-                  :class="item.type === 'redis' ? 'bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400' : 'bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400'"
-                >{{ item.type === 'redis' ? 'Redis' : 'MySQL' }}</span>
-                <span v-if="item.latencyMs >= 0" class="text-[11px] text-slate-400 dark:text-zinc-500 w-[50px] text-right font-mono">{{ item.latencyMs }}ms</span>
-                <span v-if="!item.online && item.error" class="text-xs text-rose-500 dark:text-rose-400/90 max-w-[140px] truncate" :title="item.error">{{ item.error }}</span>
+                <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-subtle)">
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-[13px] font-medium" style="color: var(--text-primary)">异常告警</span>
+                    <span class="text-[11px]" style="color: var(--text-tertiary)">状态变更时记录日志</span>
+                  </div>
+                  <Switch v-model="healthConfig.alertEnabled" @update:model-value="saveHealthConfig" />
+                </div>
+                <div class="flex items-center justify-between px-5 py-4 border-b border-r" style="border-color: var(--border-subtle)">
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-[13px] font-medium" style="color: var(--text-primary)">测活频率</span>
+                    <span class="text-[11px]" style="color: var(--text-tertiary)">检测间隔 10-300 秒</span>
+                  </div>
+                  <Select v-model="healthIntervalSec" class="w-[120px]" @update:model-value="updateHealthInterval">
+                    <SelectTrigger class="h-8 text-[13px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10 秒</SelectItem>
+                      <SelectItem value="15">15 秒</SelectItem>
+                      <SelectItem value="30">30 秒</SelectItem>
+                      <SelectItem value="60">60 秒</SelectItem>
+                      <SelectItem value="120">120 秒</SelectItem>
+                      <SelectItem value="300">300 秒</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-subtle)">
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-[13px] font-medium" style="color: var(--text-primary)">连接超时</span>
+                    <span class="text-[11px]" style="color: var(--text-tertiary)">超时时间 1-30 秒</span>
+                  </div>
+                  <Select v-model="healthTimeoutSec" class="w-[120px]" @update:model-value="updateHealthTimeout">
+                    <SelectTrigger class="h-8 text-[13px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 秒</SelectItem>
+                      <SelectItem value="3">3 秒</SelectItem>
+                      <SelectItem value="5">5 秒</SelectItem>
+                      <SelectItem value="10">10 秒</SelectItem>
+                      <SelectItem value="15">15 秒</SelectItem>
+                      <SelectItem value="30">30 秒</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="flex items-center justify-between px-5 py-4 md:col-span-2 border-b" style="border-color: var(--border-subtle)">
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-[13px] font-medium" style="color: var(--text-primary)">立即检测</span>
+                    <span class="text-[11px]" style="color: var(--text-tertiary)">立即对所有数据库连接执行一次测活</span>
+                  </div>
+                  <Button size="sm" variant="outline" class="h-8 text-[13px]" @click="forceHealthCheck" :disabled="forceChecking">
+                    <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': forceChecking }" />
+                    {{ forceChecking ? '检测中...' : '立即检测' }}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Health Status -->
+            <div v-if="healthStore.totalCount > 0" class="content-card mt-4">
+              <div class="px-5 py-4 border-b" style="border-color: var(--border-subtle)">
+                <div class="flex items-center gap-3">
+                  <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg" style="background: var(--accent-soft)">
+                    <span class="h-2 w-2 rounded-full" style="background: var(--success)" />
+                    <span class="text-[12px] font-medium" style="color: var(--success)">在线 {{ healthStore.onlineCount }}</span>
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg" style="background: color-mix(in srgb, var(--danger) 8%, transparent)">
+                    <span class="h-2 w-2 rounded-full" style="background: var(--danger)" />
+                    <span class="text-[12px] font-medium" style="color: var(--danger)">离线 {{ healthStore.offlineCount }}</span>
+                  </div>
+                  <span class="text-[12px]" style="color: var(--text-tertiary)">共 {{ healthStore.totalCount }} 个实例</span>
+                </div>
+              </div>
+              <div class="max-h-[280px] overflow-y-auto">
+                <div
+                  v-for="item in healthSortedDetails"
+                  :key="item.uid"
+                  class="flex items-center gap-3 px-5 py-3 border-b transition-colors"
+                  :style="{ 'border-color': 'var(--border-subtle)', 'background': item.online ? 'transparent' : 'color-mix(in srgb, var(--danger) 4%, transparent)' }"
+                >
+                  <StatusDot :status="item.online ? 'online' : 'offline'" size="sm" />
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[12px] font-medium truncate" style="color: var(--text-primary)">{{ item.name }}</div>
+                    <div class="text-[10px] truncate font-mono-data" style="color: var(--text-tertiary)">{{ item.host }}:{{ item.port }}</div>
+                  </div>
+                  <span class="pill pill-default text-[10px]">{{ item.type === 'redis' ? 'Redis' : 'MySQL' }}</span>
+                  <span v-if="item.latencyMs >= 0" class="text-[11px] font-mono-data w-[50px] text-right" style="color: var(--text-tertiary)">{{ item.latencyMs }}ms</span>
+                  <span v-if="!item.online && item.error" class="text-xs max-w-[140px] truncate" style="color: var(--danger)" :title="item.error">{{ item.error }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 关于系统 -->
+          <div v-if="systemSubTab === 'about'" class="fade-up">
+            <div class="content-card">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-0">
+                <div v-for="(item, idx) in [
+                  { label: '系统版本', value: appVersion || '加载中...', mono: true },
+                  { label: '运行端口', value: serverPort || '-', mono: true },
+                  { label: '当前用户', value: systemUsername || userName || '-', mono: false },
+                  { label: '主机名', value: systemHostname || '-', mono: true },
+                  { label: '操作系统', value: systemOsName || '-', mono: true },
+                  { label: '本地连接数', value: localInstances.length + ' 个', mono: false },
+                ]" :key="item.label" class="flex items-center justify-between px-5 py-3.5 border-b" :style="{ 'border-color': 'var(--border-subtle)' }">
+                  <span class="text-[12px]" style="color: var(--text-tertiary)">{{ item.label }}</span>
+                  <span class="text-[13px]" :class="item.mono ? 'font-mono-data' : ''" style="color: var(--text-primary)">{{ item.value }}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 关于系统 -->
-        <div v-if="systemSubTab === 'about'" class="content-section">
-          <div class="rounded-xl border border-border bg-card shadow-sm p-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-              <div class="flex flex-col gap-0.5 rounded-lg bg-muted px-4 py-3">
-                <span class="text-xs text-muted-foreground">系统版本</span>
-                <span class="text-sm text-foreground font-mono">{{ appVersion || '加载中...' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5 rounded-lg bg-muted px-4 py-3">
-                <span class="text-xs text-muted-foreground">运行端口</span>
-                <span class="text-sm text-foreground font-mono">{{ serverPort || '-' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5 rounded-lg bg-muted px-4 py-3">
-                <span class="text-xs text-muted-foreground">当前用户</span>
-                <span class="text-sm text-foreground">{{ systemUsername || userName || '-' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5 rounded-lg bg-muted px-4 py-3">
-                <span class="text-xs text-muted-foreground">主机名</span>
-                <span class="text-sm text-foreground font-mono">{{ systemHostname || '-' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5 rounded-lg bg-muted px-4 py-3">
-                <span class="text-xs text-muted-foreground">操作系统</span>
-                <span class="text-sm text-foreground font-mono">{{ systemOsName || '-' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5 rounded-lg bg-muted px-4 py-3">
-                <span class="text-xs text-muted-foreground">本地连接数</span>
-                <span class="text-sm text-foreground">{{ localInstances.length }} 个</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 数据库实例管理面板 -->
-      <div v-if="activeTab === 'instance'" class="pb-4">
-        <div class="content-section">
-          <Tabs v-model="instanceTab">
-            <TabsList class="bg-muted">
-              <TabsTrigger value="local" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
-                本地实例
-                <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold text-on-foreground"
-                  :class="instanceTab === 'local' ? 'bg-foreground' : 'bg-muted-foreground'">
-                  {{ localInstances.length }}
-                </span>
-              </TabsTrigger>
-              <TabsTrigger value="remote" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">
-                远程服务器
-                <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold text-on-foreground"
-                  :class="instanceTab === 'remote' ? 'bg-foreground' : 'bg-muted-foreground'">
-                  {{ remoteInstances.length }}
-                </span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mt-3 rounded-lg border border-border bg-muted p-3 min-h-[60px]">
+        <!-- 数据库实例管理面板 -->
+        <div v-if="activeTab === 'instance'" class="flex flex-col gap-4 mt-4">
+          <!-- Instance Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-gap min-h-[60px]">
             <div
               v-for="db in (instanceTab === 'local' ? localInstances : remoteInstances)"
               :key="db.id"
-              class="content-card-interactive px-3 py-2.5"
-              :class="selectedDbId === db.id ? 'border-primary bg-primary/5 shadow-md' : ''"
+              class="content-card-interactive hover-lift px-4 py-3 cursor-pointer min-h-[68px]"
+              :class="selectedDbId === db.id ? 'ring-2' : ''"
+              :style="selectedDbId === db.id ? 'ring-color: var(--accent)' : ''"
               @click="selectInstance(db.id)"
             >
-              <div class="text-[13px] font-semibold text-foreground truncate">{{ db.name }}</div>
-              <div class="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+              <div class="text-[13px] font-semibold truncate" style="color: var(--text-primary)">{{ db.name }}</div>
+              <div class="flex items-center gap-1.5 text-xs mt-1.5">
                 <StatusDot :status="selectedDbId === db.id ? 'selected' : (onlineStatus[instanceUid(db)] !== false ? 'online' : 'offline')" size="xs" />
-                {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}
-                <span class="ml-auto font-mono-data text-[11px]">{{ db.host }}:{{ db.port }}</span>
+                <span style="color: var(--text-secondary)">{{ db.type === 'redis' ? 'Redis' : 'MySQL' }}</span>
+                <span class="ml-auto font-mono-data text-[11px]" style="color: var(--text-tertiary)">{{ db.host }}:{{ db.port }}</span>
               </div>
             </div>
             <div v-if="(instanceTab === 'local' ? localInstances : remoteInstances).length === 0"
-              class="col-span-full flex flex-col items-center justify-center py-6 text-muted-foreground">
+              class="col-span-full">
               <div class="empty-state">
                 <div class="empty-state-icon">
                   <Settings class="h-8 w-8" />
@@ -358,242 +322,243 @@
               </div>
             </div>
           </div>
-        </div>
 
-        <div v-if="currentDb" class="border-t border-border" ref="detailCard">
-          <Tabs v-model="detailTab">
-            <div class="content-section-top">
-              <TabsList class="bg-muted">
-                <TabsTrigger value="info" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">基本信息</TabsTrigger>
-                <TabsTrigger value="config" v-if="currentDb.type === 'mysql' || currentDb.type === 'redis'" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">配置修改</TabsTrigger>
-                <TabsTrigger value="users" v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="text-[12px] data-[state=active]:bg-card data-[state=active]:text-foreground">用户管理</TabsTrigger>
-                <span v-if="currentDb.type === 'mysql' && currentDb.username !== 'root'" class="text-[12px] text-muted-foreground px-2 self-center">用户管理<span class="text-destructive text-[11px] ml-0.5">（仅限 root 账户）</span></span>
-              </TabsList>
+          <!-- Instance Detail -->
+          <div v-if="currentDb" ref="detailCard">
+            <!-- Detail Sub-tabs -->
+            <div class="flex items-center gap-2 mb-4">
+              <button
+                :class="detailTab === 'info' ? 'tab-active' : 'tab-inactive'"
+                class="px-4 py-2 rounded-lg text-[13px] font-medium transition-all duration-200"
+                @click="detailTab = 'info'"
+              >基本信息</button>
+              <button
+                v-if="currentDb.type === 'mysql' || currentDb.type === 'redis'"
+                :class="detailTab === 'config' ? 'tab-active' : 'tab-inactive'"
+                class="px-4 py-2 rounded-lg text-[13px] font-medium transition-all duration-200"
+                @click="detailTab = 'config'"
+              >配置修改</button>
+              <button
+                v-if="currentDb.type === 'mysql' && currentDb.username === 'root'"
+                :class="detailTab === 'users' ? 'tab-active' : 'tab-inactive'"
+                class="px-4 py-2 rounded-lg text-[13px] font-medium transition-all duration-200"
+                @click="detailTab = 'users'"
+              >用户管理</button>
+              <span v-if="currentDb.type === 'mysql' && currentDb.username !== 'root'" class="text-[12px] px-2 self-center" style="color: var(--text-tertiary)">用户管理<span style="color: var(--danger)" class="text-[11px] ml-0.5">（仅限 root 账户）</span></span>
             </div>
 
-            <TabsContent value="info" class="content-section">
-              <div class="rounded-xl border border-border bg-card shadow-sm">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 p-5">
-                  <div class="flex flex-col gap-1">
-                    <span class="text-xs text-muted-foreground">实例名称</span>
-                    <span class="text-sm text-foreground">{{ currentDb.name }}</span>
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <span class="text-xs text-muted-foreground">数据库类型</span>
-                    <Badge :variant="currentDb.type === 'mysql' ? 'default' : 'secondary'" class="w-fit rounded-full tab-active">
-                      {{ currentDb.type === 'mysql' ? 'MySQL' : 'Redis' }}
-                    </Badge>
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <span class="text-xs text-muted-foreground">主机地址</span>
-                    <span class="text-sm text-foreground font-mono">{{ currentDb.host }}</span>
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <span class="text-xs text-muted-foreground">端口</span>
-                    <span class="text-sm text-foreground font-mono">
-                      {{ currentDb.port }}
-                      <span v-if="currentDb.container" class="ml-1.5 text-[11px] text-blue-400 bg-blue-500/5 px-1.5 py-0.5 rounded">Docker</span>
-                    </span>
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <span class="text-xs text-muted-foreground">版本</span>
-                    <span class="text-sm text-foreground">{{ currentDb.version || '-' }}</span>
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <span class="text-xs text-muted-foreground">用户名</span>
-                    <span class="text-sm text-foreground">{{ currentDb.username || '-' }}</span>
-                  </div>
-                </div>
-
-                <div class="flex flex-wrap gap-3 content-section">
-                  <Button size="sm" variant="secondary" class="h-8 text-[13px] border-border shadow-none bg-card hover:bg-muted" @click="confirmAction('restart')">
-                    <RefreshCw class="h-4 w-4" />
-                    重启实例
-                  </Button>
-                  <Button size="sm" variant="destructive" class="h-8 text-[13px]" @click="confirmAction('stop')">
-                    <CircleX class="h-4 w-4" />
-                    停止实例
-                  </Button>
+            <!-- 基本信息 -->
+            <div v-if="detailTab === 'info'" class="content-card fade-up">
+              <div class="grid grid-cols-1 md:grid-cols-2">
+                <div v-for="(item, idx) in [
+                  { label: '实例名称', value: currentDb.name, mono: false },
+                  { label: '数据库类型', value: currentDb.type === 'mysql' ? 'MySQL' : 'Redis', badge: true },
+                  { label: '主机地址', value: currentDb.host, mono: true },
+                  { label: '端口', value: currentDb.port + (currentDb.container ? ' (Docker)' : ''), mono: true },
+                  { label: '版本', value: currentDb.version || '-', mono: false },
+                  { label: '用户名', value: currentDb.username || '-', mono: false },
+                ]" :key="item.label" class="flex items-center justify-between px-5 py-3.5 border-b" :style="{ 'border-color': 'var(--border-subtle)' }">
+                  <span class="text-[12px]" style="color: var(--text-tertiary)">{{ item.label }}</span>
+                  <span v-if="item.badge" class="pill pill-active text-[11px]">{{ item.value }}</span>
+                  <span v-else class="text-[13px]" :class="item.mono ? 'font-mono-data' : ''" style="color: var(--text-primary)">{{ item.value }}</span>
                 </div>
               </div>
-            </TabsContent>
+              <div class="flex flex-wrap gap-3 px-5 py-4">
+                <Button size="sm" variant="secondary" class="h-8 text-[13px]" @click="confirmAction('restart')">
+                  <RefreshCw class="h-4 w-4" />
+                  重启实例
+                </Button>
+                <Button size="sm" variant="destructive" class="h-8 text-[13px]" @click="confirmAction('stop')">
+                  <CircleX class="h-4 w-4" />
+                  停止实例
+                </Button>
+              </div>
+            </div>
 
-            <TabsContent value="config" class="content-section" v-if="currentDb.type === 'mysql' || currentDb.type === 'redis'">
-              <div class="rounded-xl border border-border bg-card shadow-sm">
-                <div class="border border-border rounded-lg m-4 overflow-hidden">
-                  <div class="flex flex-wrap items-center justify-between px-4 py-2 bg-muted border-b border-border gap-2">
-                    <span class="text-xs text-muted-foreground">
-                      {{ configSource === 'file' ? '配置文件: ' + configFilePath : '运行时变量' }}
-                    </span>
+            <!-- 配置修改 -->
+            <div v-if="detailTab === 'config' && (currentDb.type === 'mysql' || currentDb.type === 'redis')" class="content-card fade-up">
+              <!-- Code Editor -->
+              <div class="code-editor rounded-t-lg overflow-hidden border-b" style="border-color: var(--border-subtle)">
+                <div class="flex flex-wrap items-center justify-between px-4 py-2.5" style="background: var(--surface)">
+                  <span class="text-[12px]" style="color: var(--text-tertiary)">
+                    {{ configSource === 'file' ? '配置文件: ' + configFilePath : '运行时变量' }}
+                  </span>
+                  <div class="flex items-center gap-2">
+                    <Button size="sm" variant="outline" class="h-7 text-[12px]" @click="loadConfig(requestId)">
+                      <RefreshCw class="h-3.5 w-3.5" />
+                      重新加载
+                    </Button>
+                    <Button variant="primary" size="sm" class="h-7 text-[12px]" @click="saveConfig" :disabled="savingConfig" :loading="savingConfig">
+                      <FileText class="h-3.5 w-3.5" />
+                      {{ savingConfig ? '保存中...' : '保存配置' }}
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  v-model="configContent"
+                  class="font-mono text-sm leading-relaxed border-0 rounded-none min-h-[360px] focus-visible:ring-0"
+                />
+              </div>
+
+              <!-- MySQL Common Config -->
+              <div class="px-5 py-4" v-if="currentDb.type === 'mysql'">
+                <h4 class="text-[13px] font-semibold mb-3" style="color: var(--text-primary)">常用配置项</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">最大连接数</label>
+                    <Input type="number" v-model="commonConfig.maxConnections" :min="10" :max="10000" @change="updateConfig('max_connections')" class="h-8 text-[13px]" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">InnoDB缓冲池大小</label>
+                    <Input v-model="commonConfig.innodbBufferSize" placeholder="如: 1G" @change="updateConfig('innodb_buffer_pool_size')" class="h-8 text-[13px]" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">服务端口</label>
                     <div class="flex items-center gap-2">
-                      <Button size="sm" variant="outline" class="h-7 text-[12px]" @click="loadConfig(requestId)">
-                        <RefreshCw class="h-3.5 w-3.5" />
-                        重新加载
-                      </Button>
-                      <Button variant="primary" size="sm" class="h-7 text-[12px]" @click="saveConfig" :disabled="savingConfig" :loading="savingConfig">
-                        <FileText class="h-3.5 w-3.5" />
-                        {{ savingConfig ? '保存中...' : '保存配置' }}
+                      <Input type="number" v-model="commonConfig.port" :min="1024" :max="65535" @change="updateConfig('port')" class="h-8 text-[13px] flex-1" />
+                      <Button variant="primary" size="sm" class="h-8 text-[12px] shrink-0" @click="confirmAction('updatePort')" :disabled="updatingPort" :loading="updatingPort">
+                        {{ updatingPort ? '修改中...' : '应用端口' }}
                       </Button>
                     </div>
-                  </div>
-                  <Textarea
-                    v-model="configContent"
-                    class="font-mono text-sm leading-relaxed code-editor border-0 rounded-none min-h-[360px] focus-visible:ring-0"
-                  />
-                </div>
-
-                <div class="px-4 pb-4" v-if="currentDb.type === 'mysql'">
-                  <h4 class="text-sm font-semibold text-foreground mb-3">常用配置项</h4>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">最大连接数</label>
-                      <Input type="number" v-model="commonConfig.maxConnections" :min="10" :max="10000" @change="updateConfig('max_connections')" class="h-8 text-[13px]" />
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">InnoDB缓冲池大小</label>
-                      <Input v-model="commonConfig.innodbBufferSize" placeholder="如: 1G" @change="updateConfig('innodb_buffer_pool_size')" class="h-8 text-[13px]" />
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">服务端口</label>
-                      <div class="flex items-center gap-2">
-                        <Input type="number" v-model="commonConfig.port" :min="1024" :max="65535" @change="updateConfig('port')" class="h-8 text-[13px] flex-1" />
-                        <Button variant="primary" size="sm" class="h-8 text-[12px] shrink-0" @click="confirmAction('updatePort')" :disabled="updatingPort" :loading="updatingPort">
-                          {{ updatingPort ? '修改中...' : '应用端口' }}
-                        </Button>
-                      </div>
-                      <div v-if="currentDb?.container" class="mt-1.5 p-2.5 bg-blue-500/5 rounded-lg border border-blue-100">
-                        <div class="text-xs text-blue-500 font-medium mb-1.5">Docker 端口映射</div>
-                        <div class="flex items-center gap-3 text-xs">
-                          <span class="text-muted-foreground">容器内: <span class="text-foreground font-mono">{{ dockerInternalPort }}</span></span>
-                          <span class="text-muted-foreground">→</span>
-                          <span class="text-muted-foreground">宿主机: <span class="text-foreground font-mono">{{ currentDb.port }}</span></span>
-                        </div>
+                    <div v-if="currentDb?.container" class="mt-1.5 p-2.5 rounded-lg" style="background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent)">
+                      <div class="text-[11px] font-medium mb-1.5" style="color: var(--accent)">Docker 端口映射</div>
+                      <div class="flex items-center gap-3 text-[11px]">
+                        <span style="color: var(--text-tertiary)">容器内: <span class="font-mono-data" style="color: var(--text-primary)">{{ dockerInternalPort }}</span></span>
+                        <span style="color: var(--text-tertiary)">→</span>
+                        <span style="color: var(--text-tertiary)">宿主机: <span class="font-mono-data" style="color: var(--text-primary)">{{ currentDb.port }}</span></span>
                       </div>
                     </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">数据目录</label>
-                      <Input v-model="commonConfig.dataDir" placeholder="/var/lib/mysql" disabled class="h-8 text-[13px] bg-muted" />
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">慢查询阈值(秒)</label>
-                      <Input type="number" v-model="commonConfig.slowQueryTime" :min="0" :max="60" step="0.1" @change="updateConfig('long_query_time')" class="h-8 text-[13px]" />
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">绑定地址</label>
-                      <Input v-model="commonConfig.bindAddress" placeholder="0.0.0.0" @change="updateConfig('bind_address')" class="h-8 text-[13px]" />
-                    </div>
                   </div>
-                </div>
-
-                <div class="px-4 pb-4" v-if="currentDb.type === 'redis'">
-                  <h4 class="text-sm font-semibold text-foreground mb-3">常用配置项</h4>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">最大内存</label>
-                      <Input v-model="redisCommonConfig.maxmemory" placeholder="如: 1gb" @change="updateRedisConfig('maxmemory')" class="h-8 text-[13px]" />
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">最大连接数</label>
-                      <Input type="number" v-model="redisCommonConfig.maxclients" :min="10" :max="100000" @change="updateRedisConfig('maxclients')" class="h-8 text-[13px]" />
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">服务端口</label>
-                      <Input type="number" v-model="redisCommonConfig.port" :min="1024" :max="65535" @change="updateRedisConfig('port')" class="h-8 text-[13px]" />
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">超时时间(秒)</label>
-                      <Input type="number" v-model="redisCommonConfig.timeout" :min="0" :max="86400" @change="updateRedisConfig('timeout')" class="h-8 text-[13px]" />
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">数据库数量</label>
-                      <Input type="number" v-model="redisCommonConfig.databases" :min="1" :max="256" @change="updateRedisConfig('databases')" class="h-8 text-[13px]" />
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                      <label class="text-sm text-foreground">绑定地址</label>
-                      <Input v-model="redisCommonConfig.bind" placeholder="0.0.0.0" @change="updateRedisConfig('bind')" class="h-8 text-[13px]" />
-                    </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">数据目录</label>
+                    <Input v-model="commonConfig.dataDir" placeholder="/var/lib/mysql" disabled class="h-8 text-[13px]" style="background: var(--surface)" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">慢查询阈值(秒)</label>
+                    <Input type="number" v-model="commonConfig.slowQueryTime" :min="0" :max="60" step="0.1" @change="updateConfig('long_query_time')" class="h-8 text-[13px]" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">绑定地址</label>
+                    <Input v-model="commonConfig.bindAddress" placeholder="0.0.0.0" @change="updateConfig('bind_address')" class="h-8 text-[13px]" />
                   </div>
                 </div>
               </div>
-            </TabsContent>
 
-            <TabsContent value="users" class="content-section">
-              <div v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="rounded-xl border border-border bg-card shadow-sm">
-                <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-border gap-2">
-                  <span class="text-sm text-muted-foreground">管理数据库用户及其权限</span>
+              <!-- Redis Common Config -->
+              <div class="px-5 py-4" v-if="currentDb.type === 'redis'">
+                <h4 class="text-[13px] font-semibold mb-3" style="color: var(--text-primary)">常用配置项</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">最大内存</label>
+                    <Input v-model="redisCommonConfig.maxmemory" placeholder="如: 1gb" @change="updateRedisConfig('maxmemory')" class="h-8 text-[13px]" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">最大连接数</label>
+                    <Input type="number" v-model="redisCommonConfig.maxclients" :min="10" :max="100000" @change="updateRedisConfig('maxclients')" class="h-8 text-[13px]" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">服务端口</label>
+                    <Input type="number" v-model="redisCommonConfig.port" :min="1024" :max="65535" @change="updateRedisConfig('port')" class="h-8 text-[13px]" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">超时时间(秒)</label>
+                    <Input type="number" v-model="redisCommonConfig.timeout" :min="0" :max="86400" @change="updateRedisConfig('timeout')" class="h-8 text-[13px]" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">数据库数量</label>
+                    <Input type="number" v-model="redisCommonConfig.databases" :min="1" :max="256" @change="updateRedisConfig('databases')" class="h-8 text-[13px]" />
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-[13px]" style="color: var(--text-primary)">绑定地址</label>
+                    <Input v-model="redisCommonConfig.bind" placeholder="0.0.0.0" @change="updateRedisConfig('bind')" class="h-8 text-[13px]" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 用户管理 -->
+            <div v-if="detailTab === 'users'" class="fade-up">
+              <div v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="content-card">
+                <div class="flex flex-wrap items-center justify-between px-5 py-3.5 border-b" style="border-color: var(--border-subtle)">
+                  <span class="text-[13px]" style="color: var(--text-tertiary)">管理数据库用户及其权限</span>
                   <Button variant="primary" size="sm" class="h-8 text-[13px]" @click="showCreateUserDialog = true">
                     <Plus class="h-4 w-4" />
                     创建用户
                   </Button>
                 </div>
 
-                <Table class="px-4">
+                <Table>
                   <TableHeader>
-                    <TableRow class="hover:bg-transparent border-b border-border">
-                      <TableHead class="w-[150px] text-[12px] font-normal text-muted-foreground">用户名</TableHead>
-                      <TableHead class="w-[150px] text-[12px] font-normal text-muted-foreground">主机</TableHead>
-                      <TableHead class="min-w-[250px] text-[12px] font-normal text-muted-foreground">全局权限</TableHead>
-                      <TableHead class="text-center text-[12px] font-normal text-muted-foreground">操作</TableHead>
+                    <TableRow class="hover:bg-transparent border-b" style="border-color: var(--border-subtle)">
+                      <TableHead class="w-[150px] text-[12px] font-normal" style="color: var(--text-tertiary)">用户名</TableHead>
+                      <TableHead class="w-[150px] text-[12px] font-normal" style="color: var(--text-tertiary)">主机</TableHead>
+                      <TableHead class="min-w-[250px] text-[12px] font-normal" style="color: var(--text-tertiary)">全局权限</TableHead>
+                      <TableHead class="text-center text-[12px] font-normal" style="color: var(--text-tertiary)">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow v-for="row in users" :key="row.user + row.host" class="hover:bg-muted border-b border-border">
-                      <TableCell class="font-medium text-foreground">
+                    <TableRow v-for="row in users" :key="row.user + row.host" class="hover:bg-muted border-b" style="border-color: var(--border-subtle)">
+                      <TableCell class="font-medium" style="color: var(--text-primary)">
                         <div class="flex items-center gap-1.5">
                           {{ row.user }}
-                          <Lock v-if="row.account_locked" class="h-3.5 w-3.5 text-red-400" />
+                          <Lock v-if="row.account_locked" class="h-3.5 w-3.5" style="color: var(--danger)" />
                         </div>
                       </TableCell>
-                      <TableCell class="font-mono text-sm text-foreground">{{ row.host }}</TableCell>
+                      <TableCell class="font-mono text-sm" style="color: var(--text-primary)">{{ row.host }}</TableCell>
                       <TableCell>
                         <div class="flex flex-wrap gap-1">
                           <Badge v-for="priv in row.privileges" :key="priv" variant="secondary" class="text-[11px] rounded-full"
-                            :class="priv === 'ALL' ? 'tab-active' : priv === 'DELETE' || priv === 'DROP' ? 'bg-red-500/5 text-red-400' : 'bg-muted text-foreground'">
+                            :class="priv === 'ALL' ? 'pill-active' : priv === 'DELETE' || priv === 'DROP' ? 'badge-status badge-status-danger' : 'pill-default'">
                             {{ privLabelMap[priv] || priv }}
                           </Badge>
                         </div>
                       </TableCell>
                       <TableCell class="align-middle">
                         <div class="flex items-center justify-center h-full">
-                          <div class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
+                          <div class="inline-flex items-center rounded-lg p-0.5" style="border: 1px solid var(--border-subtle); background: var(--surface)">
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] transition-all whitespace-nowrap leading-none action-btn"
+                              style="color: var(--text-secondary)"
                               @click="openEditPermDialog(row)"
                             >
                               <Shield class="h-3.5 w-3.5 shrink-0" />
                               授权
                             </button>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] transition-all whitespace-nowrap leading-none action-btn"
+                              style="color: var(--text-secondary)"
                               @click="openDbGrantDialog(row)"
                             >
                               <DatabaseIcon class="h-3.5 w-3.5 shrink-0" />
                               库权限
                             </button>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] transition-all whitespace-nowrap leading-none action-btn"
+                              style="color: var(--text-secondary)"
                               @click="openChangePwdDialog(row)"
                             >
                               <KeyRound class="h-3.5 w-3.5 shrink-0" />
                               改密
                             </button>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] transition-all whitespace-nowrap leading-none action-btn"
+                              style="color: var(--text-secondary)"
                               @click="openChangeHostDialog(row)"
                             >
                               <Globe class="h-3.5 w-3.5 shrink-0" />
                               改主机
                             </button>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] transition-all whitespace-nowrap leading-none action-btn"
+                              style="color: var(--text-secondary)"
                               @click="toggleUserLock(row)"
                             >
                               <component :is="row.account_locked ? Unlock : LockIcon" class="h-3.5 w-3.5 shrink-0" />
                               {{ row.account_locked ? '解锁' : '锁定' }}
                             </button>
-                            <div class="w-px h-4 bg-border mx-0.5 shrink-0"></div>
+                            <div class="w-px h-4 mx-0.5 shrink-0" style="background: var(--border)"></div>
                             <button
-                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-400 hover:bg-muted transition-all whitespace-nowrap leading-none"
+                              class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] transition-all whitespace-nowrap leading-none btn-ghost-danger"
                               @click="confirmAction('deleteUser', row)"
                             >
                               <Trash2 class="h-3.5 w-3.5 shrink-0" />
@@ -616,28 +581,28 @@
                   </TableBody>
                 </Table>
               </div>
-              <div v-else class="rounded-xl border border-border bg-card shadow-sm p-8">
+              <div v-else class="content-card p-8">
                 <div class="empty-state">
                   <div class="empty-state-icon">
                     <Users class="h-10 w-10" />
                   </div>
                   <div class="empty-state-text">用户管理功能仅限 root 账户使用</div>
-                  <div class="text-[13px] text-muted-foreground mt-1">当前账号为 {{ currentDb.username }}，请使用 root 账号登录后重试</div>
+                  <div class="text-[13px] mt-1" style="color: var(--text-tertiary)">当前账号为 {{ currentDb.username }}，请使用 root 账号登录后重试</div>
                 </div>
               </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <div v-else class="flex items-center justify-center py-8">
-          <div class="empty-state">
-            <div class="empty-state-icon">
-              <Settings class="h-12 w-12" />
             </div>
-            <div class="empty-state-text">请选择一个数据库实例进行管理</div>
+          </div>
+
+          <div v-else class="flex items-center justify-center py-12">
+            <div class="empty-state">
+              <div class="empty-state-icon">
+                <Settings class="h-12 w-12" />
+              </div>
+              <div class="empty-state-text">请选择一个数据库实例进行管理</div>
+            </div>
           </div>
         </div>
-      </div>
+
     </div>
 
     <Dialog v-model:open="showCreateUserDialog">
@@ -893,7 +858,7 @@
                   <div class="text-[13px] font-medium text-foreground">{{ grant.database }}</div>
                   <div class="flex flex-wrap gap-1 mt-1">
                     <Badge v-for="priv in grant.privileges" :key="priv" variant="secondary" class="text-[11px] rounded-full"
-                      :class="priv === 'ALL' ? 'tab-active' : priv === 'DELETE' || priv === 'DROP' ? 'bg-red-500/5 text-red-400' : 'bg-muted text-foreground'">
+                      :class="priv === 'ALL' ? 'pill-active' : priv === 'DELETE' || priv === 'DROP' ? 'badge-status badge-status-danger' : 'pill-default'">
                       {{ privLabelMap[priv] || priv }}
                     </Badge>
                   </div>
@@ -2394,3 +2359,10 @@ onActivated(() => {
   loadDatabases()
 })
 </script>
+
+<style scoped>
+.action-btn:hover {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  color: var(--text-primary);
+}
+</style>

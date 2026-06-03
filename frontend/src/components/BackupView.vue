@@ -1,150 +1,141 @@
 <template>
   <div class="page-padding h-full flex flex-col overflow-hidden">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between section-gap shrink-0">
+      <div>
+        <h2 class="text-[17px] font-semibold text-[var(--text-primary)]">备份管理</h2>
+        <p class="text-[13px] text-[var(--text-tertiary)] mt-0.5">管理数据库备份与定时计划</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn-secondary h-[32px] text-[13px] max-sm:hidden" @click="handleImport">
+          <Upload class="h-3.5 w-3.5 mr-1.5" />导入
+        </button>
+        <button class="btn-secondary h-[32px] text-[13px] max-sm:hidden" @click="openScheduleDialog()">
+          <Clock class="h-3.5 w-3.5 mr-1.5" />新建定时
+        </button>
+        <button class="btn-primary h-[32px] text-[13px]" @click="handleCreate">
+          <Plus class="h-3.5 w-3.5 mr-1.5" />创建备份
+        </button>
+      </div>
+    </div>
+
     <div class="content-card flex flex-col flex-1 min-h-0">
-      <div class="content-header shrink-0">
-        <div class="flex items-start justify-between">
-          <div>
-            <h2 class="text-[15px] font-semibold text-foreground">备份管理</h2>
-            <p class="text-[13px] text-muted-foreground mt-0.5">管理数据库备份与定时计划</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <Button variant="outline" size="sm" class="h-[32px] text-[13px] max-sm:hidden" @click="handleImport">
-              <Upload class="h-3.5 w-3.5 mr-1.5" />导入备份
-            </Button>
-            <Button variant="outline" size="sm" class="h-[32px] text-[13px] max-sm:hidden" @click="openScheduleDialog()">
-              <Clock class="h-3.5 w-3.5 mr-1.5" />新建计划
-            </Button>
-            <Button variant="primary" size="sm" class="h-[32px] text-[13px]" @click="handleCreate">
-              <Plus class="h-3.5 w-3.5 mr-1.5" />创建备份
-            </Button>
-          </div>
+      <!-- Tab Switcher -->
+      <div class="flex items-center justify-between px-5 pt-4 pb-0 shrink-0">
+        <div class="inline-flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)]">
+          <button
+            :class="activeMainTab === 'records' ? 'tab-active px-4 py-1.5 text-[13px]' : 'tab-inactive px-4 py-1.5 text-[13px]'"
+            @click="activeMainTab = 'records'"
+          >备份记录
+          </button>
+          <button
+            :class="activeMainTab === 'scheduled' ? 'tab-active px-4 py-1.5 text-[13px]' : 'tab-inactive px-4 py-1.5 text-[13px]'"
+            @click="activeMainTab = 'scheduled'"
+          >定时备份
+          </button>
         </div>
       </div>
 
-      <div class="border-t border-border section-padding shrink-0">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <button
-              :class="[
-                'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
-                activeMainTab === 'records'
-                  ? 'tab-active shadow-lg shadow-blue-500/20'
-                  : 'tab-inactive'
-              ]"
-              @click="activeMainTab = 'records'"
-            >
-              <FileText class="h-4 w-4" />备份记录
-              <span v-if="activeMainTab === 'records'" class="absolute inset-0 bg-white/10 animate-pulse pointer-events-none"></span>
-            </button>
-            <button
-              :class="[
-                'inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 relative overflow-hidden',
-                activeMainTab === 'scheduled'
-                  ? 'tab-active shadow-lg shadow-blue-500/20'
-                  : 'tab-inactive'
-              ]"
-              @click="activeMainTab = 'scheduled'"
-            >
-              <Clock class="h-4 w-4" />定时备份
-              <span v-if="activeMainTab === 'scheduled'" class="absolute inset-0 bg-white/10 animate-pulse pointer-events-none"></span>
-            </button>
-          </div>
-          <div v-if="activeMainTab === 'records'" class="flex items-center gap-2 flex-wrap">
-            <div class="flex h-[32px] items-center rounded-lg border border-border bg-card px-2 gap-1">
-              <Search class="h-3.5 w-3.5 text-muted-foreground" />
-              <Input v-model="searchQuery" placeholder="搜索备份" class="border-0 shadow-none h-[28px] text-[13px] w-[140px] bg-transparent" @input="onSearchInput" />
-            </div>
-            <Select v-model="databaseFilter" @update:model-value="onFilterChange">
-              <SelectTrigger class="h-[32px] w-[150px] text-[13px] border-border">
-                <Database class="h-3.5 w-3.5 mr-1" />
-                <SelectValue placeholder="全部数据库" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部数据库</SelectItem>
-                <SelectItem v-for="db in allDbOptions" :key="(db.isRemote ? 'r:' : 'l:') + db.id + ':' + db.name" :value="(db.isRemote ? 'r:' : 'l:') + db.id + ':' + db.name">
-                  <div class="flex items-center gap-2">
-                    <Badge :class="db.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'" class="text-[10px] px-1.5 py-0 rounded-full">
-                      {{ db.type === 'redis' ? 'R' : 'M' }}
-                    </Badge>
-                    {{ db.name }}
-                    <span class="text-muted-foreground text-xs ml-auto">{{ db.host || '本地' }}</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" class="h-[32px] text-[13px]" @click="loadBackups">
-              <RefreshCw class="h-3.5 w-3.5 mr-1.5" />刷新
-            </Button>
-            <Button v-if="hasActiveFilters" variant="ghost" size="sm" class="h-[32px] text-[13px] text-muted-foreground" @click="clearAllFilters">
-              <X class="h-3.5 w-3.5 mr-1.5" />清除筛选
-            </Button>
-          </div>
+      <!-- Filter Bar (records tab) -->
+      <div v-if="activeMainTab === 'records'" class="flex items-center gap-2 px-5 pt-3 pb-2 shrink-0 flex-wrap">
+        <div class="flex h-[32px] items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 gap-1.5">
+          <Search class="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+          <Input v-model="searchQuery" placeholder="搜索备份..." class="border-0 shadow-none h-[28px] text-[13px] w-[140px] bg-transparent" @input="onSearchInput" />
         </div>
-      </div>
-
-      <div v-if="activeMainTab === 'records'" class="border-t border-border section-padding shrink-0">
-        <div class="flex items-center gap-2">
-          <span class="text-[12px] text-muted-foreground">备份级别：</span>
-          <Button v-for="opt in levelOptions" :key="opt.value" variant="ghost" size="sm"
-            :class="[backupLevelFilter === opt.value ? 'tab-active' : 'text-secondary-foreground hover:bg-muted', 'h-[28px] text-[12px] gap-1.5']"
-            @click="backupLevelFilter = opt.value; onFilterChange()">
-            <Database v-if="opt.value === 'mysql'" class="h-3 w-3 shrink-0 text-primary" />
-            <HardDrive v-else-if="opt.value === 'redis'" class="h-3 w-3 shrink-0 icon-special-color" />
-            <Settings v-else-if="opt.value === 'system'" class="h-3 w-3 shrink-0 text-muted-foreground" />
+        <Select v-model="databaseFilter" @update:model-value="onFilterChange">
+          <SelectTrigger class="h-[32px] w-[150px] text-[13px] border-[var(--border)]">
+            <Database class="h-3.5 w-3.5 mr-1" />
+            <SelectValue placeholder="全部数据库" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部数据库</SelectItem>
+            <SelectItem v-for="db in allDbOptions" :key="(db.isRemote ? 'r:' : 'l:') + db.id + ':' + db.name" :value="(db.isRemote ? 'r:' : 'l:') + db.id + ':' + db.name">
+              <div class="flex items-center gap-2">
+                <Badge :class="db.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'" class="text-[10px] px-1.5 py-0 rounded-full">
+                  {{ db.type === 'redis' ? 'R' : 'M' }}
+                </Badge>
+                {{ db.name }}
+                <span class="text-[var(--text-tertiary)] text-xs ml-auto">{{ db.host || '本地' }}</span>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <div class="flex items-center gap-1">
+          <button
+            v-for="opt in levelOptions" :key="opt.value"
+            :class="backupLevelFilter === opt.value ? 'pill pill-active' : 'pill pill-default'"
+            @click="backupLevelFilter = opt.value; onFilterChange()"
+          >
+            <Database v-if="opt.value === 'mysql'" class="h-3 w-3 shrink-0" />
+            <HardDrive v-else-if="opt.value === 'redis'" class="h-3 w-3 shrink-0" />
+            <Settings v-else-if="opt.value === 'system'" class="h-3 w-3 shrink-0" />
             {{ opt.label }}
-          </Button>
+          </button>
+        </div>
+        <div class="flex items-center gap-1.5 ml-auto">
+          <button class="btn-ghost h-[30px] text-[12px]" @click="loadBackups">
+            <RefreshCw class="h-3.5 w-3.5" />
+          </button>
+          <button v-if="hasActiveFilters" class="btn-ghost h-[30px] text-[12px] text-[var(--text-tertiary)]" @click="clearAllFilters">
+            <X class="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
-      <div class="flex-1 min-h-0" style="padding: 0 var(--section-padding-x) var(--section-padding-y)">
+      <!-- Content Area -->
+      <div class="flex-1 min-h-0 px-5 pb-4">
+        <!-- Records Tab -->
         <div v-if="activeMainTab === 'records'" class="h-full flex flex-col">
           <div class="flex-1 min-h-0 overflow-y-auto">
+            <!-- Loading -->
             <div v-if="loading" class="flex items-center justify-center py-16">
-              <Loader2 class="h-5 w-5 text-primary animate-spin mr-2" />
-              <span class="text-[13px] text-primary">加载中...</span>
+              <Loader2 class="h-5 w-5 text-[var(--accent)] animate-spin mr-2" />
+              <span class="text-[13px] text-[var(--text-secondary)]">加载中...</span>
             </div>
-            <div v-else-if="pageItems.length === 0" class="flex items-center justify-center py-16">
-              <Inbox class="h-8 w-8 text-muted-foreground/40 mr-2" />
-              <span class="text-[13px] text-muted-foreground">暂无备份记录</span>
+            <!-- Empty -->
+            <div v-else-if="pageItems.length === 0" class="empty-state">
+              <div class="empty-state-icon"><Inbox class="h-8 w-8" /></div>
+              <p class="empty-state-text">暂无备份记录</p>
             </div>
+            <!-- Table -->
             <Table v-else :class="{ 'opacity-40 pointer-events-none': loading }">
               <TableHeader>
-                <TableRow class="hover:bg-transparent border-b border-border">
-                  <TableHead class="w-10 text-[12px] font-normal text-muted-foreground h-10">
-                    <input type="checkbox" class="h-[15px] w-[15px] rounded border-border accent-primary cursor-pointer" :checked="isAllSelected" :indeterminate="isPartialSelected" @change="toggleSelectAll" />
+                <TableRow class="hover:bg-transparent border-b border-[var(--border-subtle)]">
+                  <TableHead class="w-10 text-[12px] font-medium text-[var(--text-tertiary)] h-9">
+                    <input type="checkbox" class="h-[14px] w-[14px] rounded border-[var(--border)] accent-[var(--accent)] cursor-pointer" :checked="isAllSelected" :indeterminate="isPartialSelected" @change="toggleSelectAll" />
                   </TableHead>
-                  <TableHead class="min-w-[220px] text-[12px] font-normal text-muted-foreground h-10 cursor-pointer select-none hover:text-foreground transition-colors" @click="toggleSort('name')">
+                  <TableHead class="min-w-[220px] text-[12px] font-medium text-[var(--text-tertiary)] h-9 cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors" @click="toggleSort('name')">
                     <span class="flex items-center gap-1">
                       备份名称
-                      <ArrowUpDown v-if="sortField !== 'name'" class="h-3 w-3 opacity-40" />
-                      <ArrowUp v-else-if="sortOrder === 'asc'" class="h-3 w-3 text-foreground" />
-                      <ArrowDown v-else class="h-3 w-3 text-foreground" />
+                      <ArrowUpDown v-if="sortField !== 'name'" class="h-3 w-3 opacity-30" />
+                      <ArrowUp v-else-if="sortOrder === 'asc'" class="h-3 w-3 text-[var(--accent)]" />
+                      <ArrowDown v-else class="h-3 w-3 text-[var(--accent)]" />
                     </span>
                   </TableHead>
-                  <TableHead class="w-[56px] text-[12px] font-normal text-muted-foreground h-10">状态</TableHead>
-                  <TableHead class="min-w-[100px] text-[12px] font-normal text-muted-foreground h-10">目标数据库</TableHead>
-                  <TableHead class="w-[80px] text-[12px] font-normal text-muted-foreground h-10 cursor-pointer select-none hover:text-foreground transition-colors" @click="toggleSort('fileSize')">
+                  <TableHead class="w-[72px] text-[12px] font-medium text-[var(--text-tertiary)] h-9">状态</TableHead>
+                  <TableHead class="min-w-[100px] text-[12px] font-medium text-[var(--text-tertiary)] h-9">目标数据库</TableHead>
+                  <TableHead class="w-[80px] text-[12px] font-medium text-[var(--text-tertiary)] h-9 cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors" @click="toggleSort('fileSize')">
                     <span class="flex items-center gap-1">
                       大小
-                      <ArrowUpDown v-if="sortField !== 'fileSize'" class="h-3 w-3 opacity-40" />
-                      <ArrowUp v-else-if="sortOrder === 'asc'" class="h-3 w-3 text-foreground" />
-                      <ArrowDown v-else class="h-3 w-3 text-foreground" />
+                      <ArrowUpDown v-if="sortField !== 'fileSize'" class="h-3 w-3 opacity-30" />
+                      <ArrowUp v-else-if="sortOrder === 'asc'" class="h-3 w-3 text-[var(--accent)]" />
+                      <ArrowDown v-else class="h-3 w-3 text-[var(--accent)]" />
                     </span>
                   </TableHead>
-                  <TableHead class="min-w-[145px] text-[12px] font-normal text-muted-foreground h-10 cursor-pointer select-none hover:text-foreground transition-colors" @click="toggleSort('createdAt')">
+                  <TableHead class="min-w-[145px] text-[12px] font-medium text-[var(--text-tertiary)] h-9 cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors" @click="toggleSort('createdAt')">
                     <span class="flex items-center gap-1">
                       创建时间
-                      <ArrowUpDown v-if="sortField !== 'createdAt'" class="h-3 w-3 opacity-40" />
-                      <ArrowUp v-else-if="sortOrder === 'asc'" class="h-3 w-3 text-foreground" />
-                      <ArrowDown v-else class="h-3 w-3 text-foreground" />
+                      <ArrowUpDown v-if="sortField !== 'createdAt'" class="h-3 w-3 opacity-30" />
+                      <ArrowUp v-else-if="sortOrder === 'asc'" class="h-3 w-3 text-[var(--accent)]" />
+                      <ArrowDown v-else class="h-3 w-3 text-[var(--accent)]" />
                     </span>
                   </TableHead>
-                  <TableHead class="text-center min-w-[200px] text-[12px] font-normal text-muted-foreground h-10">
+                  <TableHead class="text-center min-w-[200px] text-[12px] font-medium text-[var(--text-tertiary)] h-9">
                     <span class="inline-flex items-center gap-1">
                       操作
                       <button
                         v-if="sortField"
-                        class="ml-1 inline-flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                        class="ml-1 inline-flex items-center gap-0.5 text-[11px] text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-colors"
                         @click.stop="resetSort"
                       >
                         <RotateCcw class="h-2.5 w-2.5" />重置
@@ -154,181 +145,179 @@
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="row in pageItems" :key="row.id" :class="{ 'bg-muted': selectedIds.has(row.id) }" class="hover:bg-muted transition-colors duration-150 border-b border-border">
+                <TableRow v-for="row in pageItems" :key="row.id" :class="{ 'bg-[var(--accent-soft)]': selectedIds.has(row.id) }" class="hover:bg-[var(--surface)] transition-colors duration-150 border-b border-[var(--border-subtle)]">
                   <TableCell>
-                    <input type="checkbox" class="h-[15px] w-[15px] rounded border-border accent-primary cursor-pointer" :checked="selectedIds.has(row.id)" @change="toggleSelect(row)" />
+                    <input type="checkbox" class="h-[14px] w-[14px] rounded border-[var(--border)] accent-[var(--accent)] cursor-pointer" :checked="selectedIds.has(row.id)" @change="toggleSelect(row)" />
                   </TableCell>
                   <TableCell>
-                    <div class="flex items-center gap-1.5">
-                      <Settings v-if="row.backupLevel === 'system'" class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <HardDrive v-else-if="row.backupLevel === 'redis'" class="h-3.5 w-3.5 icon-special-color shrink-0" />
-                      <Database v-else class="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span class="text-[13px] truncate text-foreground max-w-[180px] inline-block" :title="row.name">{{ row.name }}</span>
-                      <Badge v-if="row.backupType === 'import'" variant="outline" class="text-[10px] py-0 bg-emerald-500/15 text-emerald-400 border-emerald-500/20 shrink-0">导入</Badge>
-                      <Badge v-else-if="row.backupType === 'scheduled'" variant="secondary" class="text-[10px] py-0 bg-muted text-foreground shrink-0">定时</Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div class="inline-flex items-center gap-1">
-                      <span v-if="row.status === 'success'" class="inline-flex items-center gap-1 text-[11px] text-emerald-400">
-                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-                        成功
-                      </span>
-                      <span v-else class="inline-flex items-center gap-1 text-[11px] text-red-400">
-                        <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span>
-                        失败
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell><span class="text-[13px] text-foreground" v-if="row.database">{{ row.database }}</span><span class="text-[13px] text-muted-foreground" v-else>-</span></TableCell>
-                  <TableCell><span class="text-[13px] font-mono-data text-foreground">{{ formatSize(row.fileSize) }}</span></TableCell>
-                  <TableCell><span class="text-[13px] text-muted-foreground">{{ formatLogTime(row.createdAt) }}</span></TableCell>
-                  <TableCell>
-                    <div class="flex items-center justify-center h-full">
-                      <div class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none" @click="handleRestore(row)">
-                          <RotateCcw class="h-3.5 w-3.5 shrink-0" />恢复
-                        </button>
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none" @click="handleDownload(row)">
-                          <Download class="h-3.5 w-3.5 shrink-0" />下载
-                        </button>
-                        <div class="w-px h-4 bg-border mx-0.5 shrink-0"></div>
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-400 hover:bg-muted transition-all whitespace-nowrap leading-none" @click="confirmDeleteTarget = row; showDeleteDialog = true">
-                          <Trash2 class="h-3.5 w-3.5 shrink-0" />删除
-                        </button>
+                    <div class="flex items-center gap-2">
+                      <div class="h-7 w-7 rounded-lg flex items-center justify-center shrink-0" :class="row.backupLevel === 'system' ? 'bg-[var(--accent-soft)]' : row.backupLevel === 'redis' ? 'bg-amber-500/10' : 'bg-blue-500/10'">
+                        <Settings v-if="row.backupLevel === 'system'" class="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+                        <HardDrive v-else-if="row.backupLevel === 'redis'" class="h-3.5 w-3.5 text-amber-500" />
+                        <Database v-else class="h-3.5 w-3.5 text-blue-500" />
                       </div>
+                      <div class="flex flex-col gap-0.5">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-[13px] text-[var(--text-primary)] truncate max-w-[180px] inline-block" :title="row.name">{{ row.name }}</span>
+                          <Badge v-if="row.backupType === 'import'" variant="outline" class="text-[10px] py-0 bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shrink-0">导入</Badge>
+                          <Badge v-else-if="row.backupType === 'scheduled'" variant="outline" class="text-[10px] py-0 bg-[var(--accent-soft)] text-[var(--accent)] border-[color-mix(in_srgb,var(--accent)_20%,transparent)] shrink-0 font-medium">定时</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span v-if="row.status === 'success'" class="badge-status badge-status-success whitespace-nowrap">
+                      <span class="h-1.5 w-1.5 rounded-full bg-[var(--success)]"></span>成功
+                    </span>
+                    <span v-else class="badge-status badge-status-error whitespace-nowrap">
+                      <span class="h-1.5 w-1.5 rounded-full bg-[var(--danger)]"></span>失败
+                    </span>
+                  </TableCell>
+                  <TableCell><span class="text-[13px] text-[var(--text-primary)]" v-if="row.database">{{ row.database }}</span><span class="text-[13px] text-[var(--text-tertiary)]" v-else>-</span></TableCell>
+                  <TableCell><span class="text-[13px] font-mono-data text-[var(--text-primary)]">{{ formatSize(row.fileSize) }}</span></TableCell>
+                  <TableCell><span class="text-[13px] text-[var(--text-secondary)]">{{ formatLogTime(row.createdAt) }}</span></TableCell>
+                  <TableCell>
+                    <div class="flex items-center justify-center gap-1">
+                      <button class="btn-ghost h-[28px] text-[11px] gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" @click="handleRestore(row)">
+                        <RotateCcw class="h-3.5 w-3.5 shrink-0" />恢复
+                      </button>
+                      <button class="btn-ghost h-[28px] text-[11px] gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" @click="handleDownload(row)">
+                        <Download class="h-3.5 w-3.5 shrink-0" />下载
+                      </button>
+                      <button class="btn-ghost-danger h-[28px] text-[11px] gap-1" @click="confirmDeleteTarget = row; showDeleteDialog = true">
+                        <Trash2 class="h-3.5 w-3.5 shrink-0" />
+                      </button>
                     </div>
                   </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
           </div>
-          <div v-if="pageItems.length > 0" class="flex items-center justify-between mt-2 shrink-0">
-            <span class="text-[12px] text-muted-foreground">共 {{ totalItems }} 条，第 {{ currentPage }}/{{ totalPages }} 页</span>
+
+          <!-- Pagination -->
+          <div v-if="pageItems.length > 0" class="flex items-center justify-between pt-3 shrink-0">
+            <span class="text-[12px] text-[var(--text-tertiary)]">共 {{ totalItems }} 条，第 {{ currentPage }}/{{ totalPages }} 页</span>
             <div class="flex items-center gap-1">
-              <Button variant="outline" size="sm" class="h-7 px-2 text-[12px]" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">
+              <button class="btn-ghost h-7 w-7 p-0 text-[12px]" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">
                 <ChevronLeft class="h-3.5 w-3.5" />
-              </Button>
+              </button>
               <template v-for="p in visiblePageNumbers" :key="p">
-                <span v-if="p === '...'" class="px-1 text-[12px] text-muted-foreground">...</span>
-                <Button
+                <span v-if="p === '...'" class="px-1 text-[12px] text-[var(--text-tertiary)]">...</span>
+                <button
                   v-else
-                  variant="outline"
-                  size="sm"
+                  :class="p === currentPage ? 'pagination-active' : 'btn-ghost'"
                   class="h-7 min-w-[28px] px-1 text-[12px]"
-                  :class="p === currentPage ? 'pagination-active' : ''"
                   @click="goToPage(p)"
-                >{{ p }}</Button>
+                >{{ p }}</button>
               </template>
-              <Button variant="outline" size="sm" class="h-7 px-2 text-[12px]" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)">
+              <button class="btn-ghost h-7 w-7 p-0 text-[12px]" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)">
                 <ChevronRight class="h-3.5 w-3.5" />
-              </Button>
+              </button>
             </div>
-          </div>
-          <div v-if="selectedBackups.length > 0" class="flex items-center gap-2 mt-2 shrink-0">
-            <span class="text-[13px] text-muted-foreground">已选 {{ selectedBackups.length }} 项</span>
-            <Button variant="destructive" size="sm" class="h-7 text-[13px]" @click="showBatchDeleteDialog = true">批量删除</Button>
-            <Button variant="outline" size="sm" class="h-7 text-[13px]" @click="selectedBackups = []">取消选择</Button>
           </div>
         </div>
 
+        <!-- Scheduled Tab -->
         <div v-if="activeMainTab === 'scheduled'" class="h-full flex flex-col">
-          <div class="flex-1 min-h-0 overflow-y-auto">
-            <div v-if="scheduleList.length === 0" class="flex items-center justify-center py-16">
-              <Inbox class="h-8 w-8 text-muted-foreground/40 mr-2" />
-              <span class="text-[13px] text-muted-foreground">暂无定时备份计划</span>
+          <div class="flex-1 min-h-0 overflow-y-auto pt-3">
+            <!-- Empty -->
+            <div v-if="scheduleList.length === 0" class="empty-state">
+              <div class="empty-state-icon"><Inbox class="h-8 w-8" /></div>
+              <p class="empty-state-text">暂无定时备份计划</p>
             </div>
-            <Table v-else>
-              <TableHeader>
-                <TableRow class="hover:bg-transparent border-b border-border">
-                  <TableHead class="min-w-[160px] text-[12px] font-normal text-muted-foreground">计划名称</TableHead>
-                  <TableHead class="w-[75px] text-[12px] font-normal text-muted-foreground">级别</TableHead>
-                  <TableHead class="min-w-[120px] text-[12px] font-normal text-muted-foreground">目标数据库</TableHead>
-                  <TableHead class="w-[90px] text-[12px] font-normal text-muted-foreground">执行周期</TableHead>
-                  <TableHead class="w-[70px] text-[12px] font-normal text-muted-foreground">状态</TableHead>
-                  <TableHead class="w-[70px] text-[12px] font-normal text-muted-foreground">保留</TableHead>
-                  <TableHead class="min-w-[160px] text-[12px] font-normal text-muted-foreground">上次执行</TableHead>
-                  <TableHead class="text-center min-w-[140px] text-[12px] font-normal text-muted-foreground">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-for="row in scheduleList" :key="row.id" class="hover:bg-muted border-b border-border">
-                  <TableCell>
-                    <span class="truncate text-[13px] text-foreground">{{ row.name }}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge v-if="row.backupLevel === 'system'" variant="outline" class="bg-amber-500/5 text-amber-600 border-amber-500/20">系统</Badge>
-                    <Badge v-else-if="row.backupLevel === 'redis'" variant="outline" class="bg-amber-500/5 text-amber-600 border-amber-500/20">Redis</Badge>
-                    <Badge v-else variant="outline" class="bg-blue-500/5 text-blue-600 border-blue-500/20">MySQL</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span v-if="row.database" class="text-foreground">{{ row.database }}</span>
-                    <span v-else class="text-muted-foreground">-</span>
-                  </TableCell>
-                  <TableCell class="text-foreground">{{ row.label }}</TableCell>
-                  <TableCell>
-                    <Switch
-                      :model-value="row.enabled"
-                      @update:model-value="(val) => { row.enabled = val; toggleSchedule(row) }"
-                    />
-                  </TableCell>
-                  <TableCell class="text-foreground">{{ row.retainCount || 7 }} 份</TableCell>
-                  <TableCell>
-                    <span v-if="row.lastRun" class="text-foreground">{{ row.lastRun }}</span>
-                    <span v-else class="text-muted-foreground">尚未执行</span>
-                  </TableCell>
-                  <TableCell>
-                    <div class="flex items-center justify-center h-full">
-                      <div class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-0.5">
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-foreground/70 hover:text-foreground hover:bg-muted transition-all whitespace-nowrap leading-none" @click="openScheduleDialog(row)">
-                          <FileText class="h-3.5 w-3.5 shrink-0" />编辑
-                        </button>
-                        <div class="w-px h-4 bg-border mx-0.5 shrink-0"></div>
-                        <button class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-400 hover:bg-muted transition-all whitespace-nowrap leading-none" @click="confirmDeleteTarget = row; showDeleteScheduleDialog = true">
-                          <Trash2 class="h-3.5 w-3.5 shrink-0" />删除
-                        </button>
-                      </div>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+            <!-- Card List -->
+            <div v-else class="grid gap-3">
+              <div v-for="row in scheduleList" :key="row.id" class="content-card-interactive hover-lift p-4 flex items-center gap-4">
+                <!-- Icon -->
+                <div class="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" :class="row.backupLevel === 'system' ? 'bg-[var(--accent-soft)]' : row.backupLevel === 'redis' ? 'bg-amber-500/10' : 'bg-blue-500/10'">
+                  <Settings v-if="row.backupLevel === 'system'" class="h-5 w-5 text-[var(--text-tertiary)]" />
+                  <HardDrive v-else-if="row.backupLevel === 'redis'" class="h-5 w-5 text-amber-500" />
+                  <Database v-else class="h-5 w-5 text-blue-500" />
+                </div>
+                <!-- Info -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-[13px] font-medium text-[var(--text-primary)] truncate">{{ row.name }}</span>
+                    <Badge v-if="row.backupLevel === 'system'" variant="outline" class="text-[10px] py-0 bg-[var(--accent-soft)] text-[var(--text-secondary)] border-[var(--border)]">系统</Badge>
+                    <Badge v-else-if="row.backupLevel === 'redis'" variant="outline" class="text-[10px] py-0 bg-amber-500/10 text-amber-600 border-amber-500/20">Redis</Badge>
+                    <Badge v-else variant="outline" class="text-[10px] py-0 bg-blue-500/10 text-blue-600 border-blue-500/20">MySQL</Badge>
+                  </div>
+                  <div class="flex items-center gap-3 text-[12px] text-[var(--text-tertiary)]">
+                    <span v-if="row.database">{{ row.database }}</span>
+                    <span v-else>-</span>
+                    <span class="text-[var(--border)]">·</span>
+                    <span>{{ row.label }}</span>
+                    <span class="text-[var(--border)]">·</span>
+                    <span>保留 {{ row.retainCount || 7 }} 份</span>
+                  </div>
+                </div>
+                <!-- Last Run -->
+                <div class="text-right shrink-0 mr-2">
+                  <p class="text-[12px] text-[var(--text-secondary)]">{{ row.lastRun || '尚未执行' }}</p>
+                  <p class="text-[11px] text-[var(--text-tertiary)]">上次执行</p>
+                </div>
+                <!-- Switch -->
+                <Switch
+                  :model-value="row.enabled"
+                  @update:model-value="(val) => { row.enabled = val; toggleSchedule(row) }"
+                />
+                <!-- Actions -->
+                <div class="flex items-center gap-1 shrink-0">
+                  <button class="btn-ghost h-[28px] text-[11px] gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" @click="openScheduleDialog(row)">
+                    <FileText class="h-3.5 w-3.5 shrink-0" />编辑
+                  </button>
+                  <button class="btn-ghost-danger h-[28px] text-[11px] gap-1" @click="confirmDeleteTarget = row; showDeleteScheduleDialog = true">
+                    <Trash2 class="h-3.5 w-3.5 shrink-0" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Floating Batch Action Bar -->
+    <Transition name="fade">
+      <div v-if="selectedBackups.length > 0" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xl shadow-black/10">
+        <span class="text-[13px] text-[var(--text-secondary)]">已选 <span class="font-semibold text-[var(--text-primary)]">{{ selectedBackups.length }}</span> 项</span>
+        <div class="w-px h-5 bg-[var(--border)]"></div>
+        <button class="btn-danger h-[30px] text-[13px]" @click="showBatchDeleteDialog = true">批量删除</button>
+        <button class="btn-ghost h-[30px] text-[13px] text-[var(--text-tertiary)]" @click="selectedBackups = []">取消</button>
+      </div>
+    </Transition>
+
     <Dialog v-model:open="showCreateDialog">
       <DialogContent class="sm:max-w-[520px]">
         <div class="flex flex-col gap-y-1.5">
-          <DialogTitle class="text-[15px] text-foreground">创建备份</DialogTitle>
+          <DialogTitle class="text-[15px] text-[var(--text-primary)]">创建备份</DialogTitle>
         </div>
         <div class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">备份类型 <span class="text-red-400">*</span></label>
-            <div class="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground">
+            <label class="text-sm font-medium text-[var(--text-primary)]">备份类型 <span class="text-[var(--danger)]">*</span></label>
+            <div class="inline-flex h-9 items-center rounded-lg bg-[var(--surface)] p-1 text-[var(--text-tertiary)]">
               <button
                 v-for="opt in createLevelOptions"
                 :key="opt.value"
                 :class="[
                   'inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-medium transition-all',
                   createForm.backupLevel === opt.value
-                    ? 'bg-card text-foreground shadow'
-                    : 'hover:text-foreground'
+                    ? 'bg-[var(--background)] text-[var(--text-primary)] shadow'
+                    : 'hover:text-[var(--text-primary)]'
                 ]"
                 @click="createForm.backupLevel = opt.value"
               >
                 {{ opt.label }}
               </button>
             </div>
-            <p v-if="createForm.backupLevel === 'system'" class="text-xs text-muted-foreground mt-1">
+            <p v-if="createForm.backupLevel === 'system'" class="text-xs text-[var(--text-tertiary)] mt-1">
               备份当前所有配置（数据库列表、远程服务器、备份记录、定时计划）
             </p>
           </div>
           <div v-if="createForm.backupLevel !== 'system'" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">目标数据库 <span class="text-red-400">*</span></label>
+            <label class="text-sm font-medium text-[var(--text-primary)]">目标数据库 <span class="text-[var(--danger)]">*</span></label>
             <Select v-model="createForm.targetDb">
-              <SelectTrigger class="border-border shadow-none">
+              <SelectTrigger class="border-[var(--border)] shadow-none">
                 <template v-if="selectedCreateDb">
                   <span class="flex items-center gap-1.5 truncate">
                     {{ selectedCreateDb.name }}
@@ -339,7 +328,7 @@
                     >
                       {{ selectedCreateDb.type === 'redis' ? 'Redis' : 'MySQL' }}
                     </Badge>
-                    <span class="text-muted-foreground text-xs shrink-0">{{ selectedCreateDb.host || '本地' }}</span>
+                    <span class="text-[var(--text-tertiary)] text-xs shrink-0">{{ selectedCreateDb.host || '本地' }}</span>
                   </span>
                 </template>
                 <SelectValue v-else placeholder="选择数据库" />
@@ -360,7 +349,7 @@
                       >
                         {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}
                       </Badge>
-                      <span class="text-muted-foreground text-xs">{{ db.host || '本地' }}</span>
+                      <span class="text-[var(--text-tertiary)] text-xs">{{ db.host || '本地' }}</span>
                     </div>
                   </div>
                 </SelectItem>
@@ -369,9 +358,9 @@
           </div>
           <!-- MySQL 备份：选择具体要备份的数据库名 -->
           <div v-if="createForm.backupLevel === 'mysql'" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">选择要备份的数据库 <span class="text-red-400">*</span></label>
+            <label class="text-sm font-medium text-[var(--text-primary)]">选择要备份的数据库 <span class="text-[var(--danger)]">*</span></label>
             <Select v-model="createForm.targetMysqlDbName">
-              <SelectTrigger class="border-border shadow-none">
+              <SelectTrigger class="border-[var(--border)] shadow-none">
                 <SelectValue placeholder="选择要备份的数据库" />
               </SelectTrigger>
               <SelectContent>
@@ -384,28 +373,28 @@
                 </SelectItem>
               </SelectContent>
             </Select>
-            <p v-if="loadingMysqlDatabases" class="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+            <p v-if="loadingMysqlDatabases" class="text-xs text-[var(--text-tertiary)] flex items-center gap-1 mt-1">
               <Loader2 class="h-3 w-3 animate-spin" /> 正在加载数据库列表...
             </p>
-            <p v-else-if="createForm.targetDb && mysqlDatabaseOptions.length === 0" class="text-xs text-amber-400 mt-1">
+            <p v-else-if="createForm.targetDb && mysqlDatabaseOptions.length === 0" class="text-xs text-[var(--warning)] mt-1">
               该连接下没有可用的数据库
             </p>
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">备份名称</label>
-            <Input v-model="createForm.name" placeholder="留空自动生成" class="border-border shadow-none" />
+            <label class="text-sm font-medium text-[var(--text-primary)]">备份名称</label>
+            <Input v-model="createForm.name" placeholder="留空自动生成" class="border-[var(--border)] shadow-none" />
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">描述信息</label>
-            <Textarea v-model="createForm.description" placeholder="可选" :rows="2" class="border-border shadow-none" />
+            <label class="text-sm font-medium text-[var(--text-primary)]">描述信息</label>
+            <Textarea v-model="createForm.description" placeholder="可选" :rows="2" class="border-[var(--border)] shadow-none" />
           </div>
         </div>
         <div class="flex justify-end gap-2 mt-2">
-          <Button variant="outline" @click="showCreateDialog = false">取消</Button>
-          <Button variant="primary" @click="submitCreate" :disabled="creating">
+          <button class="btn-secondary" @click="showCreateDialog = false">取消</button>
+          <button class="btn-primary" @click="submitCreate" :disabled="creating">
             <Loader2 v-if="creating" class="h-4 w-4 animate-spin" />
             确认创建
-          </Button>
+          </button>
         </div>
       </DialogContent>
     </Dialog>
@@ -413,24 +402,24 @@
     <Dialog v-model:open="showScheduleDialog">
       <DialogContent class="sm:max-w-[520px]">
         <div class="flex flex-col gap-y-1.5">
-          <DialogTitle class="text-[15px] text-foreground">{{ editScheduleData ? '编辑定时计划' : '新建定时备份' }}</DialogTitle>
+          <DialogTitle class="text-[15px] text-[var(--text-primary)]">{{ editScheduleData ? '编辑定时计划' : '新建定时备份' }}</DialogTitle>
         </div>
         <div class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">计划名称 <span class="text-red-400">*</span></label>
-            <Input v-model="scheduleForm.name" placeholder="如：每日数据库备份" class="border-border shadow-none" />
+            <label class="text-sm font-medium text-[var(--text-primary)]">计划名称 <span class="text-[var(--danger)]">*</span></label>
+            <Input v-model="scheduleForm.name" placeholder="如：每日数据库备份" class="border-[var(--border)] shadow-none" />
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">备份类型 <span class="text-red-400">*</span></label>
-            <div class="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground">
+            <label class="text-sm font-medium text-[var(--text-primary)]">备份类型 <span class="text-[var(--danger)]">*</span></label>
+            <div class="inline-flex h-9 items-center rounded-lg bg-[var(--surface)] p-1 text-[var(--text-tertiary)]">
               <button
                 v-for="opt in createLevelOptions"
                 :key="opt.value"
                 :class="[
                   'inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-medium transition-all',
                   scheduleForm.backupLevel === opt.value
-                    ? 'bg-card text-foreground shadow'
-                    : 'hover:text-foreground'
+                    ? 'bg-[var(--background)] text-[var(--text-primary)] shadow'
+                    : 'hover:text-[var(--text-primary)]'
                 ]"
                 @click="scheduleForm.backupLevel = opt.value"
               >
@@ -439,9 +428,9 @@
             </div>
           </div>
           <div v-if="scheduleForm.backupLevel !== 'system'" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">目标连接 <span class="text-red-400">*</span></label>
+            <label class="text-sm font-medium text-[var(--text-primary)]">目标连接 <span class="text-[var(--danger)]">*</span></label>
             <Select v-model="scheduleForm.targetDb" @update:model-value="onScheduleDbChange">
-              <SelectTrigger class="border-border shadow-none">
+              <SelectTrigger class="border-[var(--border)] shadow-none">
                 <template v-if="selectedScheduleDb">
                   <span class="flex items-center gap-1.5 truncate">
                     {{ selectedScheduleDb.name }}
@@ -452,7 +441,7 @@
                     >
                       {{ selectedScheduleDb.type === 'redis' ? 'Redis' : 'MySQL' }}
                     </Badge>
-                    <span class="text-muted-foreground text-xs shrink-0">{{ selectedScheduleDb.host || '本地' }}</span>
+                    <span class="text-[var(--text-tertiary)] text-xs shrink-0">{{ selectedScheduleDb.host || '本地' }}</span>
                   </span>
                 </template>
                 <SelectValue v-else placeholder="选择数据库连接" />
@@ -473,7 +462,7 @@
                       >
                         {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}
                       </Badge>
-                      <span class="text-muted-foreground text-xs">{{ db.host || '本地' }}</span>
+                      <span class="text-[var(--text-tertiary)] text-xs">{{ db.host || '本地' }}</span>
                     </div>
                   </div>
                 </SelectItem>
@@ -481,9 +470,9 @@
             </Select>
           </div>
           <div v-if="scheduleForm.backupLevel === 'mysql' && scheduleForm.targetDb" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">目标数据库 <span class="text-red-400">*</span></label>
+            <label class="text-sm font-medium text-[var(--text-primary)]">目标数据库 <span class="text-[var(--danger)]">*</span></label>
             <Select v-model="scheduleForm.targetMysqlDbName">
-              <SelectTrigger class="border-border shadow-none">
+              <SelectTrigger class="border-[var(--border)] shadow-none">
                 <SelectValue placeholder="选择数据库" />
               </SelectTrigger>
               <SelectContent>
@@ -496,17 +485,17 @@
                 </SelectItem>
               </SelectContent>
             </Select>
-            <p v-if="loadingScheduleMysqlDatabases" class="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            <p v-if="loadingScheduleMysqlDatabases" class="text-xs text-[var(--text-tertiary)] mt-1 flex items-center gap-1">
               <Loader2 class="h-3 w-3 animate-spin" /> 正在加载数据库列表...
             </p>
-            <p v-else-if="scheduleForm.targetDb && scheduleMysqlDatabaseOptions.length === 0" class="text-xs text-amber-400 mt-1">
+            <p v-else-if="scheduleForm.targetDb && scheduleMysqlDatabaseOptions.length === 0" class="text-xs text-[var(--warning)] mt-1">
               该连接下没有可用的数据库
             </p>
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">执行周期 <span class="text-red-400">*</span></label>
+            <label class="text-sm font-medium text-[var(--text-primary)]">执行周期 <span class="text-[var(--danger)]">*</span></label>
             <Select v-model="scheduleForm.cron">
-              <SelectTrigger class="border-border shadow-none">
+              <SelectTrigger class="border-[var(--border)] shadow-none">
                 <SelectValue placeholder="选择周期" />
               </SelectTrigger>
               <SelectContent>
@@ -519,17 +508,17 @@
             </Select>
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">保留份数</label>
-            <Input v-model="scheduleForm.retainCount" type="number" :min="1" :max="30" class="w-32 border-border shadow-none" />
-            <p class="text-xs text-muted-foreground">超过保留数量后自动删除最早的备份</p>
+            <label class="text-sm font-medium text-[var(--text-primary)]">保留份数</label>
+            <Input v-model="scheduleForm.retainCount" type="number" :min="1" :max="30" class="w-32 border-[var(--border)] shadow-none" />
+            <p class="text-xs text-[var(--text-tertiary)]">超过保留数量后自动删除最早的备份</p>
           </div>
         </div>
         <div class="flex justify-end gap-2 mt-2">
-          <Button variant="outline" @click="showScheduleDialog = false">取消</Button>
-          <Button variant="primary" @click="submitSchedule" :disabled="scheduling">
+          <button class="btn-secondary" @click="showScheduleDialog = false">取消</button>
+          <button class="btn-primary" @click="submitSchedule" :disabled="scheduling">
             <Loader2 v-if="scheduling" class="h-4 w-4 animate-spin" />
             确认
-          </Button>
+          </button>
         </div>
       </DialogContent>
     </Dialog>
@@ -537,14 +526,14 @@
     <Dialog v-model:open="showDeleteDialog">
       <DialogContent class="sm:max-w-[425px]">
         <div class="flex flex-col gap-y-1.5 text-center sm:text-left">
-          <DialogTitle class="text-[15px] text-foreground">删除确认</DialogTitle>
-          <DialogDescription class="text-[13px] text-muted-foreground">
+          <DialogTitle class="text-[15px] text-[var(--text-primary)]">删除确认</DialogTitle>
+          <DialogDescription class="text-[13px] text-[var(--text-secondary)]">
             确定要删除备份 "{{ confirmDeleteTarget?.name }}" 吗？此操作不可撤销！
           </DialogDescription>
         </div>
         <div class="flex justify-end gap-2 mt-4">
-          <Button variant="outline" @click="showDeleteDialog = false">取消</Button>
-          <Button variant="destructive" @click="handleDelete(confirmDeleteTarget); showDeleteDialog = false">确定删除</Button>
+          <button class="btn-secondary" @click="showDeleteDialog = false">取消</button>
+          <button class="btn-danger" @click="handleDelete(confirmDeleteTarget); showDeleteDialog = false">确定删除</button>
         </div>
       </DialogContent>
     </Dialog>
@@ -552,14 +541,14 @@
     <Dialog v-model:open="showBatchDeleteDialog">
       <DialogContent class="sm:max-w-[425px]">
         <div class="flex flex-col gap-y-1.5 text-center sm:text-left">
-          <DialogTitle class="text-[15px] text-foreground">批量删除确认</DialogTitle>
-          <DialogDescription class="text-[13px] text-muted-foreground">
+          <DialogTitle class="text-[15px] text-[var(--text-primary)]">批量删除确认</DialogTitle>
+          <DialogDescription class="text-[13px] text-[var(--text-secondary)]">
             确定要删除选中的 {{ selectedBackups.length }} 个备份吗？此操作不可撤销！
           </DialogDescription>
         </div>
         <div class="flex justify-end gap-2 mt-4">
-          <Button variant="outline" @click="showBatchDeleteDialog = false">取消</Button>
-          <Button variant="destructive" @click="handleBatchDelete(); showBatchDeleteDialog = false">确定删除</Button>
+          <button class="btn-secondary" @click="showBatchDeleteDialog = false">取消</button>
+          <button class="btn-danger" @click="handleBatchDelete(); showBatchDeleteDialog = false">确定删除</button>
         </div>
       </DialogContent>
     </Dialog>
@@ -567,14 +556,14 @@
     <Dialog v-model:open="showDeleteScheduleDialog">
       <DialogContent class="sm:max-w-[425px]">
         <div class="flex flex-col gap-y-1.5 text-center sm:text-left">
-          <DialogTitle class="text-[15px] text-foreground">删除确认</DialogTitle>
-          <DialogDescription class="text-[13px] text-muted-foreground">
+          <DialogTitle class="text-[15px] text-[var(--text-primary)]">删除确认</DialogTitle>
+          <DialogDescription class="text-[13px] text-[var(--text-secondary)]">
             确定要删除计划 "{{ confirmDeleteTarget?.name }}" 吗？此操作不可撤销！
           </DialogDescription>
         </div>
         <div class="flex justify-end gap-2 mt-4">
-          <Button variant="outline" @click="showDeleteScheduleDialog = false">取消</Button>
-          <Button variant="destructive" @click="deleteSchedule(confirmDeleteTarget); showDeleteScheduleDialog = false">确定删除</Button>
+          <button class="btn-secondary" @click="showDeleteScheduleDialog = false">取消</button>
+          <button class="btn-danger" @click="deleteSchedule(confirmDeleteTarget); showDeleteScheduleDialog = false">确定删除</button>
         </div>
       </DialogContent>
     </Dialog>
@@ -582,17 +571,17 @@
     <Dialog v-model:open="showRestoreDialog">
       <DialogContent class="sm:max-w-[425px]">
         <div class="flex flex-col gap-y-1.5 text-center sm:text-left">
-          <DialogTitle class="text-[15px] text-foreground">恢复确认</DialogTitle>
-          <DialogDescription class="text-[13px] text-muted-foreground">
+          <DialogTitle class="text-[15px] text-[var(--text-primary)]">恢复确认</DialogTitle>
+          <DialogDescription class="text-[13px] text-[var(--text-secondary)]">
             {{ restoreMessage }}
           </DialogDescription>
         </div>
         <div class="flex justify-end gap-2 mt-4">
-          <Button variant="outline" @click="showRestoreDialog = false">取消</Button>
-          <Button variant="destructive" @click="doRestore" :disabled="restoring">
+          <button class="btn-secondary" @click="showRestoreDialog = false">取消</button>
+          <button class="btn-danger" @click="doRestore" :disabled="restoring">
             <RefreshCw v-if="restoring" class="h-4 w-4 animate-spin" />
             确定恢复
-          </Button>
+          </button>
         </div>
       </DialogContent>
     </Dialog>
