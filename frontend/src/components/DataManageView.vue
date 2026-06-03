@@ -910,7 +910,7 @@ const doDeleteDatabase = () => {
 }
 
 const openCreateDbDialog = () => {
-  createDbForm.value = { name: '', password: '', charset: 'utf8mb4' }
+  createDbForm.value = { name: '', password: '', confirmPassword: '', charset: 'utf8mb4' }
   showCreateDbDialog.value = true
 }
 
@@ -958,7 +958,7 @@ const createTable = () => {
   const nonPkColumns = validColumns.filter(c => c.keyType !== 'PRI')
 
   const cols = validColumns.map(col => {
-    let def = `\`${col.name.trim()}\` ${col.type}`
+    let def = `\`${col.name.trim().replace(/`/g, '``')}\` ${col.type}`
     if (col.length.trim()) def += `(${col.length.trim()})`
     if (col.notNull) def += ' NOT NULL'
     if (col.autoIncrement) def += ' AUTO_INCREMENT'
@@ -981,13 +981,13 @@ const createTable = () => {
   })
 
   if (pkColumns.length > 1) {
-    cols.push(`PRIMARY KEY (${pkColumns.map(c => `\`${c.name.trim()}\``).join(', ')})`)
+    cols.push(`PRIMARY KEY (${pkColumns.map(c => `\`${c.name.trim().replace(/`/g, '``')}\``).join(', ')})`)
   } else if (pkColumns.length === 1) {
     const idx = validColumns.indexOf(pkColumns[0])
     cols[idx] += ' PRIMARY KEY'
   }
 
-  const sql = `CREATE TABLE \`${form.name.trim()}\` (${cols.join(', ')}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+  const sql = `CREATE TABLE \`${form.name.trim().replace(/`/g, '``')}\` (${cols.join(', ')}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
   fetch(`${API_BASE}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1376,9 +1376,19 @@ const exportData = async (exportAll = false) => {
   a.click(); URL.revokeObjectURL(url); toast.success(exportAll ? `已导出全部 ${dataToExport.length} 条数据` : '导出成功')
 }
 
+const DANGEROUS_SQL_PATTERNS = [
+  /^\s*DROP\s+(DATABASE|SCHEMA|TABLE)/i,
+  /^\s*TRUNCATE\s+/i,
+  /^\s*DELETE\s+FROM\s+\S+\s*$/i,
+  /^\s*DELETE\s+FROM\s+\S+\s*;\s*$/i,
+]
+
 const executeSql = () => {
   if (!sqlQuery.value.trim()) { toast.warning('请输入SQL语句'); return }
   if (!connectionId.value) { toast.warning('请先选择一个实例'); return }
+  const sqlTrimmed = sqlQuery.value.trim()
+  const isDangerous = DANGEROUS_SQL_PATTERNS.some(p => p.test(sqlTrimmed))
+  if (isDangerous && !confirm('该SQL语句可能造成数据不可逆的修改，确认执行？')) return
   sqlResultLoading.value = true
   sqlResult.value = null
   fetch(`${API_BASE}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ server_id: serverId.value, database: selectedDatabase.value, sql: sqlQuery.value }) })
@@ -1447,7 +1457,7 @@ const selectRedisKey = async (key) => {
   } catch (err) { toast.error('获取key值失败: ' + err.message) }
 }
 
-const DANGEROUS_REDIS_COMMANDS = ['FLUSHALL', 'FLUSHDB', 'SHUTDOWN', 'DEBUG', 'CONFIG', 'SCRIPT', 'SLAVEOF', 'REPLICAOF']
+const DANGEROUS_REDIS_COMMANDS = ['FLUSHALL', 'FLUSHDB', 'SHUTDOWN', 'DEBUG', 'SCRIPT', 'SLAVEOF', 'REPLICAOF', 'BGSAVE', 'BGREWRITEAOF', 'CLUSTER']
 
 const executeRedisCmd = () => {
   if (!redisCmd.value.trim()) { toast.warning('请输入Redis命令'); return }

@@ -90,6 +90,8 @@ func restoreSystemBackupJSON(content string) error {
 			return fmt.Errorf("恢复 %s 失败: %w", filename, err)
 		}
 	}
+	loadData()
+	sysLogInfo("BACKUP", "系统配置恢复成功，已重新加载配置")
 	return nil
 }
 
@@ -121,6 +123,8 @@ func restoreSystemBackupLegacy(content string) error {
 			return fmt.Errorf("恢复 %s 失败: %w", filename, err)
 		}
 	}
+	loadData()
+	sysLogInfo("BACKUP", "系统配置恢复成功，已重新加载配置")
 	return nil
 }
 
@@ -244,6 +248,7 @@ func createScheduledBackup(w http.ResponseWriter, r *http.Request) {
 	mutex.Unlock()
 
 	saveData()
+	sysLogInfo("BACKUP", fmt.Sprintf("创建定时备份计划: %s (%s, %s)", s.Name, s.Cron, s.BackupLevel))
 	writeJSON(w, map[string]interface{}{"code": 0, "msg": "success", "data": s})
 }
 
@@ -260,6 +265,7 @@ func deleteScheduledBackup(w http.ResponseWriter, r *http.Request, idStr string)
 			scheduledBackups = append(scheduledBackups[:i], scheduledBackups[i+1:]...)
 			mutex.Unlock()
 			saveData()
+			sysLogInfo("BACKUP", fmt.Sprintf("删除定时备份计划: %s", s.Name))
 			writeJSON(w, map[string]interface{}{"code": 0, "msg": "deleted"})
 			return
 		}
@@ -308,8 +314,7 @@ func parseSchedule(cron string) time.Duration {
 }
 
 func runScheduledBackup(s ScheduledBackup) {
-	fmt.Printf("runScheduledBackup called: Name=%s, ID=%d, BackupLevel=%s, ServerID=%d, Source=%s, Database=%s\n", 
-		s.Name, s.ID, s.BackupLevel, s.ServerID, s.Source, s.Database)
+	sysLogInfo("BACKUP", fmt.Sprintf("执行定时备份: %s", s.Name))
 	name := fmt.Sprintf("auto_%s_%s", s.Name, time.Now().Format("20060102_150405"))
 	bakDir := getDataDir() + "/backups"
 	fmt.Printf("Backup directory: %s\n", bakDir)
@@ -326,6 +331,7 @@ func runScheduledBackup(s ScheduledBackup) {
 		server := findRedisServer(s.ServerID, s.Source)
 		if server != nil {
 			if server.Host != "127.0.0.1" && server.Host != "localhost" {
+				sysLogWarn("BACKUP", "定时备份Redis远程实例不支持RDB备份")
 				content = fmt.Sprintf("-- Redis Auto Backup FAILED: remote Redis not supported\n")
 				fileName = name + ".rdb"
 			} else {
@@ -335,17 +341,20 @@ func runScheduledBackup(s ScheduledBackup) {
 					conn.Close()
 					rdbFileName, rdbErr := doRedisRdbCopy(server, name, bakDir)
 					if rdbErr != nil {
+						sysLogError("BACKUP", fmt.Sprintf("定时备份Redis RDB复制失败 (连接: %s:%d)", server.Host, server.Port))
 						content = fmt.Sprintf("-- Redis Auto Backup FAILED: %s\n", rdbErr.Error())
 						fileName = name + ".rdb"
 					} else {
 						fileName = rdbFileName
 					}
 				} else {
+					sysLogError("BACKUP", fmt.Sprintf("定时备份Redis连接失败 (连接: %s:%d)", server.Host, server.Port))
 					content = fmt.Sprintf("-- Redis Auto Backup FAILED: %s\n", err.Error())
 					fileName = name + ".rdb"
 				}
 			}
 		} else {
+			sysLogWarn("BACKUP", fmt.Sprintf("定时备份Redis服务器未找到: ID=%d", s.ServerID))
 			content = fmt.Sprintf("-- Redis Auto Backup FAILED: server not found\n")
 			fileName = name + ".rdb"
 		}
@@ -356,11 +365,13 @@ func runScheduledBackup(s ScheduledBackup) {
 			var err error
 			fileName, fileSize, err = doMySQLBackup(server, s.Database, bakDir, name)
 			if err != nil {
+				sysLogError("BACKUP", fmt.Sprintf("定时备份MySQL失败 (连接: %s:%d)", server.Host, server.Port))
 				content = fmt.Sprintf("-- MySQL Auto Backup FAILED: %s\n-- Error: %s\n", s.Name, err.Error())
 				fileName = name + ".sql"
 			}
 			_ = fileSize
 		} else {
+			sysLogWarn("BACKUP", fmt.Sprintf("定时备份MySQL服务器未找到: ID=%d", s.ServerID))
 			content = fmt.Sprintf("-- MySQL Auto Backup FAILED: server not found\n")
 			fileName = name + ".sql"
 		}

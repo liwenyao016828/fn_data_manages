@@ -287,7 +287,10 @@
 
         <!-- Query Distribution -->
         <div v-if="metrics" class="content-card stat-padding">
-          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">查询分布</div>
+          <div class="flex items-center justify-between mb-3 pb-2" style="border-bottom: 1px solid var(--border-subtle)">
+            <span class="text-xs font-semibold" style="color: var(--text-primary)">查询分布</span>
+            <span v-if="rangeStatsAvailable" class="text-[10px] px-1.5 py-0.5 rounded" style="background: var(--accent-soft); color: var(--accent)">{{ timeRangeLabel }}</span>
+          </div>
           <div v-if="queryTotal > 0" class="flex items-center gap-4">
             <!-- Donut Chart -->
             <div class="relative shrink-0" style="width: 100px; height: 100px;">
@@ -607,14 +610,14 @@ const queryBarWidth = (val) => {
 const queryValues = computed(() => {
   const clampZero = (v) => Math.max(parseInt(v) || 0, 0)
   if (rangeStatsAvailable.value) {
+    const rs = rangeStats.value
     const deltas = [
-      clampZero(rangeStats.deltaComSelect),
-      clampZero(rangeStats.deltaComInsert),
-      clampZero(rangeStats.deltaComUpdate),
-      clampZero(rangeStats.deltaComDelete)
+      clampZero(rs.deltaComSelect),
+      clampZero(rs.deltaComInsert),
+      clampZero(rs.deltaComUpdate),
+      clampZero(rs.deltaComDelete)
     ]
-    // If all deltas are 0, fall back to cumulative values
-    if (deltas.some(v => v > 0)) return deltas
+    return deltas
   }
   return [
     clampZero(metrics.value?.com_select),

@@ -29,6 +29,13 @@ func recoveryMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func maxBodyMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	initCrypto()
 	loadData()
@@ -66,6 +73,7 @@ func main() {
 	GetHealthService().Start()
 
 	http.HandleFunc("/health", healthHandler)
+	http.HandleFunc("/api/health", healthHandler)
 	http.HandleFunc("/api/system/info", systemInfoHandler)
 	http.HandleFunc("/api/dashboard/metrics", dashboardMetricsHandler)
 	http.HandleFunc("/api/dashboard/snapshot", dashboardHistoryHandler)
@@ -133,7 +141,7 @@ func main() {
 
 	execPath, _ := os.Executable()
 	execDir := filepath.Dir(execPath)
-	
+
 	distPath := filepath.Join(execDir, "frontend", "dist")
 	if _, err := os.Stat(distPath); os.IsNotExist(err) {
 		distPath = filepath.Join(execDir, "ui", "dist")
@@ -153,11 +161,11 @@ func main() {
 		wd, _ := os.Getwd()
 		distPath = filepath.Join(wd, "..", "frontend", "dist")
 	}
-	
+
 	fmt.Printf("Serving frontend from: %s\n", distPath)
-	
+
 	staticHandler := http.FileServer(http.Dir(distPath))
-	
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		distFile := filepath.Join(distPath, filepath.Clean(r.URL.Path))
 		if _, err := os.Stat(distFile); err == nil {
@@ -174,7 +182,7 @@ func main() {
 
 	fmt.Printf("Server starting on :%s\n", port)
 	sysLogInfo("SYSTEM", "系统服务启动")
-	srv := &http.Server{Addr: ":" + port, Handler: recoveryMiddleware(http.DefaultServeMux)}
+	srv := &http.Server{Addr: ":" + port, Handler: recoveryMiddleware(maxBodyMiddleware(http.DefaultServeMux))}
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)

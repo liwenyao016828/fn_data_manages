@@ -140,14 +140,24 @@
             <button class="btn-ghost" @click.stop="navigateTo('data', row)">数据</button>
             <button class="btn-ghost" @click.stop="navigateTo('backup', row)">备份</button>
             <button v-if="logEnabled" class="btn-ghost" @click.stop="navigateTo('logs', row)">日志</button>
+            <button class="btn-ghost" @click.stop="toggleOverlay(row)" @mouseenter.stop="showOverlayDelay(row)" @mouseleave.stop="hideOverlayDelay(row)" :title="expandedRowUid === instanceUid(row) ? '收起详情' : '查看详情'">
+              <Info class="h-3.5 w-3.5" />
+            </button>
             <div class="flex-1" />
             <button class="btn-ghost" @click.stop="handleEdit(row)">编辑</button>
             <button class="btn-ghost-danger" @click.stop="handleDelete(row)">删除</button>
           </div>
         </div>
 
-        <!-- Expanded Detail Overlay (right half, shown on hover) -->
-        <div class="conn-card-overlay" @click.stop="selectConnection(row)">
+        <!-- Expanded Detail Overlay (right half, shown on hover with delay or click) -->
+        <div
+          v-show="expandedRowUid === instanceUid(row)"
+          class="conn-card-overlay"
+          :class="expandedRowUid === instanceUid(row) ? 'show' : ''"
+          @mouseenter.stop="clearHideTimer"
+          @mouseleave.stop="hideOverlayDelay(row)"
+          @click.stop="selectConnection(row)"
+        >
           <div class="flex flex-wrap gap-x-5 gap-y-2 w-full">
               <div class="flex flex-col gap-0.5">
                 <span class="text-[11px]" style="color: var(--text-tertiary)">描述</span>
@@ -228,14 +238,14 @@
 
 <script setup>
 defineOptions({ name: 'ManagementView' })
-import { ref, computed, onMounted, onActivated, watch, inject } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted, watch, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
 import { sourceParam, instanceUid } from '@/lib/instance'
 import { formatLogTime } from '@/lib/utils'
 import { toast } from 'vue-sonner'
-import { Search, Plus, Database, Server, BarChart3, Activity, ChevronRight, ChevronLeft, Inbox } from 'lucide-vue-next'
+import { Search, Plus, Database, Server, BarChart3, Activity, ChevronRight, ChevronLeft, Inbox, Info } from 'lucide-vue-next'
 import { databaseApi } from '../api/database'
 import ManagementDialog from './ManagementDialog.vue'
 import DetectDialog from './DetectDialog.vue'
@@ -272,6 +282,9 @@ const healthStore = useHealthStore()
 const { statusMap: onlineStatus } = storeToRefs(healthStore)
 const previousIds = ref(new Set())
 let searchTimer = null
+let showTimer = null
+let hideTimer = null
+const HOVER_DELAY = 600 // 600ms 延迟显示
 
 const filteredData = computed(() => {
   const searchType = activeTab.value === 'all' ? '' : activeTab.value
@@ -413,6 +426,51 @@ const handleSuccess = () => { fetchData() }
 const navigateTo = (action, row) => {
   emit('navigate', { action, row })
 }
+const toggleOverlay = (row) => {
+  const uid = instanceUid(row)
+  clearTimers()
+  if (expandedRowUid.value === uid) {
+    expandedRowUid.value = null
+  } else {
+    expandedRowUid.value = uid
+  }
+}
+const showOverlayDelay = (row) => {
+  clearTimers()
+  const uid = instanceUid(row)
+  showTimer = setTimeout(() => {
+    expandedRowUid.value = uid
+  }, HOVER_DELAY)
+}
+const hideOverlayDelay = (row) => {
+  if (showTimer) {
+    clearTimeout(showTimer)
+    showTimer = null
+  }
+  hideTimer = setTimeout(() => {
+    expandedRowUid.value = null
+  }, 150)
+}
+const clearHideTimer = () => {
+  if (hideTimer) {
+    clearTimeout(hideTimer)
+    hideTimer = null
+  }
+}
+const clearTimers = () => {
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
+  if (showTimer) {
+    clearTimeout(showTimer)
+    showTimer = null
+  }
+  if (hideTimer) {
+    clearTimeout(hideTimer)
+    hideTimer = null
+  }
+}
 
 const confirmDelete = () => {
   if (!deleteTarget.value) return
@@ -429,6 +487,7 @@ const confirmDelete = () => {
 
 onMounted(() => { fetchData() })
 onActivated(() => { fetchData() })
+onUnmounted(() => { clearTimers() })
 </script>
 
 <style scoped>
@@ -497,11 +556,10 @@ onActivated(() => { fetchData() })
   transition: opacity 0.25s ease-out, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.conn-card:hover .conn-card-overlay {
+.conn-card-overlay.show {
   opacity: 1;
   transform: translateX(0);
   pointer-events: auto;
-  transition-delay: 0.3s;
 }
 
 .fade-slide-in {

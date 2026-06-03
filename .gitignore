@@ -61,3 +61,4 @@ build_fnapp.sh
 # Trae internal
 .trae/
 data/database.sqlite
+FPK_PACKAGING_GUIDE.md

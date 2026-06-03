@@ -17,6 +17,17 @@ func saveData() {
 	copy(bkCopy, backups)
 	schedCopy := make([]ScheduledBackup, len(scheduledBackups))
 	copy(schedCopy, scheduledBackups)
+
+	for i := range dbCopy {
+		if !isPasswordEncrypted(dbCopy[i].Password) {
+			dbCopy[i].Password = encryptPassword(dbCopy[i].Password)
+		}
+	}
+	for i := range rsCopy {
+		if !isPasswordEncrypted(rsCopy[i].Password) {
+			rsCopy[i].Password = encryptPassword(rsCopy[i].Password)
+		}
+	}
 	mutex.Unlock()
 
 	dataDir := os.Getenv("TRIM_PKGVAR")
@@ -25,19 +36,9 @@ func saveData() {
 	}
 	os.MkdirAll(dataDir, 0755)
 
-	for i := range dbCopy {
-		if !isPasswordEncrypted(dbCopy[i].Password) {
-			dbCopy[i].Password = encryptPassword(dbCopy[i].Password)
-		}
-	}
 	data, _ := json.Marshal(dbCopy)
 	atomicWriteFile(filepath.Join(dataDir, "databases.json"), data, 0644)
 
-	for i := range rsCopy {
-		if !isPasswordEncrypted(rsCopy[i].Password) {
-			rsCopy[i].Password = encryptPassword(rsCopy[i].Password)
-		}
-	}
 	remoteData, _ := json.Marshal(rsCopy)
 	atomicWriteFile(filepath.Join(dataDir, "remote_servers.json"), remoteData, 0644)
 

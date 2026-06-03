@@ -85,12 +85,15 @@
               <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-subtle)">
                 <div class="flex flex-col gap-0.5">
                   <span class="text-[13px] font-medium" style="color: var(--text-primary)">日志存储路径</span>
-                  <span class="text-[11px]" style="color: var(--text-tertiary)">日志文件保存的目录路径</span>
+                  <span class="text-[11px]" style="color: var(--text-tertiary)">默认使用应用数据空间，也可自定义选择飞牛上的存储位置</span>
                 </div>
                 <div class="flex items-center gap-2">
                   <Input v-model="logStoragePath" placeholder="存储路径..." class="h-8 text-[13px] w-[180px]" />
                   <Button size="sm" variant="outline" class="h-8 px-2.5" @click="openFolderBrowser">
                     <FolderOpen class="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="sm" variant="outline" class="h-8 px-2.5 text-[12px]" @click="resetLogPathToDefault">
+                    重置
                   </Button>
                 </div>
               </div>
@@ -1108,8 +1111,9 @@ const createUserResult = ref({ show: false, success: false, message: '' })
 const compactMode = ref(localStorage.getItem('compactMode') === 'true')
 const refreshInterval = ref(localStorage.getItem('refreshInterval') || '10000')
 const backupRetentionDays = ref(localStorage.getItem('backupRetentionDays') || '30')
-const logStoragePath = ref('./data/logs')
+const logStoragePath = ref('')
 const logRetentionDays = ref('30')
+const defaultLogPath = ref('./data/logs')
 const showFolderBrowser = ref(false)
 const browsePath = ref('')
 const browseParent = ref('')
@@ -1223,7 +1227,7 @@ const loadLogConfig = () => {
     const raw = localStorage.getItem('log_config')
     if (raw) {
       const cfg = JSON.parse(raw)
-      logStoragePath.value = cfg.path || './data/logs'
+      logStoragePath.value = cfg.path || ''
       logRetentionDays.value = String(cfg.retentionDays || 30)
     }
   } catch (e) { console.error(e) }
@@ -1231,11 +1235,18 @@ const loadLogConfig = () => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0 && data.data) {
-        if (data.data.path) logStoragePath.value = data.data.path
+        if (data.data.path) {
+          logStoragePath.value = data.data.path
+          defaultLogPath.value = data.data.path
+        }
         if (data.data.retentionDays) logRetentionDays.value = String(data.data.retentionDays)
       }
     })
     .catch(() => {})
+}
+
+const resetLogPathToDefault = () => {
+  logStoragePath.value = defaultLogPath.value
 }
 
 const saveLogConfig = () => {
@@ -1251,9 +1262,16 @@ const saveLogConfig = () => {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(cfg)
-  }).catch(e => console.error(e))
-  success('日志配置已保存')
-  writeLog(`日志配置已更新: 路径=${cfg.path}, 保留=${cfg.retentionDays}天, 启用=${cfg.enabled}`)
+  }).then(res => res.json()).then(data => {
+    if (data.code === 0) {
+      success('日志配置已保存')
+      writeLog(`日志配置已更新: 路径=${cfg.path}, 保留=${cfg.retentionDays}天, 启用=${cfg.enabled}`)
+    } else {
+      toast.error(data.msg || '保存日志配置失败')
+    }
+  }).catch(e => {
+    toast.error('保存日志配置失败: ' + e.message)
+  })
 }
 
 const openFolderBrowser = () => {
@@ -1604,7 +1622,7 @@ const updatePortOnly = async () => {
   }
   updatingPort.value = true
   const db = currentDb.value
-  let success = false
+  let ok = false
   await fetch(`/api/mysql/port?server_id=${db.id}&${sourceParam(db.isRemote || false)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -1615,14 +1633,14 @@ const updatePortOnly = async () => {
       if (data.code === 0) {
         success(data.msg || '端口已修改')
         loadDatabases()
-        success = true
+        ok = true
       } else {
         error(data.msg || '修改失败')
       }
     })
     .catch(() => error('修改失败'))
     .finally(() => { updatingPort.value = false })
-  return success
+  return ok
 }
 
 const handleSaveOnly = async () => {
@@ -2035,7 +2053,7 @@ const saveConfigOnly = async () => {
     return
   }
 
-  let success = false
+  let ok = false
   if (configSource.value === 'file' && configFilePath.value) {
     await fetch(`/api/mysql/config?server_id=${db.id}&${sourceParam(db.isRemote || false)}`, {
       method: 'PUT',
@@ -2046,7 +2064,7 @@ const saveConfigOnly = async () => {
       .then(data => {
         if (data.code === 0) {
           success(data.msg || '配置已保存，请重启MySQL使配置生效')
-          success = true
+          ok = true
         } else {
           error(data.msg || '保存失败')
         }
@@ -2079,7 +2097,7 @@ const saveConfigOnly = async () => {
         if (data.code === 0) {
           success(data.msg || '配置已在线修改')
           loadConfig(requestId)
-          success = true
+          ok = true
         } else {
           error(data.msg || '修改失败')
         }
@@ -2087,7 +2105,7 @@ const saveConfigOnly = async () => {
       .catch(() => error('修改失败'))
   }
   savingConfig.value = false
-  return success
+  return ok
 }
 
 const saveConfig = () => {

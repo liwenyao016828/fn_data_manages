@@ -82,8 +82,21 @@ func buildRangeStats(history []MetricsSnapshot) map[string]interface{} {
 		return map[string]interface{}{"available": false}
 	}
 
-	first := history[0]
-	last := history[len(history)-1]
+	// 计算增量时处理计数器重置（MySQL重启后计数器归零）
+	// 逐段累加 delta，遇到负值时使用当前值（说明计数器被重置了）
+	calcDelta := func(getVal func(s MetricsSnapshot) int64) int64 {
+		var total int64
+		for i := 1; i < len(history); i++ {
+			diff := getVal(history[i]) - getVal(history[i-1])
+			if diff < 0 {
+				// 计数器重置，使用当前值作为增量
+				total += getVal(history[i])
+			} else {
+				total += diff
+			}
+		}
+		return total
+	}
 
 	var sumThreadsRunning int64
 	var sumBPHitRate float64
@@ -100,14 +113,14 @@ func buildRangeStats(history []MetricsSnapshot) map[string]interface{} {
 	n := int64(len(history))
 
 	result := map[string]interface{}{
-		"available": true,
-		"deltaBytesReceived": last.BytesReceived - first.BytesReceived,
-		"deltaBytesSent":     last.BytesSent - first.BytesSent,
-		"deltaComSelect":     last.ComSelect - first.ComSelect,
-		"deltaComInsert":     last.ComInsert - first.ComInsert,
-		"deltaComUpdate":     last.ComUpdate - first.ComUpdate,
-		"deltaComDelete":     last.ComDelete - first.ComDelete,
-		"deltaSlowQueries":   last.SlowQueries - first.SlowQueries,
+		"available":          true,
+		"deltaBytesReceived": calcDelta(func(s MetricsSnapshot) int64 { return s.BytesReceived }),
+		"deltaBytesSent":     calcDelta(func(s MetricsSnapshot) int64 { return s.BytesSent }),
+		"deltaComSelect":     calcDelta(func(s MetricsSnapshot) int64 { return s.ComSelect }),
+		"deltaComInsert":     calcDelta(func(s MetricsSnapshot) int64 { return s.ComInsert }),
+		"deltaComUpdate":     calcDelta(func(s MetricsSnapshot) int64 { return s.ComUpdate }),
+		"deltaComDelete":     calcDelta(func(s MetricsSnapshot) int64 { return s.ComDelete }),
+		"deltaSlowQueries":   calcDelta(func(s MetricsSnapshot) int64 { return s.SlowQueries }),
 		"avgThreadsRunning":  fmt.Sprintf("%.1f", float64(sumThreadsRunning)/float64(n)),
 		"avgBPHitRate":       fmt.Sprintf("%.2f", float64(0)),
 		"avgBPPagesDirty":    fmt.Sprintf("%.0f", float64(0)),
@@ -381,7 +394,7 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 
 	var dataTotalSize string = "-"
 	var diskRemaining string = "-"
-	
+
 	var totalSize float64
 	row := db.QueryRow("SELECT COALESCE(SUM(data_length + index_length), 0) / 1024 / 1024 FROM information_schema.TABLES WHERE table_schema NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')")
 	if err := row.Scan(&totalSize); err == nil && totalSize > 0 {
@@ -391,7 +404,7 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 			dataTotalSize = fmt.Sprintf("%.2f MB", totalSize)
 		}
 	}
-	
+
 	var freeSpace float64
 	row2 := db.QueryRow("SELECT SUM(DATA_FREE) / 1024 / 1024 / 1024 FROM information_schema.FILES WHERE FILE_TYPE = 'TABLESPACE'")
 	if err := row2.Scan(&freeSpace); err == nil && freeSpace > 0 && freeSpace < 1000 {
@@ -410,28 +423,28 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 	writeJSON(w, map[string]interface{}{
 		"code": 0,
 		"data": map[string]interface{}{
-			"type":    "mysql",
-			"online":  true,
-			"host":    server.Host,
-			"port":    server.Port,
-			"version": varMap["version"],
+			"type":     "mysql",
+			"online":   true,
+			"host":     server.Host,
+			"port":     server.Port,
+			"version":  varMap["version"],
 			"rangeSec": timeRangeSec,
 
-			"uptime":          uptime,
-			"uptime_display":  formatUptime(uptime),
+			"uptime":         uptime,
+			"uptime_display": formatUptime(uptime),
 
-			"questions":       questions,
-			"qps":             fmt.Sprintf("%.2f", qps),
-			"com_select":      comSelect,
-			"com_insert":      comInsert,
-			"com_update":      comUpdate,
-			"com_delete":      comDelete,
+			"questions":  questions,
+			"qps":        fmt.Sprintf("%.2f", qps),
+			"com_select": comSelect,
+			"com_insert": comInsert,
+			"com_update": comUpdate,
+			"com_delete": comDelete,
 
-			"threads_running":   running,
-			"threads_connected": connected,
-			"threads_cached":    statusMap["Threads_cached"],
-			"max_connections":   fmt.Sprintf("%d", maxConns),
-			"connection_usage":  fmt.Sprintf("%.1f", connUsage),
+			"threads_running":     running,
+			"threads_connected":   connected,
+			"threads_cached":      statusMap["Threads_cached"],
+			"max_connections":     fmt.Sprintf("%d", maxConns),
+			"connection_usage":    fmt.Sprintf("%.1f", connUsage),
 			"max_used_connection": maxUsedConn,
 			"connections_total":   conns,
 
@@ -447,23 +460,23 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 			"aborted_connects":   abortedConnects,
 			"deadlocks":          deadlocks,
 
-			"innodb_buffer_pool_size":        bpSize,
-			"innodb_buffer_pool_hit_rate":    fmt.Sprintf("%.2f", bpHitRate),
-			"innodb_buffer_pool_pages_free":  bpPagesFree,
-			"innodb_buffer_pool_pages_total": bpPagesTotal,
-			"innodb_buffer_pool_pages_dirty": bpPagesDirty,
+			"innodb_buffer_pool_size":          bpSize,
+			"innodb_buffer_pool_hit_rate":      fmt.Sprintf("%.2f", bpHitRate),
+			"innodb_buffer_pool_pages_free":    bpPagesFree,
+			"innodb_buffer_pool_pages_total":   bpPagesTotal,
+			"innodb_buffer_pool_pages_dirty":   bpPagesDirty,
 			"innodb_buffer_pool_read_requests": fmt.Sprintf("%d", bpReadReq),
 			"innodb_buffer_pool_reads":         fmt.Sprintf("%d", bpReads),
-			"processlist": processList,
-			"data_total_size": dataTotalSize,
-			"disk_remaining": diskRemaining,
+			"processlist":                      processList,
+			"data_total_size":                  dataTotalSize,
+			"disk_remaining":                   diskRemaining,
 
 			"traffic": map[string]interface{}{
 				"echarts": echarts,
 			},
 			"rangeStats": rangeStats,
-			"now": now,
-			"totals": totals,
+			"now":        now,
+			"totals":     totals,
 		},
 	})
 }
@@ -557,10 +570,10 @@ func writeRedisMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 	writeJSON(w, map[string]interface{}{
 		"code": 0,
 		"data": map[string]interface{}{
-			"type":    "redis",
-			"host":    server.Host,
-			"port":    server.Port,
-			"version": infoMap["redis_version"],
+			"type":     "redis",
+			"host":     server.Host,
+			"port":     server.Port,
+			"version":  infoMap["redis_version"],
 			"rangeSec": timeRangeSec,
 
 			"uptime":         uptime,
@@ -574,22 +587,22 @@ func writeRedisMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 			"used_memory_peak":  memPeak,
 			"mem_fragmentation": infoMap["mem_fragmentation_ratio"],
 
-			"ops_per_sec":        opsPerSec,
-			"total_commands":     infoMap["total_commands_processed"],
-			"total_connections":  infoMap["total_connections_received"],
+			"ops_per_sec":       opsPerSec,
+			"total_commands":    infoMap["total_commands_processed"],
+			"total_connections": infoMap["total_connections_received"],
 
 			"keyspace_hits":   fmt.Sprintf("%d", keyspaceHits),
 			"keyspace_misses": fmt.Sprintf("%d", keyspaceMisses),
 			"hit_rate":        fmt.Sprintf("%.2f", hitRate),
 
-			"rdb_last_save":  infoMap["rdb_last_save_time"],
-			"rdb_changes":    infoMap["rdb_changes_since_last_save"],
-			"aof_enabled":    infoMap["aof_enabled"],
+			"rdb_last_save": infoMap["rdb_last_save_time"],
+			"rdb_changes":   infoMap["rdb_changes_since_last_save"],
+			"aof_enabled":   infoMap["aof_enabled"],
 
 			"traffic": map[string]interface{}{
 				"echarts": buildEChartsConfig(history, true),
 			},
-			"now": now,
+			"now":    now,
 			"totals": totals,
 		},
 	})

@@ -51,6 +51,7 @@ func remoteServerDetailHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	idStr := path[len("/api/remote-servers/"):]
 	if idStr == "" || idStr == "test" {
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": "invalid server id"})
 		return
 	}
 

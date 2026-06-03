@@ -101,7 +101,7 @@
           <button
             v-for="t in mysqlLogTypes" :key="t.value"
             :class="selectedMysqlLogType === t.value ? 'pill pill-active' : 'pill pill-default'"
-            @click="selectedMysqlLogType = t.value; loadLogs()"
+            @click="selectedMysqlLogType = t.value; dbLogPage = 1; loadLogs()"
           >
             {{ t.label }}
           </button>
@@ -111,7 +111,7 @@
         <div class="flex-1 min-h-0 px-5 pb-4">
           <!-- System Logs -->
           <div v-if="activeTab === 'system'" class="h-full flex flex-col">
-            <div class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-4 font-mono text-[12px] leading-5">
+            <div ref="sysLogScrollRef" class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-4 font-mono text-[12px] leading-5">
               <!-- Loading -->
               <div v-if="loadingLogs" class="flex items-center justify-center py-16">
                 <Loader2 class="h-5 w-5 text-[var(--accent)] animate-spin mr-2" />
@@ -124,7 +124,7 @@
               </div>
               <!-- Log Lines -->
               <div v-else>
-                <div v-for="(log, idx) in filteredSystemLogs" :key="idx" class="flex items-start gap-2 py-1 px-2 -mx-2 rounded-md hover:bg-[var(--surface)] transition-colors">
+                <div v-for="(log, idx) in pagedSystemLogs" :key="idx" class="flex items-start gap-2 py-1 px-2 -mx-2 rounded-md hover:bg-[var(--surface)] transition-colors">
                   <span class="text-[var(--text-tertiary)] shrink-0 text-[12px] font-mono-data">{{ formatLogTime(log.time) }}</span>
                   <span class="shrink-0 min-w-[56px] text-center" :class="systemLogLevelBadgeClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
                   <span class="text-[var(--accent)] shrink-0 min-w-[80px] text-[12px] font-mono-data">[{{ log.source || 'SYSTEM' }}]</span>
@@ -135,6 +135,25 @@
             <div v-if="filteredSystemLogs.length > 0" class="flex items-center justify-between pt-3 shrink-0">
               <span class="text-[12px] text-[var(--text-tertiary)]">共 {{ filteredSystemLogs.length }} 条</span>
               <div class="flex items-center gap-2">
+                <Select v-model="logPageSize" @update:model-value="sysLogPage = 1">
+                  <SelectTrigger class="h-[28px] w-[65px] text-[12px]" style="border-color: var(--border); box-shadow: none">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem :value="50">50</SelectItem>
+                    <SelectItem :value="100">100</SelectItem>
+                    <SelectItem :value="200">200</SelectItem>
+                    <SelectItem :value="500">500</SelectItem>
+                  </SelectContent>
+                </Select>
+                <button class="btn-ghost h-[28px] w-[28px] p-0 flex items-center justify-center" :disabled="sysLogPage <= 1" @click="sysLogPage--">
+                  <ChevronLeft class="h-3.5 w-3.5" />
+                </button>
+                <span class="text-[12px] text-[var(--text-tertiary)]">{{ sysLogPage }} / {{ sysLogTotalPages }}</span>
+                <button class="btn-ghost h-[28px] w-[28px] p-0 flex items-center justify-center" :disabled="sysLogPage >= sysLogTotalPages" @click="sysLogPage++">
+                  <ChevronRight class="h-3.5 w-3.5" />
+                </button>
+                <div class="w-px h-4 bg-[var(--border)]" />
                 <button class="btn-ghost h-[28px] text-[12px] gap-1" @click="exportSystemLogs('txt')">
                   <Download class="h-3.5 w-3.5" />TXT
                 </button>
@@ -147,7 +166,7 @@
 
           <!-- Database Logs -->
           <div v-if="activeTab === 'database'" class="h-full flex flex-col">
-            <div class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-4 font-mono text-[12px] leading-5">
+            <div ref="dbLogScrollRef" class="flex-1 min-h-0 overflow-y-auto log-viewer rounded-xl p-4 font-mono text-[12px] leading-5">
               <!-- Loading -->
               <div v-if="loadingLogs" class="flex items-center justify-center py-16">
                 <Loader2 class="h-5 w-5 text-[var(--accent)] animate-spin mr-2" />
@@ -160,7 +179,7 @@
               </div>
               <!-- Log Lines -->
               <div v-else>
-                <div v-for="(log, idx) in filteredLogs" :key="idx" class="flex items-start gap-2 py-1 px-2 -mx-2 rounded-md hover:bg-[var(--surface)] transition-colors">
+                <div v-for="(log, idx) in pagedLogs" :key="idx" class="flex items-start gap-2 py-1 px-2 -mx-2 rounded-md hover:bg-[var(--surface)] transition-colors">
                   <span class="text-[var(--text-tertiary)] shrink-0 text-[12px] font-mono-data">{{ formatLogTime(log.time) }}</span>
                   <span class="shrink-0 min-w-[56px] text-center" :class="dbLogLevelBadgeClass(log.level)">[{{ (log.level || 'INFO').toUpperCase() }}]</span>
                   <span class="log-viewer-text break-all flex-1 text-[var(--text-primary)]">{{ log.message }}</span>
@@ -170,6 +189,25 @@
             <div v-if="filteredLogs.length > 0" class="flex items-center justify-between pt-3 shrink-0">
               <span class="text-[12px] text-[var(--text-tertiary)]">共 {{ filteredLogs.length }} 条</span>
               <div class="flex items-center gap-2">
+                <Select v-model="logPageSize" @update:model-value="dbLogPage = 1">
+                  <SelectTrigger class="h-[28px] w-[65px] text-[12px]" style="border-color: var(--border); box-shadow: none">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem :value="50">50</SelectItem>
+                    <SelectItem :value="100">100</SelectItem>
+                    <SelectItem :value="200">200</SelectItem>
+                    <SelectItem :value="500">500</SelectItem>
+                  </SelectContent>
+                </Select>
+                <button class="btn-ghost h-[28px] w-[28px] p-0 flex items-center justify-center" :disabled="dbLogPage <= 1" @click="dbLogPage--">
+                  <ChevronLeft class="h-3.5 w-3.5" />
+                </button>
+                <span class="text-[12px] text-[var(--text-tertiary)]">{{ dbLogPage }} / {{ dbLogTotalPages }}</span>
+                <button class="btn-ghost h-[28px] w-[28px] p-0 flex items-center justify-center" :disabled="dbLogPage >= dbLogTotalPages" @click="dbLogPage++">
+                  <ChevronRight class="h-3.5 w-3.5" />
+                </button>
+                <div class="w-px h-4 bg-[var(--border)]" />
                 <button class="btn-ghost h-[28px] text-[12px] gap-1" @click="exportLogs('txt')">
                   <Download class="h-3.5 w-3.5" />TXT
                 </button>
@@ -289,7 +327,7 @@
 
 <script setup>
 defineOptions({ name: 'LogsView' })
-import { ref, computed, onMounted, onActivated, watch, inject } from 'vue'
+import { ref, computed, onMounted, onActivated, watch, inject, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
@@ -299,7 +337,7 @@ import { formatLogTime } from '@/lib/utils'
 import { useMessage } from '../composables/useMessage'
 import {
   FileText, Clock, Database, Server, Search, Settings,
-  RefreshCw, Download, Loader2, Trash2, FolderOpen, ChevronRight, ArrowUp, HardDrive
+  RefreshCw, Download, Loader2, Trash2, FolderOpen, ChevronRight, ChevronLeft, ArrowUp, HardDrive
 } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/Button.vue'
@@ -331,8 +369,9 @@ const rawLogs = ref([])
 const systemLogs = ref([])
 const allInstances = ref([])
 const showLogConfigDialog = ref(false)
-const logStoragePath = ref('./data/logs')
+const logStoragePath = ref('')
 const logRetentionDays = ref(30)
+const defaultLogPath = ref('./data/logs')
 const healthStore = useHealthStore()
 const { statusMap: onlineStatus } = storeToRefs(healthStore)
 const showClearLogDialog = ref(false)
@@ -341,6 +380,13 @@ const browsePath = ref('')
 const browseParent = ref('')
 const browseDirs = ref([])
 const browseIsRoot = ref(false)
+
+// 分页相关
+const sysLogPage = ref(1)
+const dbLogPage = ref(1)
+const logPageSize = ref(100)
+const sysLogScrollRef = ref(null)
+const dbLogScrollRef = ref(null)
 
 const mysqlLogTypes = [
   { value: 'error', label: '错误日志' },
@@ -356,6 +402,9 @@ const systemLogLevels = [
 ]
 
 const selectedSystemLogLevel = ref('all')
+
+let loadRequestId = 0
+let sysLoadRequestId = 0
 
 const availableDates = computed(() => {
   const dates = []
@@ -408,6 +457,20 @@ const filteredSystemLogs = computed(() => {
   return logs
 })
 
+// 分页后的系统日志
+const pagedSystemLogs = computed(() => {
+  const start = (sysLogPage.value - 1) * logPageSize.value
+  return filteredSystemLogs.value.slice(start, start + logPageSize.value)
+})
+const sysLogTotalPages = computed(() => Math.max(1, Math.ceil(filteredSystemLogs.value.length / logPageSize.value)))
+
+// 分页后的数据库日志
+const pagedLogs = computed(() => {
+  const start = (dbLogPage.value - 1) * logPageSize.value
+  return filteredLogs.value.slice(start, start + logPageSize.value)
+})
+const dbLogTotalPages = computed(() => Math.max(1, Math.ceil(filteredLogs.value.length / logPageSize.value)))
+
 const loadInstances = () => {
   const p1 = fetch('/api/databases/db/list/all').then(res => res.json()).then(d => d.code === 0 ? d.data || [] : []).catch(() => [])
   const p2 = fetch('/api/remote-servers').then(res => res.json()).then(d => d.code === 0 ? (d.data || []).map(s => ({ ...s, isRemote: true })) : []).catch(() => [])
@@ -449,6 +512,7 @@ const selectInstance = (inst) => {
 
 const loadLogs = () => {
   if (!selectedInstId.value) return
+  const requestId = ++loadRequestId
   loadingLogs.value = true
   rawLogs.value = []
   const inst = allInstances.value.find(i => instanceUid(i) === selectedInstId.value)
@@ -457,19 +521,21 @@ const loadLogs = () => {
   if (inst.type === 'mysql') {
     fetch(`/api/mysql/logs?server_id=${inst.id}&${sourceParam(inst.isRemote || false)}&type=${selectedMysqlLogType.value}`)
       .then(res => res.json()).then(data => {
+        if (requestId !== loadRequestId) return
         if (data.code === 0) { rawLogs.value = data.data || [] } else { error(data.msg || '加载失败') }
         loadingLogs.value = false
-      }).catch(() => { error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
+      }).catch(() => { if (requestId !== loadRequestId) return; error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
   } else {
     fetch(`/api/redis/logs?server_id=${inst.id}&${sourceParam(inst.isRemote || false)}`)
       .then(res => res.json()).then(data => {
+        if (requestId !== loadRequestId) return
         if (data.code === 0) { rawLogs.value = data.data || [] } else { error(data.msg || '加载失败') }
         loadingLogs.value = false
-      }).catch(() => { error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
+      }).catch(() => { if (requestId !== loadRequestId) return; error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
   }
 }
 
-const onDateChange = () => { loadLogs(); loadSystemLogs() }
+const onDateChange = () => { loadLogs(); loadSystemLogs(); sysLogPage.value = 1; dbLogPage.value = 1 }
 
 const logLevelClass = (level) => {
   const map = { Note: 'text-emerald-400', Warning: 'text-amber-400', System: 'text-blue-400', ERROR: 'text-red-400', error: 'text-red-400', warning: 'text-amber-400', info: 'text-blue-400' }
@@ -497,6 +563,9 @@ const dbLogLevelBadgeClass = (level) => {
 }
 
 const loadSystemLogs = () => {
+  const requestId = ++sysLoadRequestId
+  loadingLogs.value = true
+  systemLogs.value = []
   let url = '/api/system/logs'
   const inst = allInstances.value.find(i => instanceUid(i) === selectedInstId.value)
   if (inst) {
@@ -505,6 +574,7 @@ const loadSystemLogs = () => {
   fetch(url)
     .then(res => res.json())
     .then(data => {
+      if (requestId !== sysLoadRequestId) return
       if (data.code === 0) {
         systemLogs.value = (data.data || []).map(l => ({
           time: l.time || l.created_at || '',
@@ -515,8 +585,9 @@ const loadSystemLogs = () => {
       } else {
         systemLogs.value = []
       }
+      loadingLogs.value = false
     })
-    .catch(() => { systemLogs.value = [] })
+    .catch(() => { if (requestId !== sysLoadRequestId) return; systemLogs.value = []; loadingLogs.value = false })
 }
 
 const exportSystemLogs = (format) => {
@@ -576,7 +647,7 @@ const loadLogConfig = () => {
     const raw = localStorage.getItem('log_config')
     if (raw) {
       const cfg = JSON.parse(raw)
-      logStoragePath.value = cfg.path || './data/logs'
+      logStoragePath.value = cfg.path || ''
       logRetentionDays.value = cfg.retentionDays || 30
     }
   } catch (e) { console.error(e) }
@@ -587,7 +658,10 @@ const loadLogConfigFromBackend = async () => {
     const res = await fetch('/api/log-config')
     const data = await res.json()
     if (data.code === 0 && data.data) {
-      if (data.data.path) logStoragePath.value = data.data.path
+      if (data.data.path) {
+        logStoragePath.value = data.data.path
+        defaultLogPath.value = data.data.path
+      }
       if (data.data.retentionDays) logRetentionDays.value = data.data.retentionDays
     }
   } catch (e) { console.error(e) }
@@ -654,6 +728,11 @@ const processNavRequest = () => {
 watch([connectionId], () => {
   loadInstances()
 })
+
+watch(activeTab, () => { sysLogPage.value = 1; dbLogPage.value = 1 })
+watch(searchKeyword, () => { sysLogPage.value = 1; dbLogPage.value = 1 })
+watch(selectedSystemLogLevel, () => { sysLogPage.value = 1 })
+watch(levelFilter, () => { dbLogPage.value = 1 })
 
 watch(() => props.navRequest, (val) => { if (val) processNavRequest() })
 

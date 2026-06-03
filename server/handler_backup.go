@@ -50,6 +50,7 @@ func backupDetailHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	idStr := path[len("/api/backups/"):]
 	if idStr == "" || idStr == "import" {
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": "invalid backup id"})
 		return
 	}
 
@@ -313,6 +314,7 @@ func createBackup(w http.ResponseWriter, r *http.Request) {
 		newBackup.FileName = name + ".json"
 		newBackup.FileSize = int64(len(content))
 		if err := os.WriteFile(filepath.Join(bakDir, newBackup.FileName), []byte(content), 0644); err != nil {
+			sysLogError("BACKUP", "写入系统备份文件失败")
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "写入系统备份文件失败: " + err.Error()})
 			return
 		}
@@ -333,17 +335,20 @@ func createBackup(w http.ResponseWriter, r *http.Request) {
 		}
 		conn, err := openRedis(server)
 		if err != nil {
+			sysLogError("BACKUP", fmt.Sprintf("备份Redis连接失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + err.Error()})
 			return
 		}
 		_, err = redisDo(conn, "SAVE")
 		conn.Close()
 		if err != nil {
+			sysLogError("BACKUP", fmt.Sprintf("备份Redis SAVE失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "Redis SAVE失败: " + err.Error()})
 			return
 		}
 		rdbFileName, err := doRedisRdbCopy(server, name, bakDir)
 		if err != nil {
+			sysLogError("BACKUP", fmt.Sprintf("备份Redis RDB复制失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "复制RDB文件失败: " + err.Error()})
 			return
 		}
@@ -360,6 +365,7 @@ func createBackup(w http.ResponseWriter, r *http.Request) {
 		}
 		fileName, fileSize, err := doMySQLBackup(server, newBackup.Database, bakDir, name)
 		if err != nil {
+			sysLogError("BACKUP", fmt.Sprintf("备份MySQL失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "备份失败: " + err.Error()})
 			return
 		}
@@ -496,17 +502,7 @@ func downloadBackup(w http.ResponseWriter, r *http.Request, idStr string) {
 
 	bakDir := getDataDir() + "/backups"
 	filePath := filepath.Join(bakDir, fileName)
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]interface{}{"code": 404, "msg": "file not found"})
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
-	w.Write(data)
+	http.ServeFile(w, r, filePath)
 }
 
 func importBackup(w http.ResponseWriter, r *http.Request) {
@@ -596,6 +592,8 @@ func importBackup(w http.ResponseWriter, r *http.Request) {
 
 	saveData()
 
+	sysLogInfo("BACKUP", fmt.Sprintf("导入备份: %s", newBackup.Name))
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "msg": "导入成功", "data": newBackup})
@@ -666,10 +664,12 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 	case "system":
 		content, err := os.ReadFile(filePath)
 		if err != nil {
+			sysLogError("BACKUP", "恢复系统备份读取失败")
 			writeJSON(w, map[string]interface{}{"code": 500, "msg": "读取备份文件失败: " + err.Error()})
 			return
 		}
 		if err := restoreSystemBackup(string(content)); err != nil {
+			sysLogError("BACKUP", "系统备份恢复失败")
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "系统恢复失败: " + err.Error()})
 			return
 		}
@@ -699,12 +699,14 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 
 		input, err := os.ReadFile(filePath)
 		if err != nil {
+			sysLogError("BACKUP", "恢复Redis备份读取失败")
 			writeJSON(w, map[string]interface{}{"code": 500, "msg": "读取备份文件失败: " + err.Error()})
 			return
 		}
 
 		conn, err := openRedis(server)
 		if err != nil {
+			sysLogError("BACKUP", fmt.Sprintf("恢复Redis连接失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + err.Error()})
 			return
 		}
@@ -729,6 +731,7 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 
 		destPath := filepath.Join(rdbDir, rdbFile)
 		if err := os.WriteFile(destPath, input, 0644); err != nil {
+			sysLogError("BACKUP", "恢复Redis写入RDB文件失败")
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "写入RDB文件失败: " + err.Error()})
 			return
 		}
@@ -738,6 +741,7 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 	default:
 		content, err := os.ReadFile(filePath)
 		if err != nil {
+			sysLogError("BACKUP", "恢复MySQL备份读取失败")
 			writeJSON(w, map[string]interface{}{"code": 500, "msg": "读取备份文件失败: " + err.Error()})
 			return
 		}
@@ -767,6 +771,7 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 
 		db, err := openMySQL(server)
 		if err != nil {
+			sysLogError("BACKUP", fmt.Sprintf("恢复MySQL连接失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接数据库失败: " + err.Error()})
 			return
 		}
@@ -775,6 +780,7 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 			_, err := db.Exec(fmt.Sprintf("USE `%s`", escapeBacktick(backup.Database)))
 			if err != nil {
 				db.Close()
+				sysLogError("BACKUP", fmt.Sprintf("恢复MySQL选择数据库失败: %s", backup.Database))
 				writeJSON(w, map[string]interface{}{"code": 1, "msg": "选择数据库失败: " + err.Error()})
 				return
 			}
@@ -783,6 +789,7 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 		droppedTables, dropErr := dropAllTablesInDB(db)
 		if dropErr != nil {
 			db.Close()
+			sysLogError("BACKUP", fmt.Sprintf("恢复MySQL清空数据库失败: %s", backup.Database))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "清空数据库失败: " + dropErr.Error()})
 			return
 		}
@@ -829,6 +836,7 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 							return
 						}
 						fmt.Printf("mysql client restore failed: %s, %s\n", cmdErr.Error(), string(output))
+						sysLogError("BACKUP", fmt.Sprintf("恢复MySQL客户端执行失败: %s", backup.Database))
 					}
 				}
 			}
@@ -836,6 +844,7 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 
 		db, err = openMySQL(server)
 		if err != nil {
+			sysLogError("BACKUP", fmt.Sprintf("恢复MySQL回退连接失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接数据库失败: " + err.Error()})
 			return
 		}
@@ -844,6 +853,7 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 		if backup.Database != "" {
 			_, err := db.Exec(fmt.Sprintf("USE `%s`", escapeBacktick(backup.Database)))
 			if err != nil {
+				sysLogError("BACKUP", fmt.Sprintf("恢复MySQL回退选择数据库失败: %s", backup.Database))
 				writeJSON(w, map[string]interface{}{"code": 1, "msg": "选择数据库失败: " + err.Error()})
 				return
 			}
@@ -876,6 +886,7 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(errorMessages) > 0 && successCount == 0 {
+			sysLogError("BACKUP", fmt.Sprintf("恢复MySQL所有SQL执行失败: %s", backup.Database))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": fmt.Sprintf("恢复失败，所有SQL执行出错: %s", strings.Join(errorMessages, "; "))})
 			return
 		}
@@ -980,7 +991,7 @@ func doMySQLBackup(server *RemoteServer, dbName string, bakDir string, name stri
 		// 备份所有库
 		return doMySQLBackupAllDatabases(server, bakDir, name)
 	}
-	
+
 	if mysqldumpPath, err := exec.LookPath("mysqldump"); err == nil {
 		tmpFile, err := os.CreateTemp("", "mysqldump-*.cnf")
 		if err != nil {
@@ -1019,6 +1030,7 @@ func doMySQLBackup(server *RemoteServer, dbName string, bakDir string, name stri
 		}
 		if err != nil {
 			fmt.Printf("mysqldump failed: %s, output: %s\n", err.Error(), string(output))
+			sysLogError("BACKUP", fmt.Sprintf("mysqldump失败 (连接: %s:%d)", server.Host, server.Port))
 		}
 	}
 
@@ -1397,6 +1409,7 @@ func doMySQLBackupAllDatabases(server *RemoteServer, bakDir string, name string)
 		}
 		if err != nil {
 			fmt.Printf("mysqldump (all databases) failed: %s, output: %s\n", err.Error(), string(output))
+			sysLogError("BACKUP", fmt.Sprintf("mysqldump全库备份失败 (连接: %s:%d)", server.Host, server.Port))
 		}
 	}
 
@@ -1406,16 +1419,16 @@ func doMySQLBackupAllDatabases(server *RemoteServer, bakDir string, name string)
 
 	for _, dbName := range userDBs {
 		sb.WriteString(fmt.Sprintf("-- ===== Database: %s =====\n\n", dbName))
-		
+
 		// 切换到该库
 		_, _ = db.Exec(fmt.Sprintf("USE `%s`", escapeBacktick(dbName)))
-		
+
 		// 获取表列表
 		tblRows, err := db.Query("SHOW TABLES")
 		if err != nil {
 			continue
 		}
-		
+
 		var tables []string
 		for tblRows.Next() {
 			var tbl string
@@ -1423,31 +1436,31 @@ func doMySQLBackupAllDatabases(server *RemoteServer, bakDir string, name string)
 			tables = append(tables, tbl)
 		}
 		tblRows.Close()
-		
+
 		for _, tbl := range tables {
 			var tableName, createStmt string
 			if err := db.QueryRow(fmt.Sprintf("SHOW CREATE TABLE `%s`", escapeBacktick(tbl))).Scan(&tableName, &createStmt); err != nil {
 				continue
 			}
 			sb.WriteString(fmt.Sprintf("DROP TABLE IF EXISTS `%s`.`%s`;\n%s;\n\n", escapeBacktick(dbName), escapeBacktick(tbl), createStmt))
-			
+
 			dataRows, err := db.Query(fmt.Sprintf("SELECT * FROM `%s`.`%s`", escapeBacktick(dbName), escapeBacktick(tbl)))
 			if err != nil {
 				continue
 			}
-			
+
 			cols, _ := dataRows.Columns()
 			vals := make([]interface{}, len(cols))
 			valPointers := make([]interface{}, len(cols))
 			for i := range vals {
 				valPointers[i] = &vals[i]
 			}
-			
+
 			for dataRows.Next() {
 				if err := dataRows.Scan(valPointers...); err != nil {
 					continue
 				}
-				
+
 				var valueStrings []string
 				for _, v := range vals {
 					if v == nil {
@@ -1463,7 +1476,7 @@ func doMySQLBackupAllDatabases(server *RemoteServer, bakDir string, name string)
 						}
 					}
 				}
-				
+
 				sb.WriteString(fmt.Sprintf("INSERT INTO `%s`.`%s` VALUES (%s);\n", escapeBacktick(dbName), escapeBacktick(tbl), strings.Join(valueStrings, ", ")))
 			}
 			sb.WriteString("\n")

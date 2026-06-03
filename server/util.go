@@ -122,6 +122,21 @@ func fsBrowseHandler(w http.ResponseWriter, r *http.Request) {
 		reqPath = reqPath + "\\"
 	}
 
+	// 安全检查：限制可浏览的目录范围
+	if runtime.GOOS != "windows" {
+		forbiddenPaths := []string{"/proc", "/sys", "/dev", "/boot", "/root", "/etc/ssh", "/etc/security"}
+		for _, fp := range forbiddenPaths {
+			if strings.HasPrefix(reqPath, fp) {
+				writeJSON(w, map[string]interface{}{
+					"code": 1,
+					"msg":  "不允许浏览该系统目录",
+					"path": reqPath,
+				})
+				return
+			}
+		}
+	}
+
 	isRoot := false
 	if runtime.GOOS == "windows" && len(reqPath) == 3 && reqPath[1] == ':' && reqPath[2] == '\\' {
 		parent := filepath.Dir(reqPath)
@@ -161,8 +176,8 @@ func fsBrowseHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, map[string]interface{}{
 			"code": 1,
-			"msg":   "无法读取目录: " + err.Error(),
-			"path":  reqPath,
+			"msg":  "无法读取目录: " + err.Error(),
+			"path": reqPath,
 		})
 		return
 	}
@@ -172,6 +187,7 @@ func fsBrowseHandler(w http.ResponseWriter, r *http.Request) {
 		"proc": true, "sys": true, "dev": true,
 		"boot": true, "sbin": true, "lib": true, "lib64": true,
 		"lost+found": true, "snap": true,
+		"root": true, "ssh": true, "ssl": true, "pam.d": true, "security": true,
 	}
 	for _, entry := range entries {
 		name := entry.Name()
