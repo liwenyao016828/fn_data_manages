@@ -33,7 +33,7 @@
                   class="badge-status text-[10px]"
                   :class="row.backupLevel === 'system' || row.backupLevel === 'redis' ? 'badge-status-warning' : 'badge-status-info'"
                 >
-                  {{ row.backupLevel === 'system' ? '系统' : row.backupLevel === 'redis' ? 'Redis' : 'MySQL' }}
+                  {{ row.backupLevel === 'system' ? '系统' : getTypeLabel(row.backupLevel) }}
                 </span>
                 <span
                   class="badge-status text-[10px]"
@@ -98,7 +98,7 @@
                       class="badge-status text-[10px] px-1.5 py-0 shrink-0"
                       :class="selectedImportDb.type === 'redis' ? 'badge-status-warning' : 'badge-status-info'"
                     >
-                      {{ selectedImportDb.type === 'redis' ? 'Redis' : 'MySQL' }}
+                      {{ selectedImportDb.type === 'redis' ? 'Redis' : getTypeLabel(selectedImportDb.type) }}
                     </span>
                     <span class="text-[11px] shrink-0" style="color: var(--text-tertiary)">{{ selectedImportDb.host || 'local' }}</span>
                   </span>
@@ -118,7 +118,7 @@
                         class="badge-status text-[10px] px-1.5 py-0"
                         :class="db.type === 'redis' ? 'badge-status-warning' : 'badge-status-info'"
                       >
-                        {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}
+                        {{ db.type === 'redis' ? 'Redis' : getTypeLabel(db.type) }}
                       </span>
                       <span class="text-[11px]" style="color: var(--text-tertiary)">{{ db.host || 'local' }}</span>
                     </div>
@@ -198,7 +198,7 @@ import { Textarea } from '@/components/ui/Textarea.vue'
 import { Badge } from '@/components/ui/Badge.vue'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table.vue'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/Select.vue'
-import { formatLogTime } from '@/lib/utils'
+import { formatLogTime, getTypeLabel, getTypeBadgeClass } from '@/lib/utils'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -276,7 +276,7 @@ const loadAvailableDatabases = () => {
 const submitCreate = () => {
   creating.value = true
   const dbType = props.database?.type || 'mysql'
-  const backupLevel = dbType === 'redis' ? 'redis' : 'mysql'
+  const backupLevel = dbType === 'redis' ? 'redis' : (dbType === 'mysql' || dbType === 'mariadb' || dbType === 'postgresql' || dbType === 'sqlite') ? dbType : 'mysql'
   fetch('/api/backups', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

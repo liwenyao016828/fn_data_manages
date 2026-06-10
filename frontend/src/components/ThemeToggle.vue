@@ -33,7 +33,7 @@ import { useThemeStore } from '../stores/theme'
 import { Sun, Moon } from 'lucide-vue-next'
 
 const themeStore = useThemeStore()
-const { theme } = storeToRefs(themeStore)
+const { theme, themeMode } = storeToRefs(themeStore)
 const isDark = computed(() => theme.value === 'dark')
 
 const toggleTheme = () => {

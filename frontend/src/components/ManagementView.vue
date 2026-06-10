@@ -16,28 +16,14 @@
       </div>
     </div>
 
-    <!-- Stats Row -->
-    <div class="grid grid-cols-3 gap-3 section-gap">
-      <div class="stat-card">
-        <div class="stat-icon" style="background: var(--accent-soft); color: var(--accent)">
-          <Database class="h-4 w-4" />
-        </div>
-        <div class="flex flex-col">
-          <span class="stat-value">{{ stats.mysql }}</span>
-          <span class="stat-label">MySQL</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background: var(--warning-soft); color: var(--warning)">
-          <Server class="h-4 w-4" />
-        </div>
-        <div class="flex flex-col">
-          <span class="stat-value">{{ stats.redis }}</span>
-          <span class="stat-label">Redis</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background: var(--success-soft); color: var(--success)">
+    <!-- Stats Row with Filter -->
+    <div class="grid grid-cols-3 md:grid-cols-6 gap-3 section-gap">
+      <div
+        class="stat-card cursor-pointer transition-all duration-200"
+        :class="{ 'ring-2 ring-[var(--text-primary)] bg-[var(--surface-hover)]': activeTab === 'all' }"
+        @click="activeTab = 'all'"
+      >
+        <div class="stat-icon" style="background: var(--surface-hover); color: var(--text-primary)">
           <BarChart3 class="h-4 w-4" />
         </div>
         <div class="flex flex-col">
@@ -45,28 +31,83 @@
           <span class="stat-label">总计</span>
         </div>
       </div>
+      <div
+        class="stat-card cursor-pointer transition-all duration-200"
+        :class="{ 'ring-2 ring-[#3b82f6] bg-[rgba(59,130,246,0.1)]': activeTab === 'mysql' }"
+        @click="activeTab = activeTab === 'mysql' ? 'all' : 'mysql'"
+      >
+        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6">
+          <Database class="h-4 w-4" />
+        </div>
+        <div class="flex flex-col">
+          <span class="stat-value">{{ stats.mysql }}</span>
+          <span class="stat-label">MySQL</span>
+        </div>
+      </div>
+      <div
+        class="stat-card cursor-pointer transition-all duration-200"
+        :class="{ 'ring-2 ring-[#06b6d4] bg-[rgba(6,182,212,0.1)]': activeTab === 'mariadb' }"
+        @click="activeTab = activeTab === 'mariadb' ? 'all' : 'mariadb'"
+      >
+        <div class="stat-icon" style="background: rgba(6, 182, 212, 0.1); color: #06b6d4">
+          <Database class="h-4 w-4" />
+        </div>
+        <div class="flex flex-col">
+          <span class="stat-value">{{ stats.mariadb }}</span>
+          <span class="stat-label">MariaDB</span>
+        </div>
+      </div>
+      <div
+        class="stat-card cursor-pointer transition-all duration-200"
+        :class="{ 'ring-2 ring-[#6366f1] bg-[rgba(99,102,241,0.1)]': activeTab === 'postgresql' }"
+        @click="activeTab = activeTab === 'postgresql' ? 'all' : 'postgresql'"
+      >
+        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1">
+          <Database class="h-4 w-4" />
+        </div>
+        <div class="flex flex-col">
+          <span class="stat-value">{{ stats.postgresql }}</span>
+          <span class="stat-label">PostgreSQL</span>
+        </div>
+      </div>
+      <div
+        class="stat-card cursor-pointer transition-all duration-200"
+        :class="{ 'ring-2 ring-[#f59e0b] bg-[rgba(245,158,11,0.1)]': activeTab === 'redis' }"
+        @click="activeTab = activeTab === 'redis' ? 'all' : 'redis'"
+      >
+        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b">
+          <Server class="h-4 w-4" />
+        </div>
+        <div class="flex flex-col">
+          <span class="stat-value">{{ stats.redis }}</span>
+          <span class="stat-label">Redis</span>
+        </div>
+      </div>
+      <div
+        class="stat-card cursor-pointer transition-all duration-200"
+        :class="{ 'ring-2 ring-[#10b981] bg-[rgba(16,185,129,0.1)]': activeTab === 'sqlite' }"
+        @click="activeTab = activeTab === 'sqlite' ? 'all' : 'sqlite'"
+      >
+        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981">
+          <Database class="h-4 w-4" />
+        </div>
+        <div class="flex flex-col">
+          <span class="stat-value">{{ stats.sqlite }}</span>
+          <span class="stat-label">SQLite</span>
+        </div>
+      </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="flex items-center gap-3 section-gap flex-wrap">
+    <!-- Search Bar -->
+    <div class="flex items-center gap-3 section-gap">
       <div class="flex items-center rounded-xl border px-3 gap-1.5 h-[34px]" style="border-color: var(--border); background: var(--surface)">
         <Search class="h-3.5 w-3.5 shrink-0" style="color: var(--text-tertiary)" />
-        <Input v-model="searchKeyword" placeholder="搜索实例..." class="border-0 shadow-none h-[28px] text-[13px] w-[180px] bg-transparent" @input="handleSearch" />
+        <Input v-model="searchKeyword" placeholder="搜索实例..." class="border-0 shadow-none h-[28px] text-[13px] w-[240px] bg-transparent" @input="handleSearch" />
       </div>
-      <div class="flex items-center gap-1.5">
-        <span
-          :class="['pill', activeTab === 'all' ? 'pill-active' : 'pill-default']"
-          @click="activeTab = 'all'"
-        >全部</span>
-        <span
-          :class="['pill', activeTab === 'mysql' ? 'pill-active' : 'pill-default']"
-          @click="activeTab = 'mysql'"
-        >MySQL</span>
-        <span
-          :class="['pill', activeTab === 'redis' ? 'pill-active' : 'pill-default']"
-          @click="activeTab = 'redis'"
-        >Redis</span>
-      </div>
+      <span v-if="activeTab !== 'all'" class="text-[12px]" style="color: var(--text-tertiary)">
+        已筛选: {{ getTypeLabel(activeTab) }}
+        <span class="cursor-pointer ml-1" style="color: var(--accent)" @click="activeTab = 'all'">清除</span>
+      </span>
     </div>
 
     <!-- Connection Cards Grid -->
@@ -80,113 +121,124 @@
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 grid-gap section-gap">
       <div
-        v-for="row in tableData"
+        v-for="(row, idx) in tableData"
         :key="instanceUid(row)"
-        class="content-card-interactive conn-card"
+        class="conn-card group"
         :class="{ 'conn-card-selected': connectionId === instanceUid(row) }"
+        :style="{ '--type-color': getTypeColor(row.type), '--type-soft': getTypeSoftColor(row.type), '--card-stagger': `${idx * 45}ms` }"
         @click="selectConnection(row)"
       >
-        <!-- Top: Name + Type Badge + Status Dot -->
-        <div class="flex items-center justify-between gap-2 mb-2.5">
-          <div class="flex items-center gap-2 min-w-0">
-            <StatusDot :status="connectionId === instanceUid(row) ? 'selected' : (onlineStatus[instanceUid(row)] ? 'online' : 'default')" />
-            <span class="text-[13px] font-semibold truncate" style="color: var(--text-primary)">{{ row.name }}</span>
-            <span
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0"
-              :style="{
-                background: row.type === 'mysql' ? 'var(--accent-soft)' : 'var(--warning-soft)',
-                color: row.type === 'mysql' ? 'var(--accent)' : 'var(--warning)',
-              }"
-            >{{ row.type === 'mysql' ? 'MySQL' : 'Redis' }}</span>
-            <span
-              v-if="row.isRemote"
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0"
-              style="background: var(--warning-soft); color: var(--warning)"
-            >远程</span>
-            <span
-              v-else
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0"
-              style="background: var(--accent-soft); color: var(--accent)"
-            >本地</span>
+        <!-- Card Body -->
+        <div class="conn-card-body">
+          <!-- Header: Name (left) · Type · Source · Status (right) -->
+          <div class="conn-head">
+            <div class="conn-head-left">
+              <span
+                v-if="connectionId === instanceUid(row)"
+                class="conn-selected-dot"
+              />
+              <span class="conn-name">{{ row.name }}</span>
+            </div>
+            <div class="conn-head-right">
+              <span class="conn-type">{{ getTypeLabel(row.type) }}</span>
+              <span class="conn-dot" />
+              <span class="conn-source" :class="row.isRemote ? 'conn-source--remote' : 'conn-source--local'">
+                {{ row.isRemote ? '远程' : '本地' }}
+              </span>
+              <span class="conn-dot" />
+              <span class="conn-status" :data-status="connStatusSimple(row)">
+                <StatusDot :status="connStatusSimple(row)" size="xs" />
+                <span class="conn-status-label">{{ connStatusLabelSimple(row) }}</span>
+              </span>
+            </div>
           </div>
-          <div class="flex items-center gap-1.5 shrink-0">
-            <StatusDot :status="onlineStatus[instanceUid(row)] ? 'online' : 'offline'" size="xs" />
-            <span class="text-[11px]" :style="{ color: onlineStatus[instanceUid(row)] ? 'var(--success)' : 'var(--text-tertiary)' }">
-              {{ onlineStatus[instanceUid(row)] ? '在线' : '离线' }}
-            </span>
+
+          <!-- Address line -->
+          <div class="conn-address">
+            <span class="conn-host">{{ row.host }}:{{ row.port }}</span>
+            <span class="conn-sep">·</span>
+            <span class="conn-user">{{ row.username || '—' }}</span>
           </div>
-        </div>
 
-        <!-- Middle: Host:port, username, description -->
-        <div class="flex flex-col gap-1 mb-1">
-          <div class="flex items-center gap-1 min-w-0">
-            <span class="text-[12px] font-mono-data truncate" style="color: var(--text-secondary)">{{ row.host }}</span>
-            <span class="text-[11px] font-mono-data shrink-0" style="color: var(--text-tertiary)">:{{ row.port }}</span>
+          <!-- Flip: Front = Password + Description, Back = Info -->
+          <div class="conn-flip" :class="{ 'conn-flip--on': flippedUid === instanceUid(row) }">
+            <div class="conn-flip-inner" @click.stop="toggleFlip(row)">
+              <!-- Front -->
+              <div class="conn-flip-face conn-flip-front">
+                <div class="conn-password">
+                  <span
+                    v-if="passwordState[passwordUid(row)]?.loaded"
+                    class="conn-password-val"
+                    :title="passwordState[passwordUid(row)]?.value"
+                  >{{ passwordState[passwordUid(row)]?.value || '（空）' }}</span>
+                  <span v-else class="conn-password-val conn-password-val--masked">••••••</span>
+                  <button
+                    class="conn-eye"
+                    :class="{ 'conn-eye--on': passwordState[passwordUid(row)]?.loaded }"
+                    :title="passwordState[passwordUid(row)]?.loaded ? '隐藏密码' : '显示密码'"
+                    @click.stop="togglePassword(row)"
+                  >
+                    <Loader2 v-if="passwordState[passwordUid(row)]?.loading" class="h-3 w-3 animate-spin" />
+                    <EyeOff v-else-if="passwordState[passwordUid(row)]?.loaded" class="h-3 w-3" />
+                    <Eye v-else class="h-3 w-3" />
+                  </button>
+                </div>
+                <p v-if="row.description" class="conn-desc">{{ row.description }}</p>
+                <p v-else class="conn-desc conn-desc--empty">未填写描述</p>
+              </div>
+
+              <!-- Back -->
+              <div class="conn-flip-face conn-flip-back">
+                <div class="conn-detail">
+                  <div class="conn-detail-item">
+                    <span class="conn-detail-label">权限</span>
+                    <span class="conn-detail-val">{{ row.permission || '%' }}</span>
+                  </div>
+                  <div class="conn-detail-item">
+                    <span class="conn-detail-label">SSL</span>
+                    <span class="conn-detail-val">{{ row.ssl ? '开启' : '关闭' }}</span>
+                  </div>
+                  <div class="conn-detail-item">
+                    <span class="conn-detail-label">版本</span>
+                    <span class="conn-detail-val">{{ row.version || '—' }}</span>
+                  </div>
+                  <div class="conn-detail-item">
+                    <span class="conn-detail-label">磁盘</span>
+                    <span class="conn-detail-val">{{ row.disk || '—' }}</span>
+                  </div>
+                  <div class="conn-detail-item">
+                    <span class="conn-detail-label">创建时间</span>
+                    <span class="conn-detail-val">{{ formatLogTime(row.createdAt) || '—' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <span class="text-[12px] truncate" style="color: var(--text-tertiary)">{{ row.username }}</span>
-          <span v-if="row.description" class="text-[12px] truncate" style="color: var(--text-tertiary)">{{ row.description }}</span>
-        </div>
 
-        <!-- Duplicate Badge -->
-        <div v-if="isDuplicate(row)" class="mb-1.5">
-          <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-medium" style="background: var(--warning-soft); color: var(--warning); border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent)">
-            重复连接
-          </span>
-        </div>
-
-        <!-- Bottom: Action buttons (shown on hover) -->
-        <div class="conn-card-actions mt-auto pt-2">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <button class="btn-ghost" @click.stop="navigateTo('data', row)">数据</button>
-            <button class="btn-ghost" @click.stop="navigateTo('backup', row)">备份</button>
-            <button v-if="logEnabled" class="btn-ghost" @click.stop="navigateTo('logs', row)">日志</button>
-            <button class="btn-ghost" @click.stop="toggleOverlay(row)" @mouseenter.stop="showOverlayDelay(row)" @mouseleave.stop="hideOverlayDelay(row)" :title="expandedRowUid === instanceUid(row) ? '收起详情' : '查看详情'">
-              <Info class="h-3.5 w-3.5" />
-            </button>
-            <div class="flex-1" />
-            <button class="btn-ghost" @click.stop="handleEdit(row)">编辑</button>
-            <button class="btn-ghost-danger" @click.stop="handleDelete(row)">删除</button>
+          <!-- Duplicate tag -->
+          <div v-if="isDuplicate(row)" class="conn-dup">
+            <span>重复连接</span>
           </div>
-        </div>
 
-        <!-- Expanded Detail Overlay (right half, shown on hover with delay or click) -->
-        <div
-          v-show="expandedRowUid === instanceUid(row)"
-          class="conn-card-overlay"
-          :class="expandedRowUid === instanceUid(row) ? 'show' : ''"
-          @mouseenter.stop="clearHideTimer"
-          @mouseleave.stop="hideOverlayDelay(row)"
-          @click.stop="selectConnection(row)"
-        >
-          <div class="flex flex-wrap gap-x-5 gap-y-2 w-full">
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[11px]" style="color: var(--text-tertiary)">描述</span>
-                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.description || '无' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[11px]" style="color: var(--text-tertiary)">权限</span>
-                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.permission || '%' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[11px]" style="color: var(--text-tertiary)">SSL</span>
-                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.ssl ? '开启' : '关闭' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[11px]" style="color: var(--text-tertiary)">版本</span>
-                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.version || '-' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[11px]" style="color: var(--text-tertiary)">磁盘</span>
-                <span class="text-[12px]" style="color: var(--text-primary)">{{ row.disk || '-' }}</span>
-              </div>
-              <div class="flex flex-col gap-0.5">
-                <span class="text-[11px]" style="color: var(--text-tertiary)">创建时间</span>
-                <span class="text-[12px]" style="color: var(--text-primary)">{{ formatLogTime(row.createdAt) || '-' }}</span>
-              </div>
+          <!-- Footer actions -->
+          <div class="conn-footer">
+            <div class="conn-footer-left">
+              <button class="conn-btn" @click.stop="navigateTo('data', row)">数据</button>
+              <button class="conn-btn" @click.stop="navigateTo('backup', row)">备份</button>
+              <button v-if="logEnabled" class="conn-btn" @click.stop="navigateTo('logs', row)">日志</button>
+            </div>
+            <div class="conn-footer-right">
+              <button class="conn-btn conn-btn--edit" @click.stop="handleEdit(row)">
+                <Pencil class="h-3 w-3" />编辑
+              </button>
+              <button class="conn-btn conn-btn--danger" @click.stop="handleDelete(row)">
+                <Trash2 class="h-3 w-3" />删除
+              </button>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
     <!-- Pagination -->
     <div v-if="tableData.length > 0" class="flex items-center justify-between flex-wrap gap-2 pt-4" style="border-top: 1px solid var(--border-subtle)">
@@ -243,9 +295,12 @@ import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
 import { sourceParam, instanceUid } from '@/lib/instance'
-import { formatLogTime } from '@/lib/utils'
+import { formatLogTime, getTypeLabel, getTypeColor, getTypeSoftColor } from '@/lib/utils'
 import { toast } from 'vue-sonner'
-import { Search, Plus, Database, Server, BarChart3, Activity, ChevronRight, ChevronLeft, Inbox, Info } from 'lucide-vue-next'
+import {
+  Search, Plus, Database, Server, BarChart3, Activity, ChevronRight, ChevronLeft, Inbox,
+  Eye, EyeOff, Loader2, Pencil, Trash2,
+} from 'lucide-vue-next'
 import { databaseApi } from '../api/database'
 import ManagementDialog from './ManagementDialog.vue'
 import DetectDialog from './DetectDialog.vue'
@@ -277,7 +332,8 @@ const editData = ref({})
 const expandedRowUid = ref(null)
 const showDeleteDialog = ref(false)
 const deleteTarget = ref(null)
-const stats = ref({ mysql: 0, redis: 0, total: 0, running: 0 })
+const flippedUid = ref(null)
+const stats = ref({ mysql: 0, mariadb: 0, postgresql: 0, redis: 0, sqlite: 0, total: 0, running: 0 })
 const healthStore = useHealthStore()
 const { statusMap: onlineStatus } = storeToRefs(healthStore)
 const previousIds = ref(new Set())
@@ -312,8 +368,8 @@ const duplicateInfo = computed(() => {
 
   for (const item of items) {
     const uid = instanceUid(item)
-    // 构建唯一键：主机:端口:用户名（全部小写）
-    const key = `${(item.host || '').toLowerCase()}:${item.port}:${(item.username || '').toLowerCase()}`
+    // 构建唯一键：主机:端口:用户名:类型（全部小写）
+    const key = `${(item.host || '').toLowerCase()}:${item.port}:${(item.username || '').toLowerCase()}:${(item.type || '').toLowerCase()}`
 
     if (!connectionMap.has(key)) {
       connectionMap.set(key, [])
@@ -357,9 +413,73 @@ const selectConnection = (row) => {
   })
 }
 
+const TYPE_ICONS = {
+  mysql: Database,
+  mariadb: Database,
+  postgresql: Database,
+  redis: Server,
+  sqlite: Database,
+}
+
+const getTypeIcon = (type) => TYPE_ICONS[type] || Database
+
+const connStatus = (row) => {
+  const uid = instanceUid(row)
+  if (connectionId.value === uid) return 'selected'
+  const status = onlineStatus.value?.[uid]
+  if (status === true) return 'online'
+  if (status === false) return 'offline'
+  return 'default'
+}
+
+const connStatusLabel = (row) => {
+  const s = connStatus(row)
+  if (s === 'selected') return '已选中'
+  if (s === 'online') return '在线'
+  if (s === 'offline') return '离线'
+  return '未检测'
+}
+
+const connStatusSimple = (row) => {
+  const status = onlineStatus.value?.[instanceUid(row)]
+  if (status === true) return 'online'
+  if (status === false) return 'offline'
+  return 'default'
+}
+
+const connStatusLabelSimple = (row) => {
+  const s = connStatusSimple(row)
+  if (s === 'online') return '在线'
+  if (s === 'offline') return '离线'
+  return '未检测'
+}
+
 const resetPageAndCollapse = () => {
   page.value = 1
   expandedRowUid.value = null
+}
+
+// 密码显示/隐藏：按需请求后端明文
+// 状态: 0=未加载, 1=已隐藏, 2=已显示
+const passwordState = ref({}) // uid -> { loaded, value, loading }
+const passwordUid = (row) => `${row.id}`
+
+const togglePassword = async (row) => {
+  const uid = passwordUid(row)
+  const cur = passwordState.value[uid]
+  if (cur?.loaded && !cur.loading) {
+    passwordState.value[uid] = { ...cur, loaded: false, value: '' }
+    return
+  }
+  if (cur?.loading) return
+  passwordState.value[uid] = { loaded: false, value: '', loading: true }
+  try {
+    const res = await databaseApi.revealPassword(row.id)
+    passwordState.value[uid] = { loaded: true, value: res.data.data.password || '', loading: false }
+  } catch (e) {
+    toast.error('获取密码失败')
+    passwordState.value[uid] = { loaded: true, value: '', loading: false }
+  }
 }
 
 const fetchData = () => {
@@ -380,35 +500,48 @@ const fetchData = () => {
     previousIds.value = newIds
     stats.value.total = allData.value.length
     stats.value.mysql = allData.value.filter(i => (i.type || 'mysql') === 'mysql').length
+    stats.value.mariadb = allData.value.filter(i => i.type === 'mariadb').length
+    stats.value.postgresql = allData.value.filter(i => i.type === 'postgresql').length
     stats.value.redis = allData.value.filter(i => i.type === 'redis').length
+    stats.value.sqlite = allData.value.filter(i => i.type === 'sqlite').length
     stats.value.running = Object.values(onlineStatus.value).filter(Boolean).length
-    autoRefreshMissing(allData.value)
+    // 仅刷新在线状态，不做逐个 forceCheck（后端已定时检测）
     checkOnlineStatus(allData.value)
-    newInstanceIds.forEach(uid => {
-      healthStore.forceCheckOne(uid)
-    })
+    // 延迟补全缺失信息，避免阻塞首屏
+    if (autoRefreshMissing(allData.value)) {
+      setTimeout(() => checkOnlineStatus(allData.value), 3000)
+    }
     completeProgress?.()
   })
 }
 
-const checkOnlineStatus = async (items) => {
-  await healthStore.refreshAll()
+const checkOnlineStatus = (items) => {
+  // 非阻塞刷新
+  healthStore.refreshAll()
   stats.value.running = Object.values(onlineStatus.value).filter(Boolean).length
 }
 
 const autoRefreshMissing = (items) => {
-  items.filter(item => !item.isRemote && (!item.version || !item.disk)).forEach(item => {
+  const missing = items.filter(item => !item.isRemote && (!item.version || !item.disk))
+  if (missing.length === 0) return false
+  // 串行逐个补全，每个完成后间隔 500ms，避免同时建立多个数据库连接
+  let idx = 0
+  const next = () => {
+    if (idx >= missing.length) return
+    const item = missing[idx++]
     fetch('/api/databases/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id }) })
       .then(r => r.json()).then(data => {
         if (data.code === 0) {
-          const idx = allData.value.findIndex(r => r.id === item.id && !r.isRemote)
-          if (idx >= 0) {
-            if (data.data.version && !allData.value[idx].version) allData.value[idx].version = data.data.version
-            if (data.data.disk && !allData.value[idx].disk) allData.value[idx].disk = data.data.disk
+          const i = allData.value.findIndex(r => r.id === item.id && !r.isRemote)
+          if (i >= 0) {
+            if (data.data.version && !allData.value[i].version) allData.value[i].version = data.data.version
+            if (data.data.disk && !allData.value[i].disk) allData.value[i].disk = data.data.disk
           }
         }
-      }).catch(() => {})
-  })
+      }).catch(() => {}).finally(() => setTimeout(next, 500))
+  }
+  next()
+  return true
 }
 
 const handleSearch = () => {
@@ -434,6 +567,11 @@ const toggleOverlay = (row) => {
   } else {
     expandedRowUid.value = uid
   }
+}
+
+const toggleFlip = (row) => {
+  const uid = instanceUid(row)
+  flippedUid.value = flippedUid.value === uid ? null : uid
 }
 const showOverlayDelay = (row) => {
   clearTimers()
@@ -486,101 +624,409 @@ const confirmDelete = () => {
 }
 
 onMounted(() => { fetchData() })
-onActivated(() => { fetchData() })
+onActivated(() => { if (allData.value.length === 0) fetchData() })
 onUnmounted(() => { clearTimers() })
 </script>
 
 <style scoped>
+/* ── Card ──────────────────────────────────────────────────── */
 .conn-card {
-  padding: 0.75rem 1rem;
   position: relative;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  transition:
+    transform 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 200ms ease,
+    background 200ms ease;
+  cursor: default;
+  animation: connCardEnter 440ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--card-stagger, 0ms);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 120px;
 }
 
 .conn-card::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  left: 0; top: 0; bottom: 0;
   width: 3px;
-  background: transparent;
-  border-radius: 0 3px 3px 0;
-  transition: background var(--transition-normal);
+  background: var(--type-color, var(--accent));
+  opacity: 0.85;
+  transition: width 260ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease;
+  pointer-events: none;
+}
+
+.conn-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--type-color, var(--accent)) 28%, var(--border-subtle));
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px color-mix(in srgb, var(--type-color, var(--accent)) 10%, transparent);
+}
+
+.conn-card:hover::before { opacity: 1; }
+
+.conn-card:active { transform: translateY(0); }
+
+.conn-card-selected {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent) 2%, var(--surface));
 }
 
 .conn-card-selected::before {
+  width: 3px;
   background: var(--accent);
 }
 
-.conn-card-selected {
-  border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
-  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+.conn-selected-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
-.conn-card-actions {
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity var(--transition-normal), transform var(--transition-normal);
+@keyframes connCardEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.conn-card:hover .conn-card-actions,
-.conn-card-selected .conn-card-actions {
-  opacity: 1;
-  transform: translateY(0);
+/* ── Body ───────────────────────────────────────────────────── */
+.conn-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
 }
 
-.conn-card-overlay {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 50%;
-  padding: 0.75rem 1rem;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: inherit;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  z-index: 5;
-  cursor: pointer;
+/* ── Head: Name (left) · Type · Source · Status (right) ────── */
+.conn-head {
   display: flex;
   align-items: center;
-  opacity: 0;
-  transform: translateX(20px);
-  pointer-events: none;
-  transition: opacity 0.25s ease-out, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
 }
 
-.conn-card-overlay.show {
+.conn-head-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.conn-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.conn-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conn-type {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--type-color, var(--accent));
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.conn-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+
+.conn-source {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.conn-source--local {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.conn-source--remote {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.conn-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.conn-status[data-status='online']   { color: var(--success); }
+.conn-status[data-status='offline']  { color: var(--danger); }
+
+/* ── Address line ──────────────────────────────────────────── */
+.conn-address {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.conn-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+
+.conn-sep { color: var(--border-strong); }
+
+.conn-user {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Password row ──────────────────────────────────────────── */
+.conn-password {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  background: var(--muted);
+  border-radius: 6px;
+}
+
+.conn-password-val {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conn-password-val--masked {
+  color: var(--text-tertiary);
+  letter-spacing: 0.1em;
+}
+
+.conn-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 180ms ease;
+  flex-shrink: 0;
+}
+
+.conn-eye:hover {
+  background: color-mix(in srgb, var(--type-color, var(--accent)) 10%, transparent);
+  color: var(--type-color, var(--accent));
+}
+
+.conn-eye--on {
+  background: color-mix(in srgb, var(--type-color, var(--accent)) 12%, transparent);
+  color: var(--type-color, var(--accent));
+}
+
+/* ── Description ───────────────────────────────────────────── */
+.conn-desc {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.conn-desc--empty {
+  color: var(--text-tertiary);
+  font-style: italic;
+  opacity: 0.55;
+}
+
+/* ── Flip (details panel) ──────────────────────────────────── */
+.conn-flip {
+  perspective: 900px;
+}
+
+.conn-flip-inner {
+  position: relative;
+  width: 100%;
+  min-height: 64px;
+  transform-style: preserve-3d;
+  transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.conn-flip--on .conn-flip-inner {
+  transform: rotateY(180deg);
+}
+
+.conn-flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.conn-flip-back {
+  transform: rotateY(180deg);
+}
+
+.conn-detail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  padding: 6px 10px;
+  background: var(--muted);
+  border-radius: 6px;
+}
+
+.conn-detail-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.conn-detail-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.conn-detail-val {
+  font-size: 11px;
+  color: var(--text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ── Duplicate tag ─────────────────────────────────────────── */
+.conn-dup {
+  align-self: flex-start;
+}
+
+.conn-dup span {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Footer ────────────────────────────────────────────────── */
+.conn-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.conn-footer-left,
+.conn-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.conn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 180ms ease;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+}
+
+.conn-card:hover .conn-btn,
+.conn-card-selected .conn-btn {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(0);
   pointer-events: auto;
 }
 
-.fade-slide-in {
-  animation: fadeSlideIn 0.3s ease-out;
+.conn-btn:hover {
+  background: color-mix(in srgb, var(--type-color, var(--accent)) 10%, transparent);
+  color: var(--type-color, var(--accent));
 }
 
-@keyframes fadeSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.conn-btn:active { transform: scale(0.96); }
+
+.conn-btn--danger:hover {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
 }
 
+/* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .conn-card-actions {
-    opacity: 1;
-    transform: translateY(0);
+  .conn-card-body { padding: 12px 14px; }
+  .conn-btn { opacity: 1; transform: none; pointer-events: auto; }
+}
+
+/* ── Reduced motion ────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .conn-card,
+  .conn-btn {
+    animation: none !important;
+    transition: none !important;
   }
+  .conn-card:hover { transform: none; }
 }
 </style>

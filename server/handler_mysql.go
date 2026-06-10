@@ -1,16 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +41,14 @@ func formatMySQLError(prefix string, err error) string {
 	}
 
 	return prefix + "：" + errStr
+}
+
+// flushPrivileges 刷新 MySQL 权限缓存，失败时写警告日志
+// 注意：FLUSH PRIVILEGES 失败不应阻塞主操作流程，但需要可观测
+func flushPrivileges(db *sql.DB, context string) {
+	if _, err := db.Exec("FLUSH PRIVILEGES"); err != nil {
+		sysLogWarn("MYSQL", fmt.Sprintf("FLUSH PRIVILEGES 失败 [%s]: %v", context, err))
+	}
 }
 
 func mysqlDatabasesHandler(w http.ResponseWriter, r *http.Request) {
@@ -173,9 +179,14 @@ func mysqlCreateDatabaseHandler(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]interface{}{"code": 400, "msg": "用户名验证失败: " + err.Error()})
 			return
 		}
-		createUserSQL := fmt.Sprintf("CREATE USER IF NOT EXISTS %s@%s IDENTIFIED BY %s", quoteString(req.Name), quoteString("%"), quoteString(req.Password))
+		createUserSQL, err := buildCreateUserIfNotExists(req.Name, "%")
+		if err != nil {
+			fmt.Printf("[创建数据库] 创建用户参数验证失败: %v\n", err)
+			writeJSON(w, map[string]interface{}{"code": 400, "msg": "创建用户参数验证失败: " + err.Error()})
+			return
+		}
 		fmt.Printf("[创建数据库] 创建用户: %s@%%\n", req.Name)
-		_, err = db.Exec(createUserSQL)
+		_, err = db.Exec(createUserSQL, req.Password)
 		if err != nil {
 			fmt.Printf("[创建数据库] 创建用户失败: %v\n", err)
 			sysLogError("USER", fmt.Sprintf("创建用户失败: %s (连接: %s:%d)", req.Name, server.Host, server.Port))
@@ -198,7 +209,7 @@ func mysqlCreateDatabaseHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		fmt.Printf("[创建数据库] 授权成功\n")
-		_, _ = db.Exec("FLUSH PRIVILEGES")
+		flushPrivileges(db, "createDatabase-final")
 	}
 
 	fmt.Printf("[创建数据库] 全部完成\n")
@@ -569,23 +580,15 @@ func mysqlExecuteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sqlTrimmed := strings.TrimSpace(req.SQL)
-	sqlUpper := strings.ToUpper(sqlTrimmed)
 
-	dangerousKeywords := []string{
-		"DROP DATABASE", "DROP TABLE", "DROP VIEW", "DROP PROCEDURE", "DROP FUNCTION", "DROP TRIGGER", "DROP EVENT", "DROP USER", "DROP INDEX",
-		"ALTER DATABASE", "ALTER USER",
-		"TRUNCATE ", "RENAME ",
-		"CREATE DATABASE", "CREATE USER", "CREATE TABLESPACE",
-		"GRANT ", "REVOKE ", "KILL ", "SHUTDOWN",
-		"SET PASSWORD", "FLUSH PRIVILEGES", "FLUSH TABLES",
-		"LOAD DATA ", "INTO OUTFILE", "INTO DUMPFILE",
+	// #5 mysqlExecute 改为白名单模式
+	// 黑名单容易被大小写、注释、字符串绕过；白名单更安全
+	if err := validateExecuteSQL(req.SQL); err != nil {
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": "SQL 校验失败: " + err.Error()})
+		return
 	}
-	for _, kw := range dangerousKeywords {
-		if strings.Contains(sqlUpper, kw) {
-			writeJSON(w, map[string]interface{}{"code": 400, "msg": fmt.Sprintf("禁止执行危险操作: %s", strings.TrimSpace(kw))})
-			return
-		}
-	}
+
+	sqlUpper := strings.ToUpper(sqlTrimmed)
 
 	sqlPreview := req.SQL
 	if len(sqlPreview) > 50 {
@@ -964,6 +967,8 @@ func mysqlLogsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var logs []map[string]string
 
+	containerName := findContainerName(uint(id), source)
+
 	var mysqlDataDir string
 	dirRows, dirErr := db.Query("SHOW VARIABLES LIKE 'datadir'")
 	if dirErr == nil {
@@ -979,11 +984,11 @@ func mysqlLogsHandler(w http.ResponseWriter, r *http.Request) {
 		if logFile == "" {
 			return ""
 		}
-		if filepath.IsAbs(logFile) {
+		if strings.HasPrefix(logFile, "/") {
 			return logFile
 		}
 		if mysqlDataDir != "" {
-			return filepath.Join(mysqlDataDir, logFile)
+			return joinPosix(mysqlDataDir, logFile)
 		}
 		return logFile
 	}
@@ -992,57 +997,11 @@ func mysqlLogsHandler(w http.ResponseWriter, r *http.Request) {
 		if source == "remote" {
 			return nil, "远程服务器日志文件无法直接读取"
 		}
-		f, err := os.Open(path)
+		data, err := readLocalOrContainerFile(containerName, path, server.Host, server.Port)
 		if err != nil {
 			return nil, err.Error()
 		}
-		defer f.Close()
-
-		fi, err := f.Stat()
-		if err != nil {
-			return nil, err.Error()
-		}
-
-		const maxReadSize int64 = 512 * 1024
-		var data []byte
-		if fi.Size() > maxReadSize {
-			// 大文件只读取最后 maxReadSize 字节
-			offset := fi.Size() - maxReadSize
-			if _, err := f.Seek(offset, io.SeekStart); err != nil {
-				return nil, err.Error()
-			}
-			data, err = io.ReadAll(f)
-			if err != nil {
-				return nil, err.Error()
-			}
-			// 跳过第一行（可能不完整）
-			if idx := bytes.IndexByte(data, '\n'); idx >= 0 {
-				data = data[idx+1:]
-			}
-		} else {
-			data, err = io.ReadAll(f)
-			if err != nil {
-				return nil, err.Error()
-			}
-		}
-
-		var result []map[string]string
-		lines := strings.Split(string(data), "\n")
-		maxLines := 500
-		start := 0
-		if len(lines) > maxLines {
-			start = len(lines) - maxLines
-		}
-		for _, line := range lines[start:] {
-			line = strings.TrimSpace(line)
-			if line != "" {
-				result = append(result, map[string]string{
-					"time":    "",
-					"level":   "Note",
-					"message": line,
-				})
-			}
-		}
+		result := parseLogLines(data, 500)
 		return result, ""
 	}
 
@@ -1564,9 +1523,13 @@ func mysqlUsersHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		createUserSQL := fmt.Sprintf("CREATE USER %s@%s IDENTIFIED BY %s", quoteString(req.Username), quoteString(req.Host), quoteString(req.Password))
+		createUserSQL, err := buildCreateUserWithPassword(req.Username, req.Host)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"code": 400, "msg": "创建用户参数验证失败: " + err.Error()})
+			return
+		}
 		sysLogInfo("MYSQL", fmt.Sprintf("创建用户: %s@%s (连接: %s:%d)", req.Username, req.Host, server.Host, server.Port))
-		_, err := db.Exec(createUserSQL)
+		_, err = db.Exec(createUserSQL, req.Password)
 		if err != nil {
 			sysLogWarn("MYSQL", fmt.Sprintf("创建用户失败: %s@%s, 错误: %s", req.Username, req.Host, err.Error()))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": formatMySQLError("创建用户失败", err)})
@@ -1587,7 +1550,7 @@ func mysqlUsersHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		db.Exec("FLUSH PRIVILEGES")
+		flushPrivileges(db, "createUser")
 		writeJSON(w, map[string]interface{}{"code": 0, "msg": fmt.Sprintf("用户 %s@%s 创建成功", req.Username, req.Host)})
 
 	case "DELETE":
@@ -1623,7 +1586,7 @@ func mysqlUsersHandler(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "删除用户失败: " + err.Error()})
 			return
 		}
-		db.Exec("FLUSH PRIVILEGES")
+		flushPrivileges(db, "deleteUser")
 		sysLogInfo("MYSQL", fmt.Sprintf("删除用户: %s@%s (连接: %s:%d)", user, host, server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 0, "msg": "用户删除成功"})
 
@@ -1657,8 +1620,12 @@ func mysqlUsersHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		alterSQL := fmt.Sprintf("ALTER USER %s@%s IDENTIFIED BY %s", quoteString(user), quoteString(host), quoteString(req.Password))
-		_, err := db.Exec(alterSQL)
+		alterSQL, err := buildAlterUserPassword(user, host)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"code": 400, "msg": "修改密码参数验证失败: " + err.Error()})
+			return
+		}
+		_, err = db.Exec(alterSQL, req.Password)
 		if err != nil {
 			sysLogError("USER", fmt.Sprintf("修改密码失败: %s@%s (连接: %s:%d)", user, host, server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": formatMySQLError("修改密码失败", err)})
@@ -1692,12 +1659,12 @@ func mysqlUsersHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		action := "UNLOCK"
-		if req.Locked {
-			action = "LOCK"
+		alterSQL, err := buildAlterUserAccount(user, host, req.Locked)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"code": 400, "msg": "账户操作参数验证失败: " + err.Error()})
+			return
 		}
-		alterSQL := fmt.Sprintf("ALTER USER %s@%s ACCOUNT %s", quoteString(user), quoteString(host), action)
-		_, err := db.Exec(alterSQL)
+		_, err = db.Exec(alterSQL)
 		if err != nil {
 			sysLogError("USER", fmt.Sprintf("用户锁定/解锁失败: %s@%s (连接: %s:%d)", user, host, server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": formatMySQLError("用户锁定状态修改失败", err)})
@@ -1785,7 +1752,13 @@ func mysqlRenameUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	grantsRows, err := db.Query(fmt.Sprintf("SHOW GRANTS FOR %s@%s", quoteString(user), quoteString(req.OldHost)))
+	grantsSQL, err := buildShowGrantsFor(user, req.OldHost)
+	if err != nil {
+		sysLogError("USER", fmt.Sprintf("获取旧用户权限SQL构建失败: %s@%s (连接: %s:%d)", user, req.OldHost, server.Host, server.Port))
+		writeJSON(w, map[string]interface{}{"code": 1, "msg": "获取旧用户权限参数验证失败: " + err.Error()})
+		return
+	}
+	grantsRows, err := db.Query(grantsSQL)
 	if err != nil {
 		sysLogError("USER", fmt.Sprintf("获取旧用户权限失败: %s@%s (连接: %s:%d)", user, req.OldHost, server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "获取旧用户权限失败: " + err.Error()})
@@ -1812,8 +1785,13 @@ func mysqlRenameUserHandler(w http.ResponseWriter, r *http.Request) {
 		password = string(b)
 	}
 
-	createUserSQL := fmt.Sprintf("CREATE USER %s@%s IDENTIFIED BY %s", quoteString(user), quoteString(req.NewHost), quoteString(password))
-	_, err = db.Exec(createUserSQL)
+	createUserSQL, err := buildCreateUserWithPassword(user, req.NewHost)
+	if err != nil {
+		sysLogError("USER", fmt.Sprintf("重命名-创建新用户参数验证失败: %s@%s (连接: %s:%d)", user, req.NewHost, server.Host, server.Port))
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": "创建新用户参数验证失败: " + err.Error()})
+		return
+	}
+	_, err = db.Exec(createUserSQL, password)
 	if err != nil {
 		sysLogError("USER", fmt.Sprintf("重命名-创建新用户失败: %s@%s (连接: %s:%d)", user, req.NewHost, server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": formatMySQLError("创建新用户失败", err)})
@@ -1825,20 +1803,14 @@ func mysqlRenameUserHandler(w http.ResponseWriter, r *http.Request) {
 		if grant == "" {
 			continue
 		}
-		upper := strings.ToUpper(grant)
-		if strings.Contains(upper, "GRANT PROXY ON") {
+		// #6 严格白名单：仅接受标准 GRANT 语句，privs 必须由白名单 token 组成
+		newGrantSQL, ok := validateGrantSQL(grant, user, req.NewHost)
+		if !ok {
+			sysLogWarn("USER", fmt.Sprintf("跳过无法安全重建的权限行: %s", grant))
 			continue
 		}
-		re := regexp.MustCompile(`(?i)^GRANT\s+(.+?)\s+ON\s+(.+?)\s+TO\s+.*`)
-		matches := re.FindStringSubmatch(grant)
-		if len(matches) >= 3 {
-			privs := matches[1]
-			onPart := matches[2]
-			newGrantSQL := fmt.Sprintf("GRANT %s ON %s TO %s@%s", privs, onPart, quoteString(user), quoteString(req.NewHost))
-			_, err = db.Exec(newGrantSQL)
-			if err != nil {
-				sysLogError("MYSQL", fmt.Sprintf("复制权限失败: %s, SQL: %s", err.Error(), newGrantSQL))
-			}
+		if _, err = db.Exec(newGrantSQL); err != nil {
+			sysLogError("MYSQL", fmt.Sprintf("复制权限失败: %s, SQL: %s", err.Error(), newGrantSQL))
 		}
 	}
 
@@ -1854,7 +1826,7 @@ func mysqlRenameUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db.Exec("FLUSH PRIVILEGES")
+	flushPrivileges(db, "renameUser")
 	sysLogInfo("MYSQL", fmt.Sprintf("重命名用户: %s@%s -> %s@%s (连接: %s:%d)", user, req.OldHost, user, req.NewHost, server.Host, server.Port))
 	writeJSON(w, map[string]interface{}{"code": 0, "msg": fmt.Sprintf("用户 %s 主机已从 %s 修改为 %s", user, req.OldHost, req.NewHost)})
 }
@@ -1958,14 +1930,20 @@ func mysqlDbGrantHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		revokeSQL := fmt.Sprintf("REVOKE ALL PRIVILEGES ON %s.* FROM %s@%s", quoteIdentifier(req.Database), quoteString(user), quoteString(host))
-		_, _ = db.Exec(revokeSQL)
-
-		upper := strings.ToUpper(strings.TrimSpace(req.Privileges))
-		if upper == "ALL" {
-			upper = "ALL PRIVILEGES"
+		revokeSQL, err := buildRevokeAllDBPrivileges(req.Database, user, host)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"code": 400, "msg": "撤销旧权限参数验证失败: " + err.Error()})
+			return
 		}
-		grantSQL := fmt.Sprintf("GRANT %s ON %s.* TO %s@%s", upper, quoteIdentifier(req.Database), quoteString(user), quoteString(host))
+		if _, err := db.Exec(revokeSQL); err != nil {
+			sysLogWarn("MYSQL", fmt.Sprintf("撤销旧权限失败(可忽略) %s@%s %s: %v", user, host, req.Database, err))
+		}
+
+		grantSQL, err := buildGrantDBPrivilegesCustom(req.Privileges, req.Database, user, host)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"code": 400, "msg": "授权参数验证失败: " + err.Error()})
+			return
+		}
 		_, err = db.Exec(grantSQL)
 		if err != nil {
 			sysLogError("MYSQL", fmt.Sprintf("授权失败: %s, SQL: %s", err.Error(), grantSQL))
@@ -1973,7 +1951,7 @@ func mysqlDbGrantHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		db.Exec("FLUSH PRIVILEGES")
+		flushPrivileges(db, "grant")
 		sysLogInfo("MYSQL", fmt.Sprintf("授权: %s@%s 访问 %s (连接: %s:%d)", user, host, req.Database, server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 0, "msg": fmt.Sprintf("数据库 %s 权限已更新", req.Database)})
 
@@ -1989,7 +1967,11 @@ func mysqlDbGrantHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		revokeSQL := fmt.Sprintf("REVOKE ALL PRIVILEGES ON %s.* FROM %s@%s", quoteIdentifier(dbName), quoteString(user), quoteString(host))
+		revokeSQL, err := buildRevokeAllDBPrivileges(dbName, user, host)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"code": 400, "msg": "回收权限参数验证失败: " + err.Error()})
+			return
+		}
 		_, err = db.Exec(revokeSQL)
 		if err != nil {
 			sysLogError("MYSQL", fmt.Sprintf("回收权限失败: %s@%s 访问 %s (连接: %s:%d)", user, host, dbName, server.Host, server.Port))
@@ -1997,7 +1979,7 @@ func mysqlDbGrantHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		db.Exec("FLUSH PRIVILEGES")
+		flushPrivileges(db, "revoke")
 		sysLogInfo("MYSQL", fmt.Sprintf("回收权限: %s@%s 访问 %s (连接: %s:%d)", user, host, dbName, server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 0, "msg": fmt.Sprintf("数据库 %s 权限已回收", dbName)})
 
@@ -2073,8 +2055,14 @@ func mysqlGrantHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	revokeSQL := fmt.Sprintf("REVOKE ALL PRIVILEGES ON *.* FROM %s@%s", quoteString(safeUser), quoteString(safeHost))
-	_, _ = db.Exec(revokeSQL)
+	revokeSQL, err := buildRevokeAllGlobalPrivileges(safeUser, safeHost)
+	if err != nil {
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": "撤销全局权限参数验证失败: " + err.Error()})
+		return
+	}
+	if _, err := db.Exec(revokeSQL); err != nil {
+		sysLogWarn("MYSQL", fmt.Sprintf("撤销全局权限失败(可忽略): %s@%s: %v", safeUser, safeHost, err))
+	}
 
 	_, err = db.Exec(grantSQL)
 	if err != nil {
@@ -2083,7 +2071,7 @@ func mysqlGrantHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db.Exec("FLUSH PRIVILEGES")
+	flushPrivileges(db, "modifyGrant-final")
 	msg := "权限修改成功"
 	if strings.ToUpper(strings.TrimSpace(req.Privileges)) == "ALL" || strings.ToUpper(strings.TrimSpace(req.Privileges)) == "ALL PRIVILEGES" {
 		msg += "（注意：已授予全部权限，请确认操作意图）"
@@ -2128,6 +2116,12 @@ func mysqlRestartHandler(w http.ResponseWriter, r *http.Request) {
 	containerName := findContainerName(uint(id), source)
 
 	if containerName != "" {
+		// #2 容器名校验
+		if err := validateContainerName(containerName); err != nil {
+			sysLogError("MYSQL", fmt.Sprintf("容器名非法: %s (连接: %s:%d)", containerName, server.Host, server.Port))
+			writeJSON(w, map[string]interface{}{"code": 1, "msg": "容器名非法: " + err.Error()})
+			return
+		}
 		if dockerPath, err := exec.LookPath("docker"); err == nil {
 			out, err := exec.Command(dockerPath, "restart", containerName).CombinedOutput()
 			if err != nil {
@@ -2380,7 +2374,8 @@ func extractLogTime(line string, logType string) string {
 	if len(line) > 26 {
 		maybeTime := line[:26]
 		if _, err := time.Parse("2006-01-02T15:04:05.000000", maybeTime); err == nil {
-			return maybeTime
+			// MySQL 通用日志时间戳默认是 UTC，保留 Z 让前端按本地时区渲染
+			return maybeTime + "Z"
 		}
 	}
 	// 如果没有找到时间戳，返回当前时间

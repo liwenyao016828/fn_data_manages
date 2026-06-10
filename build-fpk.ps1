@@ -71,6 +71,13 @@ $FrontendDist = Join-Path $FrontendDir "dist"
 Copy-Item (Join-Path $FrontendDist "*") $FpkUiDist -Recurse -Force
 Write-Host "  OK" -ForegroundColor Green
 
+# 3.5 Clean up stray Windows binary (left from local dev, would bloat FPK)
+$ServerExe = Join-Path $FpkDir "app\server.exe"
+if (Test-Path $ServerExe) {
+    Remove-Item $ServerExe -Force
+    Write-Host "  Removed server.exe (Windows dev binary)" -ForegroundColor DarkGray
+}
+
 # 4. Build backend (Linux amd64)
 Write-Host ""
 Write-Host "[4/6] Building backend (Linux amd64)..." -ForegroundColor Yellow
@@ -79,6 +86,7 @@ Push-Location $ServerDir
 try {
     $env:GOOS = "linux"
     $env:GOARCH = "amd64"
+    $env:CGO_ENABLED = "0"
     $OutputPath = Join-Path $FpkDir "app\server"
     
     Write-Host "  Running go build..."
@@ -107,13 +115,25 @@ Copy-Item (Join-Path $FpkDir "ICON.PNG") (Join-Path $ImagesDir "icon_64.png") -F
 Copy-Item (Join-Path $FpkDir "ICON_256.PNG") (Join-Path $ImagesDir "icon_256.png") -Force
 Write-Host "  OK" -ForegroundColor Green
 
+# 5.5 Normalize cmd/* to LF (CRITICAL: bash on Linux can't run CRLF scripts)
+Write-Host ""
+Write-Host "[5.5/6] Converting cmd/* to LF..." -ForegroundColor Yellow
+Get-ChildItem (Join-Path $FpkDir "cmd") -File | ForEach-Object {
+    $raw = [System.IO.File]::ReadAllText($_.FullName)
+    if ($raw -match "`r`n") {
+        $lf = $raw -replace "`r`n", "`n"
+        [System.IO.File]::WriteAllText($_.FullName, $lf)
+    }
+}
+Write-Host "  OK" -ForegroundColor Green
+
 # 6. Build FPK
 Write-Host ""
 Write-Host "[6/6] Building FPK package..." -ForegroundColor Yellow
 
 Push-Location $FpkDir
 try {
-    $FpkOutput = Join-Path $FpkDir "data_manages.fpk"
+    $FpkOutput = Join-Path $FpkDir "niudb.fpk"
     if (Test-Path $FpkOutput) {
         Remove-Item $FpkOutput -Force
     }

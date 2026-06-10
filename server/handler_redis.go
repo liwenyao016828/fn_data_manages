@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -649,40 +648,11 @@ func redisLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var data []byte
-	fi, err := os.Stat(logPath)
-	if err != nil {
+	containerName := findContainerName(uint(id), source)
+	data, readErr := readLocalOrContainerFile(containerName, logPath, server.Host, server.Port)
+	if readErr != nil {
 		writeJSON(w, map[string]interface{}{"code": 0, "data": []map[string]string{
-			{"time": time.Now().Format("2006-01-02 15:04:05"), "level": "Note", "message": "无法读取日志文件: " + err.Error()},
-		}})
-		return
-	}
-	const maxReadSize int64 = 512 * 1024
-	f, err := os.Open(logPath)
-	if err != nil {
-		writeJSON(w, map[string]interface{}{"code": 0, "data": []map[string]string{
-			{"time": time.Now().Format("2006-01-02 15:04:05"), "level": "Note", "message": "无法打开日志文件: " + err.Error()},
-		}})
-		return
-	}
-	defer f.Close()
-	if fi.Size() > maxReadSize {
-		if _, err := f.Seek(fi.Size()-maxReadSize, io.SeekStart); err != nil {
-			writeJSON(w, map[string]interface{}{"code": 0, "data": []map[string]string{
-				{"time": time.Now().Format("2006-01-02 15:04:05"), "level": "Note", "message": "读取日志文件失败: " + err.Error()},
-			}})
-			return
-		}
-		data, err = io.ReadAll(f)
-		if idx := bytes.IndexByte(data, '\n'); idx >= 0 {
-			data = data[idx+1:]
-		}
-	} else {
-		data, err = io.ReadAll(f)
-	}
-	if err != nil {
-		writeJSON(w, map[string]interface{}{"code": 0, "data": []map[string]string{
-			{"time": time.Now().Format("2006-01-02 15:04:05"), "level": "Note", "message": "读取日志文件失败: " + err.Error()},
+			{"time": time.Now().Format("2006-01-02 15:04:05"), "level": "Note", "message": "无法读取日志文件: " + readErr.Error()},
 		}})
 		return
 	}

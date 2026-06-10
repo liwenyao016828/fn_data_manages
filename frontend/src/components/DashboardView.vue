@@ -48,28 +48,11 @@
       </div>
     </div>
 
-    <!-- Instance Selector -->
-    <div class="section-gap shrink-0 fade-up" style="animation-delay: 60ms">
-      <div class="instance-scroll flex gap-2 overflow-x-auto pb-1" style="scrollbar-width: thin;">
-        <div
-          v-for="db in sortedDatabases"
-          :key="instanceUid(db)"
-          :class="['instance-card', selectedUid === instanceUid(db) ? 'instance-card-active' : 'instance-card-default']"
-          @click="selectInstance(db)"
-        >
-          <StatusDot :status="selectedUid === instanceUid(db) ? 'selected' : (onlineStatus[instanceUid(db)] !== false ? 'online' : 'offline')" size="xs" />
-          <span class="font-medium text-[13px]" style="color: var(--text-primary)">{{ db.name }}</span>
-          <span class="instance-type-badge">{{ db.type }}</span>
-          <span class="text-[11px] font-mono-data" style="color: var(--text-tertiary)">{{ db.host }}:{{ db.port }}</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Empty State -->
-    <div v-if="!metrics && !loadError" class="empty-state flex-1 py-20">
+    <div v-if="!metrics && !loadError && databases.length === 0" class="empty-state flex-1 py-20">
       <div class="flex flex-col items-center gap-3" style="color: var(--text-tertiary)">
         <Gauge :size="56" class="empty-state-icon" />
-        <span class="empty-state-text">选择一个数据库实例查看实时指标</span>
+        <span class="empty-state-text">暂无数据库实例，请先添加连接</span>
       </div>
     </div>
 
@@ -80,12 +63,6 @@
       <Button size="sm" variant="ghost" class="ml-auto h-auto px-2 py-0.5 text-xs" style="color: var(--danger)" @click="loadError = ''; fetchMetrics()">重试</Button>
     </div>
 
-    <!-- Switching Loader -->
-    <div v-if="switching" class="flex flex-col items-center justify-center gap-3 py-16 fade-up" style="color: var(--text-tertiary); font-size: 13px;">
-      <Loader2 :size="32" class="animate-spin" style="color: var(--accent)" />
-      <span>正在加载 {{ switchingName }} 的指标...</span>
-    </div>
-
     <template v-if="metrics">
       <!-- Offline Banner -->
       <div v-if="metrics.online === false" class="flex items-center gap-2 px-4 py-2.5 mb-4 rounded-xl fade-up" style="background: var(--warning-soft); border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent); color: var(--warning); font-size: 12px;">
@@ -94,30 +71,70 @@
       </div>
 
       <!-- Stat Cards -->
-      <div class="grid grid-cols-2 md:grid-cols-4 grid-gap section-gap shrink-0 fade-up" style="animation-delay: 120ms">
-        <!-- Instance Card -->
-        <div class="content-card hover-lift stat-padding">
-          <div class="flex items-start justify-between">
-            <div class="flex-1 min-w-0">
-              <div class="stat-label">当前实例</div>
-              <div class="stat-value text-base truncate" style="color: var(--text-primary)">{{ instanceName }}</div>
-              <div class="text-[11px] font-mono-data mt-0.5" style="color: var(--text-tertiary)">{{ metrics.host }}:{{ metrics.port }}</div>
+      <div :class="['grid grid-cols-2 md:grid-cols-4 grid-gap section-gap shrink-0 fade-up', contentFading ? 'content-fading' : '']" style="animation-delay: 120ms">
+        <!-- Instance Card (drum picker) -->
+        <div
+          :class="['content-card cursor-pointer relative hover-lift instance-card']"
+          @click="toggleInstancePicker"
+          @wheel.prevent="onPickerWheel"
+          @mouseleave="onCardMouseLeave"
+          @mouseenter="onCardMouseEnter"
+        >
+          <!-- Normal view -->
+          <template v-if="!showInstancePicker">
+            <div ref="instanceNameContainer" class="flex items-center justify-center h-full w-full">
+              <div
+                class="font-bold text-center leading-tight instance-name-text"
+                :style="{ fontSize: instanceFontSize + 'px', opacity: instanceNameVisible ? 1 : 0 }"
+              >{{ instanceName || '选择实例' }}</div>
             </div>
-            <div class="stat-icon" style="background: var(--accent-soft); color: var(--accent)">
-              <Monitor class="h-4 w-4" />
+          </template>
+          <!-- Drum picker view (replaces card content) -->
+          <template v-else>
+            <div class="drum-viewport" @click.stop>
+              <div
+                class="drum-track"
+                :style="{ transform: `translateY(${-drumVirtualPos * ROW_H}px)` }"
+              >
+                <div
+                  v-for="(item, vi) in drumVirtualList"
+                  :key="vi"
+                  :class="['drum-item', vi === drumVirtualPos ? 'drum-item-active' : '']"
+                  :style="drumItemStyle(vi)"
+                  @click.stop="drumSelectVirtual(vi)"
+                >
+                  <StatusDot :status="vi === drumVirtualPos ? 'selected' : (onlineStatus[instanceUid(item)] !== false ? 'online' : 'offline')" size="xs" />
+                  <span :class="vi === drumVirtualPos ? 'text-[13px] font-semibold' : 'text-[11px] font-medium'" class="truncate flex-1 min-w-0" :style="vi === drumVirtualPos ? 'color: var(--text-primary)' : 'color: var(--text-tertiary)'">{{ item.name }}</span>
+                  <span :class="['instance-type-badge ml-auto shrink-0', vi !== drumVirtualPos ? 'instance-type-badge-dim' : '']">{{ item.type }}</span>
+                </div>
+              </div>
+              <!-- center highlight -->
+              <div class="drum-highlight" />
             </div>
-          </div>
+          </template>
         </div>
 
         <!-- Uptime Card -->
-        <div class="content-card hover-lift stat-padding">
+        <div :class="['content-card hover-lift stat-padding cursor-pointer', uptimeFlipping ? 'card-flip' : '']" @click="flipCard('uptime')">
           <div class="flex items-start justify-between">
-            <div class="flex-1 min-w-0">
-              <div class="stat-label">运行时间</div>
-              <div class="stat-value text-base truncate" style="color: var(--text-primary)">{{ metrics.uptime_display || '-' }}</div>
+            <div ref="addrContainer" class="flex-1 min-w-0">
+              <template v-if="!uptimeShowAddr">
+                <div class="stat-label">运行时间</div>
+                <div class="stat-value text-base" style="color: var(--text-primary)">{{ metrics.uptime_display || '-' }}</div>
+              </template>
+              <template v-else>
+                <div class="stat-label">连接地址</div>
+                <div
+                  ref="addrEl"
+                  class="stat-value font-mono-data"
+                  style="color: var(--text-primary); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-all; transition: font-size 0.15s ease"
+                  :style="{ fontSize: addrFontSize + 'px' }"
+                >{{ uptimeAddrDisplay }}</div>
+              </template>
             </div>
-            <div class="stat-icon" style="background: var(--success-soft); color: var(--success)">
-              <Clock class="h-4 w-4" />
+            <div class="stat-icon shrink-0" style="background: var(--success-soft); color: var(--success)">
+              <Clock v-if="!uptimeShowAddr" class="h-4 w-4" />
+              <Globe v-else class="h-4 w-4" />
             </div>
           </div>
         </div>
@@ -151,7 +168,7 @@
                     }"
                   />
                 </div>
-                <span class="text-[11px] font-mono-data shrink-0 leading-[16px]" style="color: var(--text-tertiary)">{{ metrics.connection_usage }}%</span>
+                <span class="text-[11px] font-mono-data shrink-0 leading-[16px]" style="color: var(--text-tertiary)">{{ metrics.connection_usage === 'N/A' ? 'N/A' : connUsageNum.toFixed(1) + '%' }}</span>
               </div>
             </div>
             <div
@@ -168,11 +185,17 @@
         </div>
 
         <!-- QPS Card -->
-        <div class="content-card hover-lift stat-padding">
+        <div :class="['content-card hover-lift stat-padding cursor-pointer', qpsFlipping ? 'card-flip' : '']" @click="flipCard('qps')">
           <div class="flex items-start justify-between">
             <div class="flex-1 min-w-0">
-              <div class="stat-label">{{ metrics.type === 'redis' ? '每秒操作' : 'QPS' }}</div>
-              <div class="stat-value text-base truncate font-mono-data" style="color: var(--text-primary)">{{ metrics.qps || metrics.ops_per_sec || '-' }}</div>
+              <template v-if="!qpsShowTps">
+                <div class="stat-label">{{ qpsLabel }}</div>
+                <div class="stat-value text-base truncate font-mono-data" style="color: var(--text-primary)">{{ metrics.qps || metrics.ops_per_sec || '-' }}</div>
+              </template>
+              <template v-else>
+                <div class="stat-label">{{ tpsLabel }}</div>
+                <div class="stat-value text-base truncate font-mono-data" style="color: var(--text-primary)">{{ metrics.tps || '-' }}</div>
+              </template>
             </div>
             <div class="stat-icon" style="background: var(--warning-soft); color: var(--warning)">
               <TrendingUp class="h-4 w-4" />
@@ -182,12 +205,8 @@
       </div>
 
       <!-- Process Panel -->
-      <div v-if="showProcessPanel && metrics.type === 'mysql' && metrics.processlist" class="section-gap shrink-0 fade-up" style="animation-delay: 180ms">
+      <div v-if="showProcessPanel && (metrics.type === 'mysql' || metrics.type === 'postgresql') && metrics.processlist" :class="['section-gap shrink-0 fade-up', contentFading ? 'content-fading' : '']" style="animation-delay: 180ms">
         <div class="content-card stat-padding">
-          <div class="flex items-center gap-2 text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">
-            当前连接
-            <span class="text-[11px] font-normal" style="color: var(--text-tertiary)">{{ metrics.processlist.length }} 个</span>
-          </div>
           <Table>
             <TableHeader>
               <TableRow class="hover:bg-transparent" style="border-bottom: 1px solid var(--border-subtle)">
@@ -225,7 +244,7 @@
       </div>
 
       <!-- Chart Cards -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 grid-gap section-gap shrink-0 fade-up" style="animation-delay: 240ms">
+      <div :class="['grid grid-cols-1 lg:grid-cols-2 grid-gap section-gap shrink-0 fade-up', contentFading ? 'content-fading' : '']" style="animation-delay: 240ms">
         <div class="content-card stat-padding">
           <div class="flex justify-between items-center mb-3">
             <span class="text-xs font-semibold" style="color: var(--text-primary)">网络</span>
@@ -241,8 +260,8 @@
         </div>
       </div>
 
-      <!-- MySQL Detail Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 grid-gap shrink-0 fade-up" style="animation-delay: 300ms" v-if="metrics.type === 'mysql'">
+      <Transition name="detail-cards" mode="out-in">
+      <div v-if="metrics.type === 'mysql'" key="mysql" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 grid-gap shrink-0">
         <!-- Threads -->
         <div class="content-card stat-padding">
           <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">线程</div>
@@ -286,14 +305,14 @@
         </div>
 
         <!-- Query Distribution -->
-        <div v-if="metrics" class="content-card stat-padding">
+        <div v-if="metrics" class="content-card stat-padding flex flex-col">
           <div class="flex items-center justify-between mb-3 pb-2" style="border-bottom: 1px solid var(--border-subtle)">
             <span class="text-xs font-semibold" style="color: var(--text-primary)">查询分布</span>
             <span v-if="rangeStatsAvailable" class="text-[10px] px-1.5 py-0.5 rounded" style="background: var(--accent-soft); color: var(--accent)">{{ timeRangeLabel }}</span>
           </div>
-          <div v-if="queryTotal > 0" class="flex items-center gap-4">
-            <!-- Donut Chart -->
-            <div class="relative shrink-0" style="width: 100px; height: 100px;">
+          <div v-if="queryTotal > 0" class="relative flex-1" style="min-height: 80px;">
+            <!-- Donut center -->
+            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style="width: min(50%, 100px); aspect-ratio: 1;">
               <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
                 <circle cx="18" cy="18" r="14" fill="none" stroke="var(--border-subtle)" stroke-width="4" />
                 <circle v-for="(seg, i) in queryDonutSegments" :key="i"
@@ -306,19 +325,41 @@
                 />
               </svg>
               <div class="absolute inset-0 flex flex-col items-center justify-center">
-                <span class="text-[13px] font-bold font-mono-data" style="color: var(--text-primary)">{{ formatNum(queryTotal) }}</span>
-                <span class="text-[9px]" style="color: var(--text-tertiary)">总数</span>
+                <span class="text-[11px] font-bold font-mono-data" style="color: var(--text-primary)">{{ formatNum(queryTotal) }}</span>
+                <span class="text-[7px]" style="color: var(--text-tertiary)">总数</span>
               </div>
             </div>
-            <!-- Legend -->
-            <div class="flex-1 flex flex-col gap-2">
-              <div v-for="item in queryLegend" :key="item.label" class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: item.color }" />
-                <span class="text-[11px] font-semibold shrink-0 w-[48px]" style="color: var(--text-secondary)">{{ item.label }}</span>
-                <div class="flex-1" />
-                <span class="text-[11px] font-mono-data shrink-0" style="color: var(--text-primary)">{{ formatNum(item.value) }}</span>
-                <span class="text-[10px] font-mono-data shrink-0 w-[36px] text-right" style="color: var(--text-tertiary)">{{ item.pct }}%</span>
+            <!-- Top Left: SELECT -->
+            <div class="absolute top-0 left-0">
+              <div class="flex items-center gap-0.5">
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ background: queryLegend[0]?.color }" />
+                <span class="text-[9px] font-semibold" style="color: var(--text-secondary)">{{ queryLegend[0]?.label }}</span>
               </div>
+              <span class="text-[8px] font-mono-data pl-2" style="color: var(--text-tertiary)">{{ formatNum(queryLegend[0]?.value) }}</span>
+            </div>
+            <!-- Top Right: INSERT -->
+            <div class="absolute top-0 right-0">
+              <div class="flex items-center gap-0.5">
+                <span class="text-[9px] font-semibold" style="color: var(--text-secondary)">{{ queryLegend[1]?.label }}</span>
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ background: queryLegend[1]?.color }" />
+              </div>
+              <span class="text-[8px] font-mono-data pr-2" style="color: var(--text-tertiary)">{{ formatNum(queryLegend[1]?.value) }}</span>
+            </div>
+            <!-- Bottom Left: UPDATE -->
+            <div class="absolute bottom-0 left-0">
+              <div class="flex items-center gap-0.5">
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ background: queryLegend[2]?.color }" />
+                <span class="text-[9px] font-semibold" style="color: var(--text-secondary)">{{ queryLegend[2]?.label }}</span>
+              </div>
+              <span class="text-[8px] font-mono-data pl-2" style="color: var(--text-tertiary)">{{ formatNum(queryLegend[2]?.value) }}</span>
+            </div>
+            <!-- Bottom Right: DELETE -->
+            <div class="absolute bottom-0 right-0">
+              <div class="flex items-center gap-0.5">
+                <span class="text-[9px] font-semibold" style="color: var(--text-secondary)">{{ queryLegend[3]?.label }}</span>
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ background: queryLegend[3]?.color }" />
+              </div>
+              <span class="text-[8px] font-mono-data pr-2" style="color: var(--text-tertiary)">{{ formatNum(queryLegend[3]?.value) }}</span>
             </div>
           </div>
           <div v-else class="flex items-center justify-center py-4 text-[12px]" style="color: var(--text-tertiary)">
@@ -332,21 +373,21 @@
           <div class="flex flex-col gap-2">
             <div class="flex justify-between items-center">
               <span class="text-xs" style="color: var(--text-secondary)">命中率</span>
-              <span :class="['text-xs font-semibold font-mono-data']" :style="parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'color: var(--success)' : 'color: var(--warning)'">
-                {{ metrics.innodb_buffer_pool_hit_rate }}%
+              <span :class="['text-xs font-semibold font-mono-data']" :style="(parseFloat(metrics.innodb_buffer_pool_hit_rate) || 0) > 95 ? 'color: var(--success)' : 'color: var(--warning)'">
+                {{ metrics.innodb_buffer_pool_hit_rate || '0.00' }}%
               </span>
             </div>
             <div class="flex justify-between items-center">
               <span class="text-xs" style="color: var(--text-secondary)">空闲页</span>
-              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.innodb_buffer_pool_pages_free }}</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.innodb_buffer_pool_pages_free || '-' }}</span>
             </div>
             <div class="flex justify-between items-center">
               <span class="text-xs" style="color: var(--text-secondary)">总页数</span>
-              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.innodb_buffer_pool_pages_total }}</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.innodb_buffer_pool_pages_total || '-' }}</span>
             </div>
             <div class="flex justify-between items-center">
               <span class="text-xs" style="color: var(--text-secondary)">脏页</span>
-              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.innodb_buffer_pool_pages_dirty }}</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.innodb_buffer_pool_pages_dirty || '-' }}</span>
             </div>
           </div>
           <div class="mt-3">
@@ -355,7 +396,7 @@
                 class="h-full rounded-full transition-all"
                 :style="{
                   width: Math.min(parseFloat(metrics.innodb_buffer_pool_hit_rate) || 0, 100) + '%',
-                  background: parseFloat(metrics.innodb_buffer_pool_hit_rate) > 95 ? 'var(--success)' : 'var(--warning)'
+                  background: (parseFloat(metrics.innodb_buffer_pool_hit_rate) || 0) > 95 ? 'var(--success)' : 'var(--warning)'
                 }"
               />
             </div>
@@ -388,8 +429,7 @@
         </div>
       </div>
 
-      <!-- Redis Detail Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 grid-gap shrink-0 fade-up" style="animation-delay: 300ms" v-if="metrics.type === 'redis'">
+      <div v-else-if="metrics.type === 'redis'" key="redis" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 grid-gap shrink-0">
         <!-- Memory -->
         <div class="content-card stat-padding">
           <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">内存</div>
@@ -442,8 +482,8 @@
             </div>
             <div class="flex justify-between items-center">
               <span class="text-xs" style="color: var(--text-secondary)">命中率</span>
-              <span :class="['text-xs font-semibold font-mono-data']" :style="parseFloat(metrics.hit_rate) > 90 ? 'color: var(--success)' : 'color: var(--warning)'">
-                {{ metrics.hit_rate }}%
+              <span :class="['text-xs font-semibold font-mono-data']" :style="(parseFloat(metrics.hit_rate) || 0) > 90 ? 'color: var(--success)' : 'color: var(--warning)'">
+                {{ metrics.hit_rate || '0.00' }}%
               </span>
             </div>
           </div>
@@ -466,13 +506,151 @@
           </div>
         </div>
       </div>
+
+      <div v-else-if="metrics.type === 'postgresql'" key="postgresql" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 grid-gap shrink-0">
+        <!-- Cache Hit Rate -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">缓存命中率</div>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">命中率</span>
+              <span :class="['text-xs font-semibold font-mono-data']" :style="(parseFloat(metrics.cache_hit_rate) || 0) > 95 ? 'color: var(--success)' : 'color: var(--warning)'">
+                {{ metrics.cache_hit_rate || '0.00' }}%
+              </span>
+            </div>
+            <div class="mt-1">
+              <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--border-subtle)">
+                <div
+                  class="h-full rounded-full transition-all"
+                  :style="{
+                    width: Math.min(parseFloat(metrics.cache_hit_rate) || 0, 100) + '%',
+                    background: (parseFloat(metrics.cache_hit_rate) || 0) > 95 ? 'var(--success)' : 'var(--warning)'
+                  }"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transaction Stats -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">事务统计</div>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">已提交</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--success)">{{ formatNum(metrics.xact_commit) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">已回滚</span>
+              <span :class="['text-xs font-semibold font-mono-data']" :style="parseInt(metrics.xact_rollback) > 0 ? 'color: var(--warning)' : 'color: var(--text-primary)'">{{ formatNum(metrics.xact_rollback) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">数据库大小</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.data_total_size || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connection Info -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">连接信息</div>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">当前连接</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--accent)">{{ metrics.threads_connected }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">最大连接</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.max_connections }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">使用率</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.connection_usage }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="metrics.type === 'sqlite'" key="sqlite" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 grid-gap shrink-0">
+        <!-- Database Info -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">数据库信息</div>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">表数量</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--accent)">{{ metrics.table_count || '0' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">文件大小</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.data_total_size || '-' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">文件路径</span>
+              <span class="text-xs font-mono-data truncate max-w-[180px]" style="color: var(--text-tertiary)" :title="metrics.host">{{ metrics.host }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Journal Mode -->
+        <div class="content-card stat-padding">
+          <div class="text-xs font-semibold mb-3 pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-subtle)">存储引擎</div>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">日志模式</span>
+              <span class="text-xs font-semibold font-mono-data" :style="metrics.journal_mode === 'wal' ? 'color: var(--success)' : 'color: var(--text-primary)'">{{ metrics.journal_mode || '-' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs" style="color: var(--text-secondary)">版本</span>
+              <span class="text-xs font-semibold font-mono-data" style="color: var(--text-primary)">{{ metrics.version || '-' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      </Transition>
+
+      <!-- PostgreSQL Process Panel -->
+      <div v-if="showProcessPanel && metrics.type === 'postgresql' && metrics.processlist" :class="['section-gap shrink-0 fade-up', contentFading ? 'content-fading' : '']" style="animation-delay: 180ms">
+        <div class="content-card stat-padding">
+          <Table>
+            <TableHeader>
+              <TableRow class="hover:bg-transparent" style="border-bottom: 1px solid var(--border-subtle)">
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">PID</TableHead>
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">用户</TableHead>
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">来源</TableHead>
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">状态</TableHead>
+                <TableHead class="text-[11px] font-normal" style="color: var(--text-tertiary)">时长</TableHead>
+                <TableHead class="text-[11px] font-normal max-w-[300px]" style="color: var(--text-tertiary)">查询</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow
+                v-for="p in metrics.processlist"
+                :key="p.id"
+                :class="p.time > 10 ? 'process-row-danger' : 'process-row-normal'"
+                style="border-bottom: 1px solid var(--border-subtle)"
+              >
+                <TableCell class="font-mono-data text-[11px]" style="color: var(--text-primary)">{{ p.id }}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" class="text-[11px] font-medium" style="background: var(--muted); color: var(--text-primary)">{{ p.user || '-' }}</Badge>
+                </TableCell>
+                <TableCell class="font-mono-data text-[11px]" style="color: var(--text-secondary)">{{ p.host || '-' }}</TableCell>
+                <TableCell>
+                  <span class="badge-status badge-status-success text-[10px] font-semibold rounded-full">{{ p.command || '-' }}</span>
+                </TableCell>
+                <TableCell :class="['font-mono-data text-[11px]', p.time > 10 ? 'font-semibold' : '']" :style="p.time > 10 ? 'color: var(--danger)' : 'color: var(--text-primary)'">{{ p.time }}s</TableCell>
+                <TableCell class="text-xs max-w-[300px] truncate" style="color: var(--text-primary)" :title="p.info">{{ p.info || '-' }}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup>
 defineOptions({ name: 'DashboardView' })
-import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted, watch, inject } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted, watch, inject, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
@@ -481,13 +659,14 @@ import { sourceParam, instanceUid } from '@/lib/instance'
 import { Button } from '@/components/ui/Button.vue'
 import { Badge } from '@/components/ui/Badge.vue'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table.vue'
-import { RefreshCw, Gauge, CircleX, Loader2, Monitor, Clock, Link, TrendingUp } from 'lucide-vue-next'
+import { RefreshCw, Gauge, CircleX, Loader2, Monitor, Clock, Link, TrendingUp, Globe } from 'lucide-vue-next'
 import StatusDot from './StatusDot.vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
+import { STORAGE_KEYS, safeStorage } from '@/lib/storageKeys'
 
 const completeProgress = inject('completeProgress')
 
@@ -501,9 +680,60 @@ const metrics = ref(null)
 const loading = ref(false)
 const reloadingHistory = ref(false)
 const loadError = ref('')
-const switching = ref(false)
-const switchingName = ref('')
+const contentFading = ref(false)
 const showProcessPanel = ref(false)
+const showInstancePicker = ref(false)
+const uptimeShowAddr = ref(false)
+const qpsShowTps = ref(false)
+const uptimeFlipping = ref(false)
+const qpsFlipping = ref(false)
+let uptimeAutoSwitch = false // track if we auto-switched
+
+// Horizontal flip animation for cards
+const flipCard = (card) => {
+  // Don't flip uptime card during drum scrolling
+  if (card === 'uptime' && showInstancePicker.value) return
+
+  const flippingRef = card === 'uptime' ? uptimeFlipping : qpsFlipping
+  const stateRef = card === 'uptime' ? uptimeShowAddr : qpsShowTps
+
+  flippingRef.value = true
+  // At halfway (90deg), toggle the content
+  setTimeout(() => {
+    stateRef.value = !stateRef.value
+  }, 200)
+  // After animation completes, remove flip class
+  setTimeout(() => {
+    flippingRef.value = false
+  }, 400)
+}
+
+// When picker opens, auto-switch uptime card to show address
+watch(showInstancePicker, (val) => {
+  if (val) {
+    if (!uptimeShowAddr.value) {
+      uptimeAutoSwitch = true
+      flipCard('uptime')
+    }
+  } else {
+    if (uptimeAutoSwitch) {
+      uptimeAutoSwitch = false
+      flipCard('uptime')
+    }
+  }
+})
+
+// Display address that follows drum preview
+const uptimeAddrDisplay = computed(() => {
+  if (showInstancePicker.value && drumVirtualPos.value >= 0) {
+    const dbs = sortedDatabases.value
+    if (dbs.length > 0) {
+      const db = dbs[drumVirtualPos.value % dbs.length]
+      if (db) return `${db.host}:${db.port}`
+    }
+  }
+  return `${metrics.value?.host || ''}:${metrics.value?.port || ''}`
+})
 const polling = ref(true)
 const countdown = ref(3)
 const connHistory = ref([])
@@ -527,15 +757,15 @@ const timeRanges = [
   { value: 86400, label: '24小时' },
   { value: 604800, label: '7天' },
 ]
-const TIME_RANGE_KEY = 'dashboard_time_range'
-const timeRange = ref(parseInt(localStorage.getItem(TIME_RANGE_KEY)) || 3600)
+const TIME_RANGE_KEY = STORAGE_KEYS.DASHBOARD_TIME_RANGE
+const timeRange = ref(parseInt(safeStorage.get(TIME_RANGE_KEY)) || 3600)
 const MAX_HISTORY_POINTS = 15000
 let pollTimer = null
 let countdownTimer = null
 let metricsRequestId = 0
 
 const getRefreshIntervalMs = () => {
-  const val = localStorage.getItem('refreshInterval')
+  const val = safeStorage.get(STORAGE_KEYS.DASHBOARD_REFRESH_INTERVAL)
   if (!val || val === 'off') return 0
   const ms = parseInt(val)
   if (isNaN(ms) || ms <= 0) return 0
@@ -550,6 +780,223 @@ const instanceName = computed(() => {
   if (!selectedUid.value) return ''
   return selectedDb.value ? selectedDb.value.name : ''
 })
+
+const instanceNameContainer = ref(null)
+const instanceFontSize = ref(28)
+const instanceNameVisible = ref(true)
+
+// 根据数据库类型返回QPS标签
+const qpsLabel = computed(() => {
+  const t = metrics.value?.type
+  if (t === 'redis') return '每秒操作'
+  if (t === 'postgresql') return 'QPS'
+  if (t === 'sqlite') return '读/秒'
+  return 'QPS'
+})
+
+// 根据数据库类型返回TPS标签
+const tpsLabel = computed(() => {
+  const t = metrics.value?.type
+  if (t === 'redis') return '命中/秒'
+  if (t === 'postgresql') return 'TPS'
+  if (t === 'sqlite') return '写/秒'
+  return 'TPS'
+})
+
+// 连接地址自适应字号
+const addrContainer = ref(null)
+const addrEl = ref(null)
+const addrFontSize = ref(16)
+
+const calcAddrFontSize = () => {
+  const container = addrContainer.value
+  const el = addrEl.value
+  if (!container || !el) return
+
+  const containerW = container.clientWidth
+  if (!containerW) return
+
+  // 临时设置nowrap确保测量准确
+  const origWS = el.style.whiteSpace
+  el.style.whiteSpace = 'nowrap'
+
+  let size = 16
+  el.style.fontSize = size + 'px'
+  while (size > 9 && el.scrollWidth > containerW) {
+    size -= 1
+    el.style.fontSize = size + 'px'
+  }
+  addrFontSize.value = size
+
+  // 恢复
+  el.style.whiteSpace = origWS
+}
+
+watch(uptimeShowAddr, (v) => {
+  if (v) nextTick(() => calcAddrFontSize())
+})
+watch(uptimeAddrDisplay, () => {
+  if (uptimeShowAddr.value) nextTick(() => calcAddrFontSize())
+})
+
+// 动态计算最大字体大小：尽可能大，但不超出容器
+const CHAR_WIDTH_RATIO = 0.6 // 中英混合字符平均宽度与字号的比例
+
+// 纯计算字号，不依赖DOM
+const calcFontSizeForName = (name) => {
+  const container = instanceNameContainer.value
+  if (!container) return 28
+
+  const containerW = container.clientWidth
+  const containerH = container.clientHeight
+  if (!name || !containerW || !containerH) return 28
+
+  const charCount = name.length
+  const singleLineSize = Math.min(containerH, Math.floor(containerW / (charCount * CHAR_WIDTH_RATIO)))
+
+  if (singleLineSize >= 18) {
+    return Math.min(singleLineSize, 48)
+  }
+
+  const halfChars = Math.ceil(charCount / 2)
+  const twoLineSize = Math.min(
+    Math.floor(containerH / 2.4),
+    Math.floor(containerW / (halfChars * CHAR_WIDTH_RATIO)),
+    28
+  )
+  return Math.max(twoLineSize, 14)
+}
+
+const calcInstanceFontSize = () => {
+  const name = instanceName.value || '选择实例'
+  instanceFontSize.value = calcFontSizeForName(name)
+}
+
+watch(instanceName, (newName) => {
+  // 先隐藏
+  instanceNameVisible.value = false
+  // 立即算好字号（容器尺寸没变，可以直接算）
+  instanceFontSize.value = calcFontSizeForName(newName || '选择实例')
+  // 下一帧淡入（此时字号已确定，名称和字号同时渲染）
+  requestAnimationFrame(() => {
+    instanceNameVisible.value = true
+  })
+})
+
+onMounted(() => {
+  nextTick(() => calcInstanceFontSize())
+  // 监听容器大小变化
+  if (instanceNameContainer.value) {
+    const ro = new ResizeObserver(() => calcInstanceFontSize())
+    ro.observe(instanceNameContainer.value)
+    onUnmounted(() => ro.disconnect())
+  }
+})
+
+const toggleInstancePicker = () => {
+  if (showInstancePicker.value) {
+    showInstancePicker.value = false
+  } else {
+    showInstancePicker.value = true
+    initDrumPos()
+  }
+}
+
+const pickInstance = (db) => {
+  selectInstance(db)
+}
+
+// Drum picker with virtual looping list
+let mouseLeaveTimer = null
+const ROW_H = 26
+const DRUM_REPEATS = 20
+
+const drumIndex = computed(() => {
+  if (!selectedUid.value) return 0
+  const idx = sortedDatabases.value.findIndex(d => instanceUid(d) === selectedUid.value)
+  return idx >= 0 ? idx : 0
+})
+
+// Virtual list: repeat sortedDatabases N times
+const drumVirtualList = computed(() => {
+  const dbs = sortedDatabases.value
+  if (dbs.length === 0) return []
+  const list = []
+  for (let r = 0; r < DRUM_REPEATS; r++) {
+    for (let i = 0; i < dbs.length; i++) {
+      list.push(dbs[i])
+    }
+  }
+  return list
+})
+
+// Track virtual position directly (no recalculation from real index)
+const drumVirtualPos = ref(0)
+
+// Initialize virtual position when opening picker
+const initDrumPos = () => {
+  const dbs = sortedDatabases.value
+  drumVirtualPos.value = Math.floor(DRUM_REPEATS / 2) * dbs.length + drumIndex.value
+}
+
+const drumItemStyle = (vi) => {
+  const dist = Math.abs(vi - drumVirtualPos.value)
+  const scale = dist === 0 ? 1 : Math.max(0.82, 1 - dist * 0.1)
+  const opacity = dist === 0 ? 1 : Math.max(0.3, 1 - dist * 0.25)
+  return {
+    transform: `scale(${scale})`,
+    opacity,
+  }
+}
+
+// Click a virtual row
+const drumSelectVirtual = (vi) => {
+  const dbs = sortedDatabases.value
+  if (dbs.length === 0) return
+  if (vi === drumVirtualPos.value) {
+    // Confirm current selection
+    const realIdx = vi % dbs.length
+    const db = dbs[realIdx]
+    if (db) selectInstance(db)
+    showInstancePicker.value = false
+  } else {
+    // Preview: just move to that position
+    drumVirtualPos.value = vi
+  }
+}
+
+const onPickerWheel = (e) => {
+  const dbs = sortedDatabases.value
+  if (dbs.length <= 1) return
+  // 如果 picker 没打开，先打开再切换
+  if (!showInstancePicker.value) {
+    showInstancePicker.value = true
+    initDrumPos()
+  }
+  // 确保运行时间卡片翻转到地址面
+  if (!uptimeShowAddr.value) {
+    uptimeAutoSwitch = true
+    flipCard('uptime')
+  }
+  const dir = e.deltaY > 0 ? 1 : -1
+  drumVirtualPos.value += dir
+}
+
+const onCardMouseLeave = () => {
+  if (!showInstancePicker.value) return
+  mouseLeaveTimer = setTimeout(() => {
+    showInstancePicker.value = false
+  }, 1000)
+}
+
+const onCardMouseEnter = () => {
+  if (mouseLeaveTimer) {
+    clearTimeout(mouseLeaveTimer)
+    mouseLeaveTimer = null
+  }
+}
+
+// Close picker when clicking outside (handled by overlay click.self)
 
 const sortedDatabases = computed(() => {
   return [...databases.value].sort((a, b) => {
@@ -573,13 +1020,14 @@ watch(onlineStatus, (status) => {
 }, { deep: true })
 
 const formatNum = (val) => {
-  if (val == null) return '-'
-  const n = parseInt(val)
-  if (isNaN(n) || n < 0) return '0'
+  if (val == null || val === '-') return '-'
+  const n = parseFloat(val)
+  if (isNaN(n)) return '-'
+  if (n < 0) return '-'
   if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B'
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'
   if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'
-  return String(n)
+  return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
 
 const queryBarWidth = (val) => {
@@ -669,6 +1117,7 @@ const connStatusClass = computed(() => {
 const connCurrent = computed(() => {
   if (!metrics.value) return '-'
   if (metrics.value.type === 'redis') return metrics.value.connected_clients
+  if (metrics.value.type === 'sqlite') return '1'
   return metrics.value.threads_connected
 })
 
@@ -899,19 +1348,17 @@ const loadDatabases = () => {
   })
 }
 
-const checkAllOnlineStatus = async () => {
-  await healthStore.refreshAll()
+const checkAllOnlineStatus = () => {
+  healthStore.refreshAll()
 }
 
 const selectInstance = (db) => {
   if (selectedUid.value === instanceUid(db)) return
-  switchingName.value = db ? db.name : ''
-  switching.value = true
   loadError.value = ''
   showProcessPanel.value = false
   selectedUid.value = instanceUid(db)
-  metrics.value = null
   prevRawCounters.value = { questions: 0, writes: 0, timestamp: 0 }
+  contentFading.value = true
   fetchMetrics(true)
   if (db) {
     store.setContext({
@@ -947,6 +1394,12 @@ const fetchMetrics = (rebuildHistory = false) => {
           onlineStatus.value = { ...onlineStatus.value, [selectedUid.value]: data.data.online }
         }
         loadError.value = ''
+
+        // 自动翻卡片：轮询刷新时交替显示地址/名称
+        if (!rebuildHistory) {
+          flipCard('uptime')
+          flipCard('qps')
+        }
 
         if (rebuildHistory && data.data.traffic?.echarts) {
           const echarts = data.data.traffic.echarts
@@ -1021,7 +1474,7 @@ const fetchMetrics = (rebuildHistory = false) => {
       if (rid !== metricsRequestId) return
       loading.value = false
       reloadingHistory.value = false
-      switching.value = false
+      contentFading.value = false
     })
 }
 
@@ -1037,9 +1490,9 @@ const togglePolling = () => {
 const startPolling = () => {
   stopPolling()
   let intervalMs = getRefreshIntervalMs()
-  if (intervalMs === 0) {
+  if (intervalMs === 0 || intervalMs < 5000) {
     intervalMs = 10000
-    localStorage.setItem('refreshInterval', '10000')
+    safeStorage.set(STORAGE_KEYS.DASHBOARD_REFRESH_INTERVAL, '10000')
   }
   polling.value = true
   const countdownSec = Math.floor(intervalMs / 1000)
@@ -1067,14 +1520,14 @@ watch(connectionId, (newId) => {
     const matchDb = databases.value.find(d => instanceUid(d) === newId)
     if (matchDb && instanceUid(matchDb) !== selectedUid.value) {
       selectedUid.value = instanceUid(matchDb)
-      metrics.value = null
+      contentFading.value = true
       fetchMetrics(true)
     }
   }
 })
 
 watch(timeRange, (newVal) => {
-  localStorage.setItem(TIME_RANGE_KEY, newVal)
+  safeStorage.set(TIME_RANGE_KEY, newVal)
   if (selectedUid.value) {
     loadError.value = ''
     fetchMetrics(true)
@@ -1088,7 +1541,8 @@ onMounted(() => {
 })
 
 onActivated(() => {
-  loadDatabases()
+  // 仅在数据为空时重新加载，避免 KeepAlive 切换时重复请求
+  if (databases.value.length === 0) loadDatabases()
   if (!pollTimer && polling.value) startPolling()
 })
 
@@ -1115,38 +1569,117 @@ const onRefreshIntervalChange = () => {
 </script>
 
 <style scoped>
-/* Instance selector cards */
+/* Card horizontal flip animation */
+.card-flip {
+  animation: cardFlipX 0.4s ease-in-out;
+}
+@keyframes cardFlipX {
+  0% { transform: perspective(600px) rotateY(0deg); }
+  50% { transform: perspective(600px) rotateY(90deg); }
+  100% { transform: perspective(600px) rotateY(0deg); }
+}
+
+/* Instance name text - smooth opacity transition */
+.instance-name-text {
+  color: var(--text-primary);
+  transition: opacity 0.25s ease, font-size 0.15s ease;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Instance card - compact padding to match other cards */
 .instance-card {
+  padding: 6px var(--stat-padding-x);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+.instance-card:hover {
+  transform: scale(1.06);
+  z-index: 10;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Drum picker - iOS style sliding */
+.drum-viewport {
+  position: relative;
+  height: 78px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+}
+.drum-track {
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding-top: 26px;
+}
+.drum-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 12px;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  white-space: nowrap;
+}
+.drum-item:hover {
+  background: var(--muted);
+}
+.drum-item-active {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 0 10px;
+}
+.drum-highlight {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 26px;
+  transform: translateY(-50%);
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  pointer-events: none;
+}
+.instance-type-badge-dim {
+  opacity: 0.5;
+}
+
+/* Instance selector */
+.instance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 9999px;
   cursor: pointer;
   transition: all var(--transition-normal);
   white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.instance-card-default {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border);
   background: var(--surface);
+  color: var(--text-primary);
 }
-
-.instance-card-default:hover {
+.instance-pill:hover {
   border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   box-shadow: var(--card-shadow-hover);
   transform: translateY(-1px);
 }
-
-.instance-card-active {
-  border-left: 3px solid var(--accent);
-  border-top: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  border-right: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+.instance-pill-active {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   background: var(--accent-soft);
 }
-
+.instance-pill-active .instance-type-badge {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
 .instance-type-badge {
   font-size: 10px;
   font-weight: 600;
@@ -1156,30 +1689,6 @@ const onRefreshIntervalChange = () => {
   background: var(--muted);
   color: var(--text-secondary);
   text-transform: uppercase;
-}
-
-.instance-card-active .instance-type-badge {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
-}
-
-/* Instance scroll container */
-.instance-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-.instance-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-
-.instance-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.instance-scroll::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 9999px;
 }
 
 /* Refresh ring animation */
@@ -1213,6 +1722,47 @@ const onRefreshIntervalChange = () => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Content fading during instance switch */
+.content-fading {
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+/* Detail cards transition - out-in mode */
+.detail-cards-leave-active {
+  transition: opacity 0.15s ease-in, transform 0.15s ease-in;
+}
+.detail-cards-leave-to {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.detail-cards-enter-active {
+  transition: opacity 0.1s ease;
+}
+.detail-cards-enter-from {
+  opacity: 0;
+}
+.detail-cards-enter-active .content-card {
+  animation: cardSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.detail-cards-enter-active .content-card:nth-child(1) { animation-delay: 0ms; }
+.detail-cards-enter-active .content-card:nth-child(2) { animation-delay: 60ms; }
+.detail-cards-enter-active .content-card:nth-child(3) { animation-delay: 120ms; }
+.detail-cards-enter-active .content-card:nth-child(4) { animation-delay: 180ms; }
+.detail-cards-enter-active .content-card:nth-child(5) { animation-delay: 240ms; }
+
+@keyframes cardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
   }
 }
 </style>

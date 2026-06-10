@@ -13,30 +13,22 @@
 
         <div class="flex flex-col gap-1.5">
           <label class="text-[12px] font-medium" style="color: var(--text-secondary)">类型 <span style="color: var(--danger)">*</span></label>
-          <div class="flex gap-1">
+          <div class="flex gap-1 flex-wrap">
             <button
+              v-for="t in [
+                { key: 'mysql', label: 'MySQL' },
+                { key: 'mariadb', label: 'MariaDB' },
+                { key: 'postgresql', label: 'PostgreSQL' },
+                { key: 'redis', label: 'Redis' },
+                { key: 'sqlite', label: 'SQLite' },
+              ]"
+              :key="t.key"
               type="button"
               class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
-              :class="form.type === 'mysql' ? 'tab-active' : 'tab-inactive'"
-              @click="onTypeChange('mysql')"
+              :class="form.type === t.key ? 'tab-active' : 'tab-inactive'"
+              @click="onTypeChange(t.key)"
             >
-              MySQL
-            </button>
-            <button
-              type="button"
-              class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
-              :class="form.type === 'mariadb' ? 'tab-active' : 'tab-inactive'"
-              @click="onTypeChange('mariadb')"
-            >
-              MariaDB
-            </button>
-            <button
-              type="button"
-              class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
-              :class="form.type === 'redis' ? 'tab-active' : 'tab-inactive'"
-              @click="onTypeChange('redis')"
-            >
-              Redis
+              {{ t.label }}
             </button>
           </div>
         </div>
@@ -70,6 +62,32 @@
                 5.6
               </button>
             </template>
+            <template v-if="form.type === 'postgresql'">
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '16.x' ? 'tab-active' : 'tab-inactive'"
+                @click="form.version = '16.x'"
+              >
+                16.x
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '15.x' ? 'tab-active' : 'tab-inactive'"
+                @click="form.version = '15.x'"
+              >
+                15.x
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '14.x' ? 'tab-active' : 'tab-inactive'"
+                @click="form.version = '14.x'"
+              >
+                14.x
+              </button>
+            </template>
             <template v-if="form.type === 'redis'">
               <button
                 type="button"
@@ -86,6 +104,16 @@
                 @click="form.version = '6.x'"
               >
                 6.x
+              </button>
+            </template>
+            <template v-if="form.type === 'sqlite'">
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '3.x' ? 'tab-active' : 'tab-inactive'"
+                @click="form.version = '3.x'"
+              >
+                3.x
               </button>
             </template>
           </div>
@@ -199,6 +227,12 @@ const onTypeChange = (type) => {
   form.type = type
   if (type === 'redis') {
     form.port = 6379
+    form.version = ''
+  } else if (type === 'postgresql') {
+    form.port = 5432
+    form.version = ''
+  } else if (type === 'sqlite') {
+    form.port = 0
     form.version = ''
   } else {
     form.port = 23366

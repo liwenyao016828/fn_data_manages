@@ -121,6 +121,24 @@
             <div class="content-card flex flex-col">
               <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-subtle)">
                 <div class="flex flex-col gap-0.5">
+                  <span class="text-[13px] font-medium" style="color: var(--text-primary)">主题模式</span>
+                  <span class="text-[11px]" style="color: var(--text-tertiary)">{{ themeModeLabel }}</span>
+                </div>
+                <div class="inline-flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)]">
+                  <button
+                    v-for="item in themeOptions"
+                    :key="item.value"
+                    :class="themeStore.themeMode === item.value ? 'tab-active' : 'tab-inactive'"
+                    class="px-3 py-1.5 text-[12px] inline-flex items-center gap-1.5"
+                    @click="setThemeMode(item.value)"
+                  >
+                    <component :is="item.icon" class="h-3.5 w-3.5" />
+                    {{ item.label }}
+                  </button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--border-subtle)">
+                <div class="flex flex-col gap-0.5">
                   <span class="text-[13px] font-medium" style="color: var(--text-primary)">侧边栏状态</span>
                   <span class="text-[11px]" style="color: var(--text-tertiary)">{{ sidebarCollapsed ? '已收起' : '已展开' }}</span>
                 </div>
@@ -268,7 +286,7 @@
                     <div class="text-[12px] font-medium truncate" style="color: var(--text-primary)">{{ item.name }}</div>
                     <div class="text-[10px] truncate font-mono-data" style="color: var(--text-tertiary)">{{ item.host }}:{{ item.port }}</div>
                   </div>
-                  <span class="pill pill-default text-[10px]">{{ item.type === 'redis' ? 'Redis' : 'MySQL' }}</span>
+                  <span class="pill pill-default text-[10px]">{{ getTypeLabel(item.type) }}</span>
                   <span v-if="item.latencyMs >= 0" class="text-[11px] font-mono-data w-[50px] text-right" style="color: var(--text-tertiary)">{{ item.latencyMs }}ms</span>
                   <span v-if="!item.online && item.error" class="text-xs max-w-[140px] truncate" style="color: var(--danger)" :title="item.error">{{ item.error }}</span>
                 </div>
@@ -309,10 +327,10 @@
               @click="selectInstance(db.id)"
             >
               <div class="text-[13px] font-semibold truncate" style="color: var(--text-primary)">{{ db.name }}</div>
-              <div class="flex items-center gap-1.5 text-xs mt-1.5">
+              <div class="flex items-center gap-1.5 text-xs mt-1.5 min-w-0">
                 <StatusDot :status="selectedDbId === db.id ? 'selected' : (onlineStatus[instanceUid(db)] !== false ? 'online' : 'offline')" size="xs" />
-                <span style="color: var(--text-secondary)">{{ db.type === 'redis' ? 'Redis' : 'MySQL' }}</span>
-                <span class="ml-auto font-mono-data text-[11px]" style="color: var(--text-tertiary)">{{ db.host }}:{{ db.port }}</span>
+                <span class="shrink-0" style="color: var(--text-secondary)">{{ getTypeLabel(db.type) }}</span>
+                <span class="ml-auto font-mono-data text-[11px] truncate min-w-0" style="color: var(--text-tertiary)">{{ db.host }}:{{ db.port }}</span>
               </div>
             </div>
             <div v-if="(instanceTab === 'local' ? localInstances : remoteInstances).length === 0"
@@ -336,18 +354,18 @@
                 @click="detailTab = 'info'"
               >基本信息</button>
               <button
-                v-if="currentDb.type === 'mysql' || currentDb.type === 'redis'"
+                v-if="isSqlType(currentDb.type) || currentDb.type === 'redis'"
                 :class="detailTab === 'config' ? 'tab-active' : 'tab-inactive'"
                 class="px-4 py-2 rounded-lg text-[13px] font-medium transition-all duration-200"
                 @click="detailTab = 'config'"
               >配置修改</button>
               <button
-                v-if="currentDb.type === 'mysql' && currentDb.username === 'root'"
+                v-if="isSqlType(currentDb.type) && currentDb.username === 'root'"
                 :class="detailTab === 'users' ? 'tab-active' : 'tab-inactive'"
                 class="px-4 py-2 rounded-lg text-[13px] font-medium transition-all duration-200"
                 @click="detailTab = 'users'"
               >用户管理</button>
-              <span v-if="currentDb.type === 'mysql' && currentDb.username !== 'root'" class="text-[12px] px-2 self-center" style="color: var(--text-tertiary)">用户管理<span style="color: var(--danger)" class="text-[11px] ml-0.5">（仅限 root 账户）</span></span>
+              <span v-if="isSqlType(currentDb.type) && currentDb.username !== 'root'" class="text-[12px] px-2 self-center" style="color: var(--text-tertiary)">用户管理<span style="color: var(--danger)" class="text-[11px] ml-0.5">（仅限 root 账户）</span></span>
             </div>
 
             <!-- 基本信息 -->
@@ -355,7 +373,7 @@
               <div class="grid grid-cols-1 md:grid-cols-2">
                 <div v-for="(item, idx) in [
                   { label: '实例名称', value: currentDb.name, mono: false },
-                  { label: '数据库类型', value: currentDb.type === 'mysql' ? 'MySQL' : 'Redis', badge: true },
+                  { label: '数据库类型', value: getTypeLabel(currentDb.type), badge: true },
                   { label: '主机地址', value: currentDb.host, mono: true },
                   { label: '端口', value: currentDb.port + (currentDb.container ? ' (Docker)' : ''), mono: true },
                   { label: '版本', value: currentDb.version || '-', mono: false },
@@ -375,11 +393,15 @@
                   <CircleX class="h-4 w-4" />
                   停止实例
                 </Button>
+                <Button size="sm" variant="outline" class="h-8 text-[13px] ml-auto" style="color: var(--danger); border-color: var(--danger)" @click="confirmAction('deleteConnection')">
+                  <Trash2 class="h-4 w-4" />
+                  删除连接
+                </Button>
               </div>
             </div>
 
             <!-- 配置修改 -->
-            <div v-if="detailTab === 'config' && (currentDb.type === 'mysql' || currentDb.type === 'redis')" class="content-card fade-up">
+            <div v-if="detailTab === 'config' && (isSqlType(currentDb.type) || currentDb.type === 'redis')" class="content-card fade-up">
               <!-- Code Editor -->
               <div class="code-editor rounded-t-lg overflow-hidden border-b" style="border-color: var(--border-subtle)">
                 <div class="flex flex-wrap items-center justify-between px-4 py-2.5" style="background: var(--surface)">
@@ -481,7 +503,7 @@
 
             <!-- 用户管理 -->
             <div v-if="detailTab === 'users'" class="fade-up">
-              <div v-if="currentDb.type === 'mysql' && currentDb.username === 'root'" class="content-card">
+              <div v-if="isSqlType(currentDb.type) && currentDb.username === 'root'" class="content-card">
                 <div class="flex flex-wrap items-center justify-between px-5 py-3.5 border-b" style="border-color: var(--border-subtle)">
                   <span class="text-[13px]" style="color: var(--text-tertiary)">管理数据库用户及其权限</span>
                   <Button variant="primary" size="sm" class="h-8 text-[13px]" @click="showCreateUserDialog = true">
@@ -1002,15 +1024,18 @@ import { ref, computed, onMounted, onActivated, watch, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
+import { useThemeStore } from '../stores/theme'
 import { sourceParam, instanceUid } from '@/lib/instance'
 import { writeLog } from '../api/log'
+import { getTypeLabel, isSqlType } from '@/lib/utils'
 import { useMessage } from '../composables/useMessage'
 import StatusDot from './StatusDot.vue'
 import {
   RefreshCw, CircleX, FileText,
   Plus, Settings, Users, Database, HardDrive, Info, Palette, Activity,
   FolderOpen, ChevronRight, ArrowUp, Lock,
-  KeyRound, Shield, Database as DatabaseIcon, Globe, Lock as LockIcon, Unlock, Trash2
+  KeyRound, Shield, Database as DatabaseIcon, Globe, Lock as LockIcon, Unlock, Trash2,
+  Sun, Moon, Monitor
 } from 'lucide-vue-next'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs.vue'
 import { Button } from '@/components/ui/Button.vue'
@@ -1021,6 +1046,7 @@ import { Input } from '@/components/ui/Input.vue'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/Select.vue'
 import { Textarea } from '@/components/ui/Textarea.vue'
 import { Switch } from '@/components/ui/Switch.vue'
+import { STORAGE_KEYS, safeStorage } from '@/lib/storageKeys'
 
 const completeProgress = inject('completeProgress')
 const sidebarCollapsed = inject('sidebarCollapsed', ref(false))
@@ -1028,22 +1054,58 @@ const sidebarCollapsed = inject('sidebarCollapsed', ref(false))
 const pageContainer = ref(null)
 const detailCard = ref(null)
 
-const savedActiveTab = localStorage.getItem('settingsMainTab')
+const savedActiveTab = safeStorage.get(STORAGE_KEYS.SETTINGS_MAIN_TAB)
 const activeTab = ref(savedActiveTab || 'instance')
-const systemSubTab = ref(localStorage.getItem('settingsSystemSubTab') || 'logs')
+const systemSubTab = ref(safeStorage.get(STORAGE_KEYS.SETTINGS_SYSTEM_SUB_TAB) || 'logs')
 const allDatabases = ref([])
 const healthStore = useHealthStore()
 const { statusMap: onlineStatus } = storeToRefs(healthStore)
 const selectedDbId = ref(null)
 
-const savedInstanceTab = localStorage.getItem('settingsInstanceTab')
+const savedInstanceTab = safeStorage.get(STORAGE_KEYS.SETTINGS_INSTANCE_TAB)
 const instanceTab = ref(savedInstanceTab || 'local')
 let requestId = 0
 
 const store = useAppContext()
 const { connectionId, logEnabled, userName, host, port, name } = storeToRefs(store)
+const themeStore = useThemeStore()
+const { themeMode } = storeToRefs(themeStore)
+
+// 当全局 context 变化时（如仪表盘切换实例），同步 selectedDbId 和 instanceTab
+watch(connectionId, (uid) => {
+  if (!uid) return
+  // uid 格式: "l:123" 或 "r:456"
+  const parts = uid.split(':')
+  const prefix = parts[0]
+  const id = parts.length === 2 ? parseInt(parts[1]) : null
+  if (!id) return
+  // 自动切换到对应的标签页（本地/远程）
+  const targetTab = prefix === 'r' ? 'remote' : 'local'
+  if (instanceTab.value !== targetTab) {
+    instanceTab.value = targetTab
+  }
+  if (id !== selectedDbId.value) {
+    selectedDbId.value = id
+    onInstanceChange()
+  }
+})
 
 const { success, error, warning, info } = useMessage()
+
+const themeOptions = [
+  { value: 'auto', label: '跟随系统', icon: Monitor },
+  { value: 'light', label: '浅色', icon: Sun },
+  { value: 'dark', label: '深色', icon: Moon }
+]
+const themeModeLabel = computed(() => {
+  const map = { auto: '根据系统偏好自动切换', light: '始终使用浅色模式', dark: '始终使用深色模式' }
+  return map[themeMode.value] || map.auto
+})
+
+const setThemeMode = (val) => {
+  themeStore.setThemeMode(val)
+  writeLog(`主题模式已切换为: ${themeOptions.find(o => o.value === val)?.label || val}`)
+}
 
 const deduplicateInstances = (instances) => {
   const seen = new Set()
@@ -1053,7 +1115,8 @@ const deduplicateInstances = (instances) => {
     const host = String(inst.host || 'localhost').trim()
     const username = String(inst.username || '').trim()
     const port = Number(inst.port || 3306)
-    const key = `${host}:${username}:${port}`
+    const type = String(inst.type || 'mysql').trim()
+    const key = `${host}:${username}:${port}:${type}`
     
     if (!seen.has(key)) {
       seen.add(key)
@@ -1108,9 +1171,11 @@ const userForm = ref({
 
 const createUserResult = ref({ show: false, success: false, message: '' })
 
-const compactMode = ref(localStorage.getItem('compactMode') === 'true')
-const refreshInterval = ref(localStorage.getItem('refreshInterval') || '10000')
-const backupRetentionDays = ref(localStorage.getItem('backupRetentionDays') || '30')
+const compactMode = ref(safeStorage.get(STORAGE_KEYS.UI_COMPACT_MODE) === 'true')
+const refreshInterval = ref(safeStorage.get(STORAGE_KEYS.DASHBOARD_REFRESH_INTERVAL) || '10000')
+const backupRetentionDays = ref(safeStorage.get(STORAGE_KEYS.UI_BACKUP_RETENTION_DAYS) || '30')
+
+
 const logStoragePath = ref('')
 const logRetentionDays = ref('30')
 const defaultLogPath = ref('./data/logs')
@@ -1224,7 +1289,7 @@ const loadBackupRetention = () => {
 
 const loadLogConfig = () => {
   try {
-    const raw = localStorage.getItem('log_config')
+    const raw = safeStorage.get(STORAGE_KEYS.LOG_CONFIG)
     if (raw) {
       const cfg = JSON.parse(raw)
       logStoragePath.value = cfg.path || ''
@@ -1256,7 +1321,7 @@ const saveLogConfig = () => {
     enabled: logEnabled.value,
   }
   try {
-    localStorage.setItem('log_config', JSON.stringify(cfg))
+    safeStorage.set(STORAGE_KEYS.LOG_CONFIG, JSON.stringify(cfg))
   } catch (e) { console.error(e) }
   fetch('/api/log-config', {
     method: 'PUT',
@@ -1324,25 +1389,25 @@ const saveBackupRetention = (val) => {
 }
 
 watch(activeTab, (tab) => {
-  localStorage.setItem('settingsMainTab', tab)
+  safeStorage.set(STORAGE_KEYS.SETTINGS_MAIN_TAB, tab)
 })
 
 watch(systemSubTab, (tab) => {
-  localStorage.setItem('settingsSystemSubTab', tab)
+  safeStorage.set(STORAGE_KEYS.SETTINGS_SYSTEM_SUB_TAB, tab)
 })
 
 watch(compactMode, (val) => {
-  localStorage.setItem('compactMode', String(val))
+  safeStorage.set(STORAGE_KEYS.UI_COMPACT_MODE, String(val))
   window.dispatchEvent(new CustomEvent('compact-mode-change', { detail: val }))
 }, { immediate: true })
 
 watch(refreshInterval, (val) => {
-  localStorage.setItem('refreshInterval', val)
+  safeStorage.set(STORAGE_KEYS.DASHBOARD_REFRESH_INTERVAL, val)
   window.dispatchEvent(new CustomEvent('refresh-interval-change', { detail: val }))
 })
 
 watch(backupRetentionDays, (val) => {
-  localStorage.setItem('backupRetentionDays', val)
+  safeStorage.set(STORAGE_KEYS.UI_BACKUP_RETENTION_DAYS, val)
   saveBackupRetention(val)
 })
 
@@ -1354,8 +1419,9 @@ const currentDb = computed(() => allDatabases.value.find(db => db.id === selecte
 
 const dockerInternalPort = computed(() => {
   if (!currentDb.value?.container) return ''
-  if (currentDb.value.type === 'mysql') return '3306'
+  if (currentDb.value.type === 'mysql' || currentDb.value.type === 'mariadb') return '3306'
   if (currentDb.value.type === 'redis') return '6379'
+  if (currentDb.value.type === 'postgresql') return '5432'
   return ''
 })
 
@@ -1499,7 +1565,7 @@ const privilegeOptions = privilegeGroups.flatMap(g => g.items)
 const privLabelMap = Object.fromEntries(privilegeOptions.map(p => [p.value, p.label]))
 
 watch(instanceTab, (tab) => {
-  localStorage.setItem('settingsInstanceTab', tab)
+  safeStorage.set(STORAGE_KEYS.SETTINGS_INSTANCE_TAB, tab)
 })
 
 const smoothScrollTo = (element, targetTop, duration = 800) => {
@@ -1533,10 +1599,10 @@ const smoothScrollToElement = (targetElement, containerElement, duration = 800) 
   smoothScrollTo(containerElement, targetTop, duration)
 }
 
-const detailTab = ref(localStorage.getItem('settingsDetailTab') || 'info')
+const detailTab = ref(safeStorage.get(STORAGE_KEYS.SETTINGS_DETAIL_TAB) || 'info')
 
 watch(detailTab, (tab) => {
-  localStorage.setItem('settingsDetailTab', tab)
+  safeStorage.set(STORAGE_KEYS.SETTINGS_DETAIL_TAB, tab)
   
   if (tab === 'config' && detailCard.value && pageContainer.value) {
     setTimeout(() => {
@@ -1581,6 +1647,12 @@ const confirmAction = (action, payload = null) => {
       variant: 'destructive',
       confirmText: '确定删除',
     },
+    deleteConnection: {
+      title: '删除连接',
+      description: `确定要删除连接 "${currentDb.value?.name}" 吗？此操作仅删除连接配置，不会影响数据库本身。`,
+      variant: 'destructive',
+      confirmText: '确定删除',
+    },
   }
   const cfg = configs[action]
   if (!cfg) return
@@ -1597,6 +1669,7 @@ const handleConfirm = () => {
   confirmState.value.open = false
   if (action === 'restart') restartDb()
   else if (action === 'stop') stopDb()
+  else if (action === 'deleteConnection') deleteConnection()
   else if (action === 'updatePort') {
     saveAndRestartState.value = {
       open: true,
@@ -1827,7 +1900,7 @@ const submitEditPerm = () => {
 const selectInstance = (id) => {
   selectedDbId.value = id
   const db = allDatabases.value.find(d => d.id === id)
-  if (db && db.type === 'mysql' && db.username !== 'root' && detailTab.value === 'users') {
+  if (db && isSqlType(db.type) && db.username !== 'root' && detailTab.value === 'users') {
     detailTab.value = 'info'
   }
   onInstanceChange()
@@ -1878,8 +1951,9 @@ const loadDatabases = () => {
   })
 }
 
-const checkOnlineStatus = async (items) => {
-  await healthStore.refreshAll()
+const checkOnlineStatus = (items) => {
+  // 非阻塞刷新
+  healthStore.refreshAll()
 }
 
 const onInstanceChange = () => {
@@ -1908,7 +1982,7 @@ const onInstanceChange = () => {
   users.value = []
   if (currentDb.value.type === 'redis') {
     loadRedisConfig(rid)
-  } else {
+  } else if (isSqlType(currentDb.value.type)) {
     loadConfig(rid)
     loadUsers(rid)
   }
@@ -2180,6 +2254,25 @@ const stopDb = () => {
   }
 }
 
+const deleteConnection = () => {
+  const db = currentDb.value
+  if (!db) return
+  writeLog(`删除连接: ${db.name} (${db.type})`, 'warning')
+  const deletePromise = db.isRemote
+    ? fetch(`/api/remote-servers/${db.id}`, { method: 'DELETE' }).then(r => r.json())
+    : fetch('/api/databases/db', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: db.id }) }).then(r => r.json())
+  deletePromise.then(data => {
+    if (data.code === 0) {
+      success('连接已删除')
+      selectedDbId.value = null
+      currentDb.value = null
+      loadDatabases()
+    } else {
+      error(data.msg || '删除失败')
+    }
+  }).catch(() => error('删除失败'))
+}
+
 const deleteUser = (row) => {
   const db = currentDb.value
   writeLog(`删除用户: ${row.user}@${row.host} (实例: ${db.name})`, 'warning')
@@ -2351,7 +2444,7 @@ const removeDbGrant = (database) => {
 
 const loadUsers = (rid) => {
   const db = currentDb.value
-  if (!db || db.type !== 'mysql') return
+  if (!db || !isSqlType(db.type)) return
   fetch(`/api/mysql/users?server_id=${db.id}&${sourceParam(db.isRemote || false)}`)
     .then(res => res.json())
     .then(data => {
@@ -2374,7 +2467,7 @@ onMounted(() => {
 })
 
 onActivated(() => {
-  loadDatabases()
+  if (allDatabases.value.length === 0) loadDatabases()
 })
 </script>
 

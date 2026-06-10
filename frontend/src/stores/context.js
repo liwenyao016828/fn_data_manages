@@ -3,13 +3,14 @@ import { defineStore } from 'pinia'
 import axios from 'axios'
 import { databaseApi } from '../api/database'
 import { sourceValue } from '@/lib/instance'
+import { STORAGE_KEYS, safeStorage } from '../lib/storageKeys'
 
-const FAVORITES_KEY = 'preferred_connections'
-const CURRENT_CONTEXT_KEY = 'current_context'
+const FAVORITES_KEY = STORAGE_KEYS.CONTEXT_FAVORITES
+const CURRENT_CONTEXT_KEY = STORAGE_KEYS.CONTEXT_CURRENT
 
 const loadLogEnabled = () => {
   try {
-    const raw = localStorage.getItem('log_config')
+    const raw = safeStorage.get(STORAGE_KEYS.LOG_CONFIG)
     if (raw) {
       const cfg = JSON.parse(raw)
       return cfg.enabled !== false
@@ -30,7 +31,7 @@ const syncLogEnabledFromBackend = async (logEnabledRef) => {
 
 const loadPersistedContext = () => {
   try {
-    const raw = localStorage.getItem(CURRENT_CONTEXT_KEY)
+    const raw = safeStorage.get(CURRENT_CONTEXT_KEY)
     if (raw) return JSON.parse(raw)
   } catch (e) { console.error(e) }
   return null
@@ -45,9 +46,9 @@ export const useAppContext = defineStore('context', () => {
 
   watch(logEnabled, (val) => {
     try {
-      const raw = localStorage.getItem('log_config')
+      const raw = safeStorage.get(STORAGE_KEYS.LOG_CONFIG)
       const existing = raw ? JSON.parse(raw) : {}
-      localStorage.setItem('log_config', JSON.stringify({ ...existing, enabled: val }))
+      safeStorage.set(STORAGE_KEYS.LOG_CONFIG, JSON.stringify({ ...existing, enabled: val }))
     } catch (e) {
       console.error(e)
     }
@@ -69,6 +70,10 @@ export const useAppContext = defineStore('context', () => {
   const isRemote = computed(() => current.value?.isRemote ?? false)
   const name = computed(() => current.value?.name ?? '')
   const isRedis = computed(() => current.value?.type === 'redis')
+  const isPostgreSQL = computed(() => current.value?.type === 'postgresql')
+  const isSQLite = computed(() => current.value?.type === 'sqlite')
+  const isMariaDB = computed(() => current.value?.type === 'mariadb')
+  const isSQLLike = computed(() => ['mysql', 'mariadb', 'postgresql', 'sqlite'].includes(current.value?.type))
   const hostname = ref('')
   const osName = ref('')
 
@@ -87,28 +92,22 @@ export const useAppContext = defineStore('context', () => {
       addFavorite(ctx.connectionId, ctx.name)
     }
     current.value = ctx ? { ...ctx } : null
-    try {
-      if (current.value) {
-        localStorage.setItem(CURRENT_CONTEXT_KEY, JSON.stringify(current.value))
-      } else {
-        localStorage.removeItem(CURRENT_CONTEXT_KEY)
-      }
-    } catch (e) { console.error(e) }
+    if (current.value) {
+      safeStorage.set(CURRENT_CONTEXT_KEY, JSON.stringify(current.value))
+    } else {
+      safeStorage.remove(CURRENT_CONTEXT_KEY)
+    }
   }
 
   const clearContext = () => {
     current.value = null
-    try {
-      localStorage.removeItem(CURRENT_CONTEXT_KEY)
-    } catch (e) { console.error(e) }
+    safeStorage.remove(CURRENT_CONTEXT_KEY)
   }
 
   const setDatabase = (dbName) => {
     if (current.value) {
       current.value = { ...current.value, dbName }
-      try {
-        localStorage.setItem(CURRENT_CONTEXT_KEY, JSON.stringify(current.value))
-      } catch (e) { console.error(e) }
+      safeStorage.set(CURRENT_CONTEXT_KEY, JSON.stringify(current.value))
     }
   }
 
@@ -122,12 +121,12 @@ export const useAppContext = defineStore('context', () => {
       favorites.value.unshift({ id, name, count: 1, lastUsed: Date.now() })
       if (favorites.value.length > 5) favorites.value.pop()
     }
-    try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites.value)) } catch (e) { console.error(e) }
+    safeStorage.set(FAVORITES_KEY, JSON.stringify(favorites.value))
   }
 
   const loadFavorites = () => {
     try {
-      const raw = localStorage.getItem(FAVORITES_KEY)
+      const raw = safeStorage.get(FAVORITES_KEY)
       if (raw) favorites.value = JSON.parse(raw)
     } catch (e) { console.error(e) }
   }
@@ -154,10 +153,10 @@ export const useAppContext = defineStore('context', () => {
     logEnabled.value = val
     let fullConfig = { enabled: val }
     try {
-      const raw = localStorage.getItem('log_config')
+      const raw = safeStorage.get(STORAGE_KEYS.LOG_CONFIG)
       const existing = raw ? JSON.parse(raw) : {}
       fullConfig = { ...existing, enabled: val }
-      localStorage.setItem('log_config', JSON.stringify(fullConfig))
+      safeStorage.set(STORAGE_KEYS.LOG_CONFIG, JSON.stringify(fullConfig))
     } catch (e) { console.error(e) }
     fetch('/api/log-config', {
       method: 'PUT',
@@ -179,6 +178,10 @@ export const useAppContext = defineStore('context', () => {
     isRemote,
     name,
     isRedis,
+    isPostgreSQL,
+    isSQLite,
+    isMariaDB,
+    isSQLLike,
     logEnabled,
     favorites,
     hostname,

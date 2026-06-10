@@ -3,16 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>数据库管理</title>
+    <title>niudb</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
       (function () {
         try {
-          var saved = localStorage.getItem('db_manager_theme');
+          var mode = localStorage.getItem('niudb.theme.mode');
+          var saved = localStorage.getItem('niudb.theme.value');
           var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          var theme = (saved === 'dark' || saved === 'light') ? saved : (prefersDark ? 'dark' : 'light');
+          var theme;
+          if (mode === 'light' || mode === 'dark') {
+            theme = mode;
+          } else if (saved === 'dark' || saved === 'light') {
+            theme = saved;
+          } else {
+            theme = prefersDark ? 'dark' : 'light';
+          }
           if (theme === 'dark') {
             document.documentElement.classList.add('dark');
             document.documentElement.style.colorScheme = 'dark';

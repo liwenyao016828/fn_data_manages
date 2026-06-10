@@ -1,35 +1,68 @@
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { STORAGE_KEYS, safeStorage } from '../lib/storageKeys'
 
-const THEME_KEY = 'db_manager_theme'
-
-const resolveInitialTheme = () => {
-  try {
-    const saved = localStorage.getItem(THEME_KEY)
-    if (saved === 'dark' || saved === 'light') return saved
-  } catch (e) { console.error(e) }
+const getSystemTheme = () => {
   if (typeof window !== 'undefined' && window.matchMedia) {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   }
   return 'light'
 }
 
-export const useThemeStore = defineStore('theme', () => {
-  const theme = ref(resolveInitialTheme())
+const resolveInitialTheme = () => {
+  try {
+    const mode = safeStorage.get(STORAGE_KEYS.THEME_MODE)
+    if (mode === 'light' || mode === 'dark') {
+      return mode
+    }
+    if (mode === 'auto') {
+      return getSystemTheme()
+    }
+    const saved = safeStorage.get(STORAGE_KEYS.THEME)
+    if (saved === 'dark' || saved === 'light') return saved
+  } catch (e) { console.error(e) }
+  return getSystemTheme()
+}
 
-  const isDark = () => theme.value === 'dark'
+export const useThemeStore = defineStore('theme', () => {
+  const initialMode = (() => {
+    const m = safeStorage.get(STORAGE_KEYS.THEME_MODE)
+    if (m === 'auto' || m === 'light' || m === 'dark') return m
+    return 'auto'
+  })()
+  const theme = ref(resolveInitialTheme())
+  const themeMode = ref(initialMode)
+
+  const isDark = computed(() => theme.value === 'dark')
+
+  const effectiveTheme = computed(() => {
+    if (themeMode.value === 'auto') {
+      return getSystemTheme()
+    }
+    return theme.value
+  })
 
   const setTheme = (val) => {
     theme.value = val
-    try {
-      localStorage.setItem(THEME_KEY, val)
-    } catch (e) { console.error(e) }
+    safeStorage.set(STORAGE_KEYS.THEME, val)
     applyTheme(val)
+  }
+
+  const setThemeMode = (mode) => {
+    themeMode.value = mode
+    safeStorage.set(STORAGE_KEYS.THEME_MODE, mode)
+    if (mode === 'auto') {
+      theme.value = getSystemTheme()
+    } else {
+      theme.value = mode
+    }
   }
 
   const toggleTheme = () => {
     const next = theme.value === 'dark' ? 'light' : 'dark'
     setTheme(next)
+    safeStorage.set(STORAGE_KEYS.THEME_MODE, next)
+    themeMode.value = next
   }
 
   const applyTheme = (val) => {
@@ -48,10 +81,11 @@ export const useThemeStore = defineStore('theme', () => {
     if (typeof window === 'undefined' || !window.matchMedia) return
     const mql = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = (e) => {
-      try {
-        if (localStorage.getItem(THEME_KEY)) return
-      } catch (err) { /* noop */ }
-      setTheme(e.matches ? 'dark' : 'light')
+      if (themeMode.value === 'auto') {
+        const next = e.matches ? 'dark' : 'light'
+        theme.value = next
+        applyTheme(next)
+      }
     }
     mql.addEventListener?.('change', handler)
   }
@@ -66,8 +100,11 @@ export const useThemeStore = defineStore('theme', () => {
 
   return {
     theme,
+    themeMode,
     isDark,
+    effectiveTheme,
     setTheme,
+    setThemeMode,
     toggleTheme,
   }
 })

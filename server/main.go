@@ -11,6 +11,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -37,7 +38,18 @@ func maxBodyMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
-	initCrypto()
+	// Print startup diagnostics
+	fmt.Println("=== NiuDB Server Starting ===")
+	fmt.Printf("PID: %d\n", os.Getpid())
+	execPath, _ := os.Executable()
+	fmt.Printf("Executable: %s\n", execPath)
+	wd, _ := os.Getwd()
+	fmt.Printf("Working Dir: %s\n", wd)
+	fmt.Printf("TRIM_SERVICE_PORT: %s\n", os.Getenv("TRIM_SERVICE_PORT"))
+	fmt.Printf("TRIM_PKGVAR: %s\n", os.Getenv("TRIM_PKGVAR"))
+	fmt.Printf("TRIM_PKGSHARE: %s\n", os.Getenv("TRIM_PKGSHARE"))
+
+	// 密码明文存储（内网环境，无需加密）
 	loadData()
 
 	go func() {
@@ -79,6 +91,7 @@ func main() {
 	http.HandleFunc("/api/dashboard/snapshot", dashboardHistoryHandler)
 	http.HandleFunc("/api/databases/refresh", refreshHandler)
 	http.HandleFunc("/api/databases/detect", detectHandler)
+	http.HandleFunc("/api/databases/detect/ignore", detectIgnoreHandler)
 	http.HandleFunc("/api/sync/ports", syncPortsHandler)
 	http.HandleFunc("/api/databases/db", dbHandler)
 	http.HandleFunc("/api/databases/db/search", searchHandler)
@@ -128,6 +141,31 @@ func main() {
 	http.HandleFunc("/api/redis/restore", redisRestoreHandler)
 	http.HandleFunc("/api/redis/restart", redisRestartHandler)
 	http.HandleFunc("/api/redis/stop", redisStopHandler)
+
+	// PostgreSQL routes
+	http.HandleFunc("/api/postgresql/databases", postgresqlDatabasesHandler)
+	http.HandleFunc("/api/postgresql/databases/create", postgresqlCreateDatabaseHandler)
+	http.HandleFunc("/api/postgresql/databases/delete", postgresqlDeleteDatabaseHandler)
+	http.HandleFunc("/api/postgresql/tables", postgresqlTablesHandler)
+	http.HandleFunc("/api/postgresql/columns", postgresqlColumnsHandler)
+	http.HandleFunc("/api/postgresql/data", postgresqlDataHandler)
+	http.HandleFunc("/api/postgresql/execute", postgresqlExecuteHandler)
+	http.HandleFunc("/api/postgresql/users", postgresqlUsersHandler)
+	http.HandleFunc("/api/postgresql/config", postgresqlConfigHandler)
+	http.HandleFunc("/api/postgresql/ping", postgresqlPingHandler)
+	http.HandleFunc("/api/postgresql/restart", postgresqlRestartHandler)
+	http.HandleFunc("/api/postgresql/logs", postgresqlLogsHandler)
+
+	// SQLite routes
+	http.HandleFunc("/api/sqlite/tables", sqliteTablesHandler)
+	http.HandleFunc("/api/sqlite/columns", sqliteColumnsHandler)
+	http.HandleFunc("/api/sqlite/data", sqliteDataHandler)
+	http.HandleFunc("/api/sqlite/execute", sqliteExecuteHandler)
+	http.HandleFunc("/api/sqlite/create-table", sqliteCreateTableHandler)
+	http.HandleFunc("/api/sqlite/drop-table", sqliteDropTableHandler)
+	http.HandleFunc("/api/sqlite/ping", sqlitePingHandler)
+	http.HandleFunc("/api/sqlite/backup", sqliteBackupHandler)
+	http.HandleFunc("/api/sqlite/restore", sqliteRestoreHandler)
 	http.HandleFunc("/api/log-config", logConfigHandler)
 	http.HandleFunc("/api/system/logs", systemLogsHandler)
 	http.HandleFunc("/api/system/logs/clear", systemLogsClearHandler)
@@ -139,7 +177,6 @@ func main() {
 
 	http.HandleFunc("/api/fs/browse", fsBrowseHandler)
 
-	execPath, _ := os.Executable()
 	execDir := filepath.Dir(execPath)
 
 	distPath := filepath.Join(execDir, "frontend", "dist")
@@ -174,6 +211,27 @@ func main() {
 		}
 		http.ServeFile(w, r, filepath.Join(distPath, "index.html"))
 	})
+
+	// Drop privileges from root to niudb on Linux (fnOS FPK runs as root)
+	if runtime.GOOS == "linux" && os.Getuid() == 0 {
+		if u, err := user.Lookup("niudb"); err == nil {
+			uid, _ := strconv.Atoi(u.Uid)
+			gid, _ := strconv.Atoi(u.Gid)
+			// 获取 niudb 的补充组（包括 docker 组）
+			groupStrs, _ := u.GroupIds()
+			var gids []int
+			for _, gs := range groupStrs {
+				g, _ := strconv.Atoi(gs)
+				gids = append(gids, g)
+			}
+			syscall.Setgroups(gids)
+			syscall.Setgid(gid)
+			syscall.Setuid(uid)
+			fmt.Printf("Privileges dropped: running as niudb (uid=%d, gid=%d, groups=%v)\n", uid, gid, gids)
+		} else {
+			fmt.Printf("Warning: niudb user not found, running as root\n")
+		}
+	}
 
 	port := os.Getenv("TRIM_SERVICE_PORT")
 	if port == "" {

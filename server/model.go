@@ -68,17 +68,22 @@ type DatabaseUpdate struct {
 }
 
 type DetectedInstance struct {
-	Name         string `json:"name"`
-	Type         string `json:"type"`
-	Host         string `json:"host"`
-	Port         int    `json:"port"`
-	Source       string `json:"source"`
-	Username     string `json:"username"`
-	Password     string `json:"password"`
-	Status       string `json:"status"`
-	Version      string `json:"version"`
-	Container    string `json:"container"`
-	WeakPassword bool   `json:"weakPassword"`
+	Name          string   `json:"name"`
+	Type          string   `json:"type"`
+	Host          string   `json:"host"`
+	Port          int      `json:"port"`
+	Source        string   `json:"source"`        // "Docker" or "宿主机"
+	Image         string   `json:"image,omitempty"` // Docker image name
+	Username      string   `json:"username"`
+	Password      string   `json:"password"`
+	Status        string   `json:"status"`
+	Version       string   `json:"version"`
+	Container     string   `json:"container"`
+	ContainerID   string   `json:"containerId"`
+	WeakPassword  bool     `json:"weakPassword"`
+	ReachableFrom []string `json:"reachableFrom,omitempty"`
+	Fingerprint   string   `json:"fingerprint"`
+	Ignored       bool     `json:"ignored"`
 }
 
 type RemoteServer struct {
@@ -167,11 +172,19 @@ var (
 	backups          []Backup
 	scheduledBackups []ScheduledBackup
 	metricsHistory   map[uint][]MetricsSnapshot
-	mutex            sync.Mutex
+	mutex            sync.Mutex // #7 兼容用：保留旧全局锁，新代码逐步迁移到细分锁
 	nextID           uint = 1
 	nextRemoteID     uint = 1
 	nextBackupID     uint = 1
 	nextSchedID      uint = 1
 	lastRawCounters  = make(map[uint]rawCounter)
 	lastRawMutex     sync.Mutex
+
+	// #7 细分锁：拆分全局 mutex，避免备份/调度与列表查询互斥
+	// 命名约定：<域>Mu
+	dbMu      sync.RWMutex // 保护 databases
+	remoteMu  sync.RWMutex // 保护 remoteServers
+	backupMu  sync.RWMutex // 保护 backups + scheduledBackups
+	metricsMu sync.RWMutex // 保护 metricsHistory
+	idMu      sync.Mutex   // 保护 nextID/nextRemoteID/nextBackupID/nextSchedID
 )

@@ -27,7 +27,7 @@
             >系统日志
             </button>
             <button
-              v-if="selectedInst.type === 'mysql' || selectedInst.type === 'redis'"
+              v-if="isSqlType(selectedInst.type) || selectedInst.type === 'redis'"
               :class="activeTab === 'database' ? 'tab-active px-4 py-1.5 text-[13px]' : 'tab-inactive px-4 py-1.5 text-[13px]'"
               @click="activeTab = 'database'"
             >数据库日志
@@ -97,7 +97,7 @@
         </div>
 
         <!-- MySQL Log Type Filter -->
-        <div v-if="activeTab === 'database' && selectedInst.type === 'mysql'" class="flex items-center gap-1 px-5 pb-2 shrink-0">
+        <div v-if="activeTab === 'database' && (selectedInst.type === 'mysql' || selectedInst.type === 'mariadb')" class="flex items-center gap-1 px-5 pb-2 shrink-0">
           <button
             v-for="t in mysqlLogTypes" :key="t.value"
             :class="selectedMysqlLogType === t.value ? 'pill pill-active' : 'pill pill-default'"
@@ -333,7 +333,7 @@ import { useAppContext } from '../stores/context'
 import { useHealthStore } from '../stores/health'
 import { writeLog } from '../api/log'
 import { sourceParam, instanceUid } from '@/lib/instance'
-import { formatLogTime } from '@/lib/utils'
+import { formatLogTime, isSqlType } from '@/lib/utils'
 import { useMessage } from '../composables/useMessage'
 import {
   FileText, Clock, Database, Server, Search, Settings,
@@ -347,6 +347,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 const completeProgress = inject('completeProgress')
 import StatusDot from './StatusDot.vue'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/Select.vue'
+import { STORAGE_KEYS, safeStorage } from '@/lib/storageKeys'
 
 const props = defineProps({
   navRequest: { type: Object, default: null }
@@ -361,9 +362,10 @@ const { success, error, warning } = useMessage()
 const activeTab = ref('system')
 const selectedInstId = ref(null)
 const logDate = ref('today')
+const todayKey = ref(new Date().toISOString().slice(0, 10))
 const levelFilter = ref('all')
 const searchKeyword = ref('')
-const selectedMysqlLogType = ref('error')
+const selectedMysqlLogType = ref('general')
 const loadingLogs = ref(false)
 const rawLogs = ref([])
 const systemLogs = ref([])
@@ -389,9 +391,9 @@ const sysLogScrollRef = ref(null)
 const dbLogScrollRef = ref(null)
 
 const mysqlLogTypes = [
+  { value: 'general', label: '通用日志' },
   { value: 'error', label: '错误日志' },
   { value: 'slow', label: '慢查询' },
-  { value: 'general', label: '通用日志' },
 ]
 
 const systemLogLevels = [
@@ -407,6 +409,7 @@ let loadRequestId = 0
 let sysLoadRequestId = 0
 
 const availableDates = computed(() => {
+  void todayKey.value // 响应式依赖，确保日期变化时重新计算
   const dates = []
   const today = new Date()
   for (let i = 0; i < 7; i++) {
@@ -422,6 +425,7 @@ const availableDates = computed(() => {
 const selectedInst = computed(() => allInstances.value.find(i => instanceUid(i) === selectedInstId.value))
 
 const filteredLogs = computed(() => {
+  void todayKey.value
   let logs = [...rawLogs.value]
   if (logDate.value !== 'all' && logDate.value !== 'today') {
     logs = logs.filter(l => l.time?.startsWith(logDate.value))
@@ -440,6 +444,7 @@ const filteredLogs = computed(() => {
 })
 
 const filteredSystemLogs = computed(() => {
+  void todayKey.value
   let logs = [...systemLogs.value]
   if (logDate.value !== 'all' && logDate.value !== 'today') {
     logs = logs.filter(l => l.time?.startsWith(logDate.value))
@@ -490,8 +495,9 @@ const loadInstances = () => {
   })
 }
 
-const checkOnlineStatus = async (items) => {
-  await healthStore.refreshAll()
+const checkOnlineStatus = (items) => {
+  // 非阻塞刷新
+  healthStore.refreshAll()
 }
 
 const selectInstance = (inst) => {
@@ -518,20 +524,33 @@ const loadLogs = () => {
   const inst = allInstances.value.find(i => instanceUid(i) === selectedInstId.value)
   if (!inst) { loadingLogs.value = false; return }
 
-  if (inst.type === 'mysql') {
+  if (inst.type === 'mysql' || inst.type === 'mariadb') {
     fetch(`/api/mysql/logs?server_id=${inst.id}&${sourceParam(inst.isRemote || false)}&type=${selectedMysqlLogType.value}`)
       .then(res => res.json()).then(data => {
         if (requestId !== loadRequestId) return
         if (data.code === 0) { rawLogs.value = data.data || [] } else { error(data.msg || '加载失败') }
         loadingLogs.value = false
       }).catch(() => { if (requestId !== loadRequestId) return; error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
-  } else {
+  } else if (inst.type === 'postgresql') {
+    fetch(`/api/postgresql/logs?server_id=${inst.id}&${sourceParam(inst.isRemote || false)}`)
+      .then(res => res.json()).then(data => {
+        if (requestId !== loadRequestId) return
+        if (data.code === 0) { rawLogs.value = data.data || [] } else { error(data.msg || '加载失败') }
+        loadingLogs.value = false
+      }).catch(() => { if (requestId !== loadRequestId) return; error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
+  } else if (inst.type === 'redis') {
     fetch(`/api/redis/logs?server_id=${inst.id}&${sourceParam(inst.isRemote || false)}`)
       .then(res => res.json()).then(data => {
         if (requestId !== loadRequestId) return
         if (data.code === 0) { rawLogs.value = data.data || [] } else { error(data.msg || '加载失败') }
         loadingLogs.value = false
       }).catch(() => { if (requestId !== loadRequestId) return; error('加载失败'); rawLogs.value = []; loadingLogs.value = false })
+  } else if (inst.type === 'sqlite') {
+    rawLogs.value = [{ time: '', level: 'Note', message: 'SQLite 是嵌入式文件数据库，没有服务端日志' }]
+    loadingLogs.value = false
+  } else {
+    rawLogs.value = []
+    loadingLogs.value = false
   }
 }
 
@@ -644,7 +663,7 @@ const exportLogs = (format) => {
 
 const loadLogConfig = () => {
   try {
-    const raw = localStorage.getItem('log_config')
+    const raw = safeStorage.get(STORAGE_KEYS.LOG_CONFIG)
     if (raw) {
       const cfg = JSON.parse(raw)
       logStoragePath.value = cfg.path || ''
@@ -674,7 +693,7 @@ const saveLogConfig = () => {
     enabled: logEnabled.value,
   }
   try {
-    localStorage.setItem('log_config', JSON.stringify(cfg))
+    safeStorage.set(STORAGE_KEYS.LOG_CONFIG, JSON.stringify(cfg))
   } catch (e) { console.error(e) }
   fetch('/api/log-config', {
     method: 'PUT',
@@ -725,8 +744,12 @@ const processNavRequest = () => {
   emit('navAccepted')
 }
 
-watch([connectionId], () => {
-  loadInstances()
+watch(connectionId, (uid) => {
+  if (uid && uid !== selectedInstId.value) {
+    selectedInstId.value = uid
+    loadSystemLogs()
+    loadLogs()
+  }
 })
 
 watch(activeTab, () => { sysLogPage.value = 1; dbLogPage.value = 1 })
@@ -737,5 +760,5 @@ watch(levelFilter, () => { dbLogPage.value = 1 })
 watch(() => props.navRequest, (val) => { if (val) processNavRequest() })
 
 onMounted(() => { loadInstances(); loadLogConfig(); loadLogConfigFromBackend() })
-onActivated(() => { loadInstances(); loadLogConfig() })
+onActivated(() => { todayKey.value = new Date().toISOString().slice(0, 10); logDate.value = 'today'; if (allInstances.value.length === 0) loadInstances(); loadLogConfig() })
 </script>

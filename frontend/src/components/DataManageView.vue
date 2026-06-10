@@ -27,7 +27,7 @@
             @click="selectInstance(inst)"
           >
             <div class="flex items-center gap-3">
-              <div class="instance-icon" :style="{ background: getInstanceColor(inst) }">
+              <div class="instance-icon" :style="{ background: getTypeColor(inst.type) }">
                 <Database class="h-[18px] w-[18px] text-white" />
               </div>
               <div class="flex-1 flex flex-col gap-0.5 min-w-0">
@@ -37,7 +37,7 @@
                 </div>
                 <div class="flex items-center gap-1.5 text-[11px]" style="color: var(--text-tertiary)">
                   <StatusDot :status="connectionId === instanceUid(inst) ? 'selected' : (onlineStatus[instanceUid(inst)] !== false ? 'online' : 'offline')" size="xs" />
-                  {{ inst.type === 'mysql' ? 'MySQL' : inst.type }}
+                  {{ getTypeLabel(inst.type) }}
                   <span class="ml-auto font-mono-data">{{ inst.host || 'localhost' }}:{{ inst.port || 3306 }}</span>
                 </div>
               </div>
@@ -79,7 +79,7 @@
                   <span class="breadcrumb-item breadcrumb-item--current">{{ selectedRedisKey }}</span>
                 </template>
 
-                <template v-if="!isRedis && selectedDatabase">
+                <template v-if="isSQLLike && !isSQLite && selectedDatabase">
                   <ChevronRight class="breadcrumb-sep" />
                   <span
                     class="breadcrumb-item breadcrumb-item--active"
@@ -87,17 +87,17 @@
                   >{{ selectedDatabase }}</span>
                 </template>
 
-                <template v-if="!isRedis && selectedTable">
+                <template v-if="isSQLLike && selectedTable">
                   <ChevronRight class="breadcrumb-sep" />
                   <span class="breadcrumb-item breadcrumb-item--current">{{ selectedTable }}</span>
                 </template>
               </nav>
               <p class="text-[13px] mt-0.5" style="color: var(--text-tertiary)">
-                {{ isRedis ? 'Redis' : 'MySQL' }} · {{ currentInst?.host }}:{{ currentInst?.port }}
+                {{ getTypeLabel(currentInst?.type) }} · {{ currentInst?.host }}{{ currentInst?.port ? ':' + currentInst?.port : '' }}
               </p>
             </div>
             <div class="flex items-center gap-2 shrink-0 flex-wrap">
-              <button v-if="!isRedis && !selectedDatabase" class="btn-primary" @click="openCreateDbDialog">
+              <button v-if="isSQLLike && !isSQLite && !selectedDatabase" class="btn-primary" @click="openCreateDbDialog">
                 <Plus class="h-3.5 w-3.5" />
                 创建数据库
               </button>
@@ -105,15 +105,15 @@
                 <RefreshCw class="h-3.5 w-3.5" />
                 刷新
               </button>
-              <button v-if="selectedTable && !isRedis" class="btn-primary" @click="showInsertDialog = true">
+              <button v-if="selectedTable && isSQLLike" class="btn-primary" @click="showInsertDialog = true">
                 <Plus class="h-3.5 w-3.5" />
                 插入
               </button>
-              <button v-if="selectedTable && !isRedis" class="btn-secondary" @click="exportData(false)">
+              <button v-if="selectedTable && isSQLLike" class="btn-secondary" @click="exportData(false)">
                 <Download class="h-3.5 w-3.5" />
                 导出
               </button>
-              <button v-if="selectedTable && !isRedis" class="btn-secondary" @click="exportData(true)">
+              <button v-if="selectedTable && isSQLLike" class="btn-secondary" @click="exportData(true)">
                 <Download class="h-3.5 w-3.5" />
                 全量导出
               </button>
@@ -167,9 +167,7 @@
               </div>
               <div>
                 <div class="stat-value">
-                  {{ redisInfo.keyspace_hits && redisInfo.keyspace_misses ?
-                    (parseInt(redisInfo.keyspace_hits) * 100 / (parseInt(redisInfo.keyspace_hits) + parseInt(redisInfo.keyspace_misses))).toFixed(1) + '%'
-                    : '—' }}
+                  {{ formatRedisHitRate(redisInfo.keyspace_hits, redisInfo.keyspace_misses) }}
                 </div>
                 <div class="stat-label">命中率</div>
               </div>
@@ -316,8 +314,8 @@
           </div>
         </div>
 
-        <!-- ── MySQL: Database Grid ── -->
-        <div v-if="!isRedis && !selectedDatabase" class="content-body fade-up">
+        <!-- ── SQL: Database Grid ── -->
+        <div v-if="isSQLLike && !isSQLite && !selectedDatabase" class="content-body fade-up">
           <div class="section-label" style="color: var(--text-secondary)">选择数据库</div>
           <div v-if="loadingDatabases" class="flex items-center gap-2 py-6 text-[13px]" style="color: var(--text-tertiary)">
             <Loader2 class="h-4 w-4 animate-spin" />
@@ -351,8 +349,8 @@
           </div>
         </div>
 
-        <!-- ── MySQL: Table Grid ── -->
-        <div v-else-if="!isRedis && !selectedTable" class="content-body fade-up">
+        <!-- ── SQL: Table Grid ── -->
+        <div v-else-if="isSQLLike && !selectedTable" class="content-body fade-up">
           <div class="flex items-center justify-between mb-3">
             <div class="section-label" style="color: var(--text-secondary)">选择数据表</div>
             <div class="flex items-center gap-2">
@@ -404,8 +402,8 @@
         </div>
       </div>
 
-      <!-- ── MySQL: Data Table Card ── -->
-      <div v-if="!isRedis && selectedTable" class="content-card fade-up">
+      <!-- ── SQL: Data Table Card ── -->
+      <div v-if="isSQLLike && selectedTable" class="content-card fade-up">
         <!-- Pagination Bar -->
         <div class="data-table-pagination">
           <span class="text-[13px]" style="color: var(--text-tertiary)">共 {{ totalRows }} 行数据</span>
@@ -497,33 +495,14 @@
               </Table>
             </TabsContent>
             <TabsContent value="sql">
-              <div class="sql-console">
-                <Textarea v-model="sqlQuery" :rows="5" placeholder="输入SQL查询语句..." class="font-mono text-sm mb-3 code-editor" style="border-color: var(--border)" />
-                <div class="flex justify-end mb-3">
-                  <button class="btn-primary" @click="executeSql" :disabled="sqlResultLoading">
-                    {{ sqlResultLoading ? '执行中...' : '执行' }}
-                  </button>
-                </div>
-                <div v-if="sqlResult" class="mt-2">
-                  <div v-if="sqlResult.type === 'rows'" class="sql-result-table">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead v-for="col in sqlResult.columns" :key="col" class="text-xs">{{ col }}</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <TableRow v-for="(row, idx) in sqlResult.data" :key="idx">
-                          <TableCell v-for="col in sqlResult.columns" :key="col" class="text-xs font-mono-data">{{ row[col] ?? 'NULL' }}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                    <div class="sql-result-footer" style="color: var(--text-tertiary)">共 {{ sqlResult.data.length }} 行</div>
-                  </div>
-                  <div v-else-if="sqlResult.type === 'message'" class="sql-result-msg sql-result-msg--success">{{ sqlResult.data }}</div>
-                  <div v-else-if="sqlResult.type === 'error'" class="sql-result-msg sql-result-msg--error">{{ sqlResult.data }}</div>
-                </div>
-              </div>
+              <!-- #17 拆出 SqlConsoleTab 子组件 -->
+              <SqlConsoleTab
+                :server-id="serverId"
+                :is-s-q-lite="isSQLite"
+                :selected-database="selectedDatabase"
+                :api-prefix="apiPrefix"
+                :is-remote="currentInst?.isRemote || false"
+              />
             </TabsContent>
           </Tabs>
         </div>
@@ -770,9 +749,12 @@ import { ref, computed, onMounted, onActivated, watch, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useHealthStore } from '../stores/health'
 import { toast } from 'vue-sonner'
+import { useConfirm } from '../composables/useConfirm'
 import { useAppContext } from '../stores/context'
 import { sourceParam, sourceValue, instanceUid } from '@/lib/instance'
 import { databaseApi } from '../api/database'
+import SqlConsoleTab from './SqlConsoleTab.vue'
+import { getTypeLabel, getTypeColor, getTypeSoftColor } from '@/lib/utils'
 import InstanceDialog from './InstanceDialog.vue'
 import StatusDot from './StatusDot.vue'
 
@@ -793,11 +775,17 @@ import {
   Table2, Loader2, AlertTriangle, Inbox, X, Trash2
 } from 'lucide-vue-next'
 
-const API_BASE = '/api/mysql'
 const REDIS_API = '/api/redis'
 
 const store = useAppContext()
-const { connectionId, isRedis, serverId } = storeToRefs(store)
+const { connectionId, isRedis, isSQLLike, isSQLite, serverId } = storeToRefs(store)
+
+const apiPrefix = computed(() => {
+  const type = currentInst.value?.type
+  if (type === 'postgresql') return '/api/postgresql'
+  if (type === 'sqlite') return '/api/sqlite'
+  return '/api/mysql' // mysql and mariadb use same API
+})
 
 const props = defineProps({
   navRequest: { type: Object, default: null }
@@ -848,9 +836,7 @@ const page = ref(1)
 const pageSize = ref(50)
 
 const activeTab = ref('structure')
-const sqlQuery = ref('')
-const sqlResult = ref(null)
-const sqlResultLoading = ref(false)
+// #17 sqlQuery / sqlResult / sqlResultLoading 已迁移到 SqlConsoleTab.vue
 const showInsertDialog = ref(false)
 const showEditDialog = ref(false)
 const insertForm = ref({})
@@ -875,7 +861,7 @@ const openDeleteDbDialog = (dbName) => {
 }
 
 const doDeleteDatabase = () => {
-  const url = `${API_BASE}/databases/delete?${sourceParam(currentInst.value?.isRemote || false)}`
+  const url = `${apiPrefix.value}/databases/delete?${sourceParam(currentInst.value?.isRemote || false)}`
   const body = { server_id: serverId.value, name: deleteDbName.value }
   console.log('[删除数据库] 请求URL:', url)
   console.log('[删除数据库] 请求体:', JSON.stringify(body))
@@ -961,7 +947,7 @@ const createTable = () => {
     let def = `\`${col.name.trim().replace(/`/g, '``')}\` ${col.type}`
     if (col.length.trim()) def += `(${col.length.trim()})`
     if (col.notNull) def += ' NOT NULL'
-    if (col.autoIncrement) def += ' AUTO_INCREMENT'
+    if (col.autoIncrement) def += isSQLite.value ? ' AUTOINCREMENT' : ' AUTO_INCREMENT'
     
     if (col.defaultValue && col.keyType !== 'PRI') {
       const defaultVal = col.defaultValue.trim()
@@ -987,11 +973,12 @@ const createTable = () => {
     cols[idx] += ' PRIMARY KEY'
   }
 
-  const sql = `CREATE TABLE \`${form.name.trim().replace(/`/g, '``')}\` (${cols.join(', ')}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
-  fetch(`${API_BASE}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, {
+  const sqlSuffix = isSQLite.value ? '' : ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+  const sql = `CREATE TABLE \`${form.name.trim().replace(/`/g, '``')}\` (${cols.join(', ')})${sqlSuffix}`
+  fetch(`${apiPrefix.value}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ server_id: serverId.value, database: selectedDatabase.value, sql })
+    body: JSON.stringify(buildExecuteBody(sql))
   })
     .then(res => res.json())
     .then(data => {
@@ -1014,10 +1001,10 @@ const confirmDeleteTable = (tbl) => {
 const deleteTable = () => {
   const tbl = deleteTableName.value
   const sql = `DROP TABLE IF EXISTS \`${tbl}\``
-  fetch(`${API_BASE}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, {
+  fetch(`${apiPrefix.value}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ server_id: serverId.value, database: selectedDatabase.value, sql })
+    body: JSON.stringify(buildExecuteBody(sql))
   })
     .then(res => res.json())
     .then(data => {
@@ -1058,10 +1045,17 @@ const formatKeySize = (type, size) => {
   return ''
 }
 
+// Redis 命中率格式化：避免除以 0
+const formatRedisHitRate = (hits, misses) => {
+  const h = parseInt(hits) || 0
+  const m = parseInt(misses) || 0
+  const total = h + m
+  if (total === 0) return '—'
+  return ((h * 100) / total).toFixed(1) + '%'
+}
+
 const getInstanceColor = (inst) => {
-  if (inst.type === 'redis') return '#e6a23c'
-  if (inst.isRemote) return '#67c23a'
-  return '#3b82f6'
+  return getTypeColor(inst.type)
 }
 
 const isNumericType = (t) => /^(int|tinyint|smallint|mediumint|bigint|float|double|decimal|numeric|number)/i.test(t || '')
@@ -1093,13 +1087,10 @@ const handleConfirm = () => {
 const loadInstances = () => {
   store.loadInstances().then(result => {
     const newIds = new Set(result.map(i => (i.isRemote ? 'r:' : 'l:') + i.id))
-    const newInstanceIds = [...newIds].filter(uid => !previousInstanceIds.value.has(uid))
     instances.value = result
     previousInstanceIds.value = newIds
     healthStore.cleanup([...newIds])
-    newInstanceIds.forEach(uid => {
-      healthStore.forceCheckOne(uid)
-    })
+    // 不做逐个 forceCheckOne，依赖后端定时检测
     checkOnlineStatus(result)
     if (!connectionId.value && instances.value.length > 0) {
       const inst = instances.value[0]
@@ -1114,14 +1105,20 @@ const loadInstances = () => {
   })
 }
 
-const checkOnlineStatus = async (items) => {
-  await healthStore.refreshAll()
+const checkOnlineStatus = (items) => {
+  // 非阻塞刷新，不 await
+  healthStore.refreshAll()
 }
 
 const autoOpenFromStore = () => {
   if (!connectionId.value) return
   if (isRedis.value) {
     loadRedisInfo(); loadRedisKeys()
+    return
+  }
+  if (isSQLite.value) {
+    // SQLite: no database selection, go directly to tables
+    loadTables()
     return
   }
   loadDatabases()
@@ -1152,6 +1149,7 @@ const clearDataState = () => {
 
 const backToDatabases = () => {
   if (isRedis.value) { selectedRedisKey.value = null; selectedRedisKeyData.value = null; return }
+  if (isSQLite.value) { clearTablesState(); return }
   selectedDatabase.value = null; clearTablesState()
 }
 
@@ -1175,9 +1173,9 @@ const selectTable = (tbl) => {
 }
 
 const loadDatabases = () => {
-  if (!connectionId.value) return
+  if (!connectionId.value || isSQLite.value) return
   loadingDatabases.value = true
-  fetch(`${API_BASE}/databases?server_id=${serverId.value}&${sourceParam(currentInst.value?.isRemote || false)}`)
+  fetch(`${apiPrefix.value}/databases?server_id=${serverId.value}&${sourceParam(currentInst.value?.isRemote || false)}`)
     .then(res => res.json())
     .then(data => { if (data.code === 0) databases.value = data.data || []; else toast.error(data.msg || '获取数据库列表失败') })
     .catch(err => toast.error('连接MySQL失败: ' + err.message))
@@ -1185,18 +1183,21 @@ const loadDatabases = () => {
 }
 
 const loadTables = () => {
-  if (!connectionId.value || !selectedDatabase.value) return
+  if (!connectionId.value) return
+  if (!isSQLite.value && !selectedDatabase.value) return
   loadingTables.value = true; tableLoadError.value = ''
-  fetch(`${API_BASE}/tables?server_id=${serverId.value}&${sourceParam(currentInst.value?.isRemote || false)}&database=${encodeURIComponent(selectedDatabase.value)}`)
+  const dbParam = isSQLite.value ? '' : `&database=${encodeURIComponent(selectedDatabase.value)}`
+  fetch(`${apiPrefix.value}/tables?server_id=${serverId.value}&${sourceParam(currentInst.value?.isRemote || false)}${dbParam}`)
     .then(res => res.json())
     .then(data => { if (data.code === 0) tables.value = data.data || []; else { tableLoadError.value = data.msg || '获取表列表失败'; toast.error(data.msg || '获取表列表失败') } })
-    .catch(err => { tableLoadError.value = err.message; toast.error('连接MySQL失败: ' + err.message) })
+    .catch(err => { tableLoadError.value = err.message; toast.error('连接失败: ' + err.message) })
     .finally(() => { loadingTables.value = false })
 }
 
 const loadColumns = () => {
   if (!connectionId.value) return
-  fetch(`${API_BASE}/columns?server_id=${serverId.value}&${sourceParam(currentInst.value?.isRemote || false)}&database=${encodeURIComponent(selectedDatabase.value)}&table=${encodeURIComponent(selectedTable.value)}`)
+  const dbParam = isSQLite.value ? '' : `&database=${encodeURIComponent(selectedDatabase.value)}`
+  fetch(`${apiPrefix.value}/columns?server_id=${serverId.value}&${sourceParam(currentInst.value?.isRemote || false)}${dbParam}&table=${encodeURIComponent(selectedTable.value)}`)
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) columns.value = (data.data || []).map(col => ({ name: col.Field, type: col.Type, key: col.Key, default: col.Default, extra: col.Extra }))
@@ -1208,7 +1209,9 @@ const loadColumns = () => {
 const fetchTableData = () => {
   if (!connectionId.value) return
   loadingData.value = true
-  fetch(`${API_BASE}/data?${new URLSearchParams({ server_id: serverId.value, source: sourceValue(currentInst.value?.isRemote || false), database: selectedDatabase.value, table: selectedTable.value, page: page.value, pageSize: pageSize.value })}`)
+  const params = { server_id: serverId.value, source: sourceValue(currentInst.value?.isRemote || false), table: selectedTable.value, page: page.value, pageSize: pageSize.value }
+  if (!isSQLite.value) params.database = selectedDatabase.value
+  fetch(`${apiPrefix.value}/data?${new URLSearchParams(params)}`)
     .then(res => res.json())
     .then(data => { if (data.code === 0) { tableData.value = data.data.rows || []; totalRows.value = data.data.total || 0 } else toast.error(data.msg || '获取数据失败') })
     .catch(err => toast.error('连接失败: ' + err.message))
@@ -1228,6 +1231,10 @@ const processNavRequest = () => {
 
 const refreshData = () => {
   if (isRedis.value) { loadRedisKeys(); loadRedisInfo(); return }
+  if (isSQLite.value) {
+    if (selectedTable.value) { fetchTableData(); toast.success('刷新成功'); return }
+    loadTables(); toast.success('刷新成功'); return
+  }
   if (selectedTable.value) { fetchTableData(); toast.success('刷新成功'); return }
   if (selectedDatabase.value) { loadTables(); toast.success('刷新成功'); return }
   loadDatabases(); toast.success('刷新成功')
@@ -1242,7 +1249,7 @@ const createDatabase = () => {
     return
   }
   createDbError.value = ''
-  const url = `${API_BASE}/databases/create?${sourceParam(currentInst.value?.isRemote || false)}`
+  const url = `${apiPrefix.value}/databases/create?${sourceParam(currentInst.value?.isRemote || false)}`
   const body = {
     server_id: serverId.value,
     name,
@@ -1302,12 +1309,19 @@ const deleteInstance = (inst) => {
 const editRow = (row) => { editForm.value = { ...row }; showEditDialog.value = true }
 const confirmDeleteRow = (row) => { showConfirm('删除确认', '确定删除该行数据？', () => doDeleteRow(row)) }
 
+const buildExecuteBody = (sql) => {
+  const body = { server_id: serverId.value, sql }
+  if (!isSQLite.value) body.database = selectedDatabase.value
+  return body
+}
+
 const doDeleteRow = (row) => {
   if (!connectionId.value) return
   const pkCol = columns.value.find(c => c.key === 'PRI')
   if (!pkCol) { toast.warning('该表没有主键，无法删除'); return }
-  const sql = `DELETE FROM \`${escapeSqlName(selectedDatabase.value)}\`.\`${escapeSqlName(selectedTable.value)}\` WHERE \`${escapeSqlName(pkCol.name)}\` = ${escapeSqlValue(row[pkCol.name])}`
-  fetch(`${API_BASE}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ server_id: serverId.value, database: selectedDatabase.value, sql }) })
+  const tableRef = isSQLite.value ? `\`${escapeSqlName(selectedTable.value)}\`` : `\`${escapeSqlName(selectedDatabase.value)}\`.\`${escapeSqlName(selectedTable.value)}\``
+  const sql = `DELETE FROM ${tableRef} WHERE \`${escapeSqlName(pkCol.name)}\` = ${escapeSqlValue(row[pkCol.name])}`
+  fetch(`${apiPrefix.value}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildExecuteBody(sql)) })
     .then(res => res.json()).then(data => { if (data.code === 0) { toast.success('删除成功'); fetchTableData() } else toast.error(data.msg) })
     .catch(err => toast.error('操作失败: ' + err.message))
 }
@@ -1317,8 +1331,9 @@ const insertData = () => {
   const fields = columns.value.filter(c => c.extra !== 'auto_increment')
   const names = fields.map(c => `\`${escapeSqlName(c.name)}\``).join(', ')
   const vals = fields.map(c => escapeSqlValue(insertForm.value[c.name])).join(', ')
-  const sql = `INSERT INTO \`${escapeSqlName(selectedDatabase.value)}\`.\`${escapeSqlName(selectedTable.value)}\` (${names}) VALUES (${vals})`
-  fetch(`${API_BASE}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ server_id: serverId.value, database: selectedDatabase.value, sql }) })
+  const tableRef = isSQLite.value ? `\`${escapeSqlName(selectedTable.value)}\`` : `\`${escapeSqlName(selectedDatabase.value)}\`.\`${escapeSqlName(selectedTable.value)}\``
+  const sql = `INSERT INTO ${tableRef} (${names}) VALUES (${vals})`
+  fetch(`${apiPrefix.value}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildExecuteBody(sql)) })
     .then(res => res.json()).then(data => { if (data.code === 0) { toast.success('插入成功'); showInsertDialog.value = false; insertForm.value = {}; fetchTableData() } else toast.error(data.msg) })
     .catch(err => toast.error('操作失败: ' + err.message))
 }
@@ -1330,8 +1345,9 @@ const updateData = () => {
   const sets = columns.value.filter(c => c.key !== 'PRI' && c.extra !== 'auto_increment')
     .map(c => `\`${escapeSqlName(c.name)}\` = ${escapeSqlValue(editForm.value[c.name])}`).join(', ')
   if (!sets) { toast.warning('没有可更新的字段'); return }
-  const sql = `UPDATE \`${escapeSqlName(selectedDatabase.value)}\`.\`${escapeSqlName(selectedTable.value)}\` SET ${sets} WHERE \`${escapeSqlName(pkCol.name)}\` = ${escapeSqlValue(editForm.value[pkCol.name])}`
-  fetch(`${API_BASE}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ server_id: serverId.value, database: selectedDatabase.value, sql }) })
+  const tableRef = isSQLite.value ? `\`${escapeSqlName(selectedTable.value)}\`` : `\`${escapeSqlName(selectedDatabase.value)}\`.\`${escapeSqlName(selectedTable.value)}\``
+  const sql = `UPDATE ${tableRef} SET ${sets} WHERE \`${escapeSqlName(pkCol.name)}\` = ${escapeSqlValue(editForm.value[pkCol.name])}`
+  fetch(`${apiPrefix.value}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildExecuteBody(sql)) })
     .then(res => res.json()).then(data => { if (data.code === 0) { toast.success('保存成功'); showEditDialog.value = false; fetchTableData() } else toast.error(data.msg) })
     .catch(err => toast.error('操作失败: ' + err.message))
 }
@@ -1351,7 +1367,9 @@ const exportData = async (exportAll = false) => {
   let dataToExport = tableData.value
   if (exportAll) {
     try {
-      const res = await fetch(`${API_BASE}/data?${new URLSearchParams({ server_id: serverId.value, source: sourceValue(currentInst.value?.isRemote || false), database: selectedDatabase.value, table: selectedTable.value, page: 1, pageSize: totalRows.value })}`)
+      const exportParams = { server_id: serverId.value, source: sourceValue(currentInst.value?.isRemote || false), table: selectedTable.value, page: 1, pageSize: totalRows.value }
+      if (!isSQLite.value) exportParams.database = selectedDatabase.value
+      const res = await fetch(`${apiPrefix.value}/data?${new URLSearchParams(exportParams)}`)
       const data = await res.json()
       if (data.code === 0) {
         dataToExport = data.data.rows || []
@@ -1376,42 +1394,7 @@ const exportData = async (exportAll = false) => {
   a.click(); URL.revokeObjectURL(url); toast.success(exportAll ? `已导出全部 ${dataToExport.length} 条数据` : '导出成功')
 }
 
-const DANGEROUS_SQL_PATTERNS = [
-  /^\s*DROP\s+(DATABASE|SCHEMA|TABLE)/i,
-  /^\s*TRUNCATE\s+/i,
-  /^\s*DELETE\s+FROM\s+\S+\s*$/i,
-  /^\s*DELETE\s+FROM\s+\S+\s*;\s*$/i,
-]
-
-const executeSql = () => {
-  if (!sqlQuery.value.trim()) { toast.warning('请输入SQL语句'); return }
-  if (!connectionId.value) { toast.warning('请先选择一个实例'); return }
-  const sqlTrimmed = sqlQuery.value.trim()
-  const isDangerous = DANGEROUS_SQL_PATTERNS.some(p => p.test(sqlTrimmed))
-  if (isDangerous && !confirm('该SQL语句可能造成数据不可逆的修改，确认执行？')) return
-  sqlResultLoading.value = true
-  sqlResult.value = null
-  fetch(`${API_BASE}/execute?${sourceParam(currentInst.value?.isRemote || false)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ server_id: serverId.value, database: selectedDatabase.value, sql: sqlQuery.value }) })
-    .then(res => res.json()).then(data => {
-      if (data.code === 0) {
-        if (data.data.rows && data.data.rows.length > 0) {
-          sqlResult.value = { type: 'rows', data: data.data.rows, columns: Object.keys(data.data.rows[0]) }
-          toast.success(`查询成功，返回 ${data.data.rows.length} 行`)
-        } else {
-          sqlResult.value = { type: 'message', data: data.data.msg || '执行成功' }
-          toast.success(data.data.msg || '执行成功')
-        }
-      } else {
-        sqlResult.value = { type: 'error', data: data.msg }
-        toast.error(data.msg)
-      }
-    })
-    .catch(err => {
-      sqlResult.value = { type: 'error', data: err.message }
-      toast.error('执行失败: ' + err.message)
-    })
-    .finally(() => { sqlResultLoading.value = false })
-}
+// #17 SQL 控制台已拆出到 SqlConsoleTab.vue，相关函数与状态已迁移
 
 const redisKeys = ref([])
 const redisInfo = ref({})
@@ -1491,7 +1474,7 @@ watch(connectionId, (newId) => {
 watch(() => props.navRequest, (val) => { if (val) processNavRequest() })
 
 onMounted(() => { loadInstances() })
-onActivated(() => { loadInstances() })
+onActivated(() => { if (instances.value.length === 0) loadInstances() })
 </script>
 
 <style scoped>

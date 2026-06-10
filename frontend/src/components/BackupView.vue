@@ -42,24 +42,6 @@
           <Search class="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
           <Input v-model="searchQuery" placeholder="搜索备份..." class="border-0 shadow-none h-[28px] text-[13px] w-[140px] bg-transparent" @input="onSearchInput" />
         </div>
-        <Select v-model="databaseFilter" @update:model-value="onFilterChange">
-          <SelectTrigger class="h-[32px] w-[150px] text-[13px] border-[var(--border)]">
-            <Database class="h-3.5 w-3.5 mr-1" />
-            <SelectValue placeholder="全部数据库" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部数据库</SelectItem>
-            <SelectItem v-for="db in allDbOptions" :key="(db.isRemote ? 'r:' : 'l:') + db.id + ':' + db.name" :value="(db.isRemote ? 'r:' : 'l:') + db.id + ':' + db.name">
-              <div class="flex items-center gap-2">
-                <Badge :class="db.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'" class="text-[10px] px-1.5 py-0 rounded-full">
-                  {{ db.type === 'redis' ? 'R' : 'M' }}
-                </Badge>
-                {{ db.name }}
-                <span class="text-[var(--text-tertiary)] text-xs ml-auto">{{ db.host || '本地' }}</span>
-              </div>
-            </SelectItem>
-          </SelectContent>
-        </Select>
         <div class="flex items-center gap-1">
           <button
             v-for="opt in levelOptions" :key="opt.value"
@@ -77,6 +59,34 @@
             <RefreshCw class="h-3.5 w-3.5" />
           </button>
           <button v-if="hasActiveFilters" class="btn-ghost h-[30px] text-[12px] text-[var(--text-tertiary)]" @click="clearAllFilters">
+            <X class="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar (scheduled tab) -->
+      <div v-if="activeMainTab === 'scheduled'" class="flex items-center gap-2 px-5 pt-3 pb-2 shrink-0 flex-wrap">
+        <div class="flex h-[32px] items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 gap-1.5">
+          <Search class="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+          <Input v-model="scheduleSearchQuery" placeholder="搜索计划..." class="border-0 shadow-none h-[28px] text-[13px] w-[140px] bg-transparent" />
+        </div>
+        <div class="flex items-center gap-1">
+          <button
+            v-for="opt in levelOptions" :key="opt.value"
+            :class="scheduleLevelFilter === opt.value ? 'pill pill-active' : 'pill pill-default'"
+            @click="scheduleLevelFilter = opt.value"
+          >
+            <Database v-if="opt.value === 'mysql'" class="h-3 w-3 shrink-0" />
+            <HardDrive v-else-if="opt.value === 'redis'" class="h-3 w-3 shrink-0" />
+            <Settings v-else-if="opt.value === 'system'" class="h-3 w-3 shrink-0" />
+            {{ opt.label }}
+          </button>
+        </div>
+        <div class="flex items-center gap-1.5 ml-auto">
+          <button class="btn-ghost h-[30px] text-[12px]" @click="loadSchedules">
+            <RefreshCw class="h-3.5 w-3.5" />
+          </button>
+          <button v-if="scheduleSearchQuery || scheduleLevelFilter" class="btn-ghost h-[30px] text-[12px] text-[var(--text-tertiary)]" @click="scheduleSearchQuery = ''; scheduleLevelFilter = ''">
             <X class="h-3.5 w-3.5" />
           </button>
         </div>
@@ -221,13 +231,13 @@
         <div v-if="activeMainTab === 'scheduled'" class="h-full flex flex-col">
           <div class="flex-1 min-h-0 overflow-y-auto pt-3">
             <!-- Empty -->
-            <div v-if="scheduleList.length === 0" class="empty-state">
+            <div v-if="filteredScheduleList.length === 0" class="empty-state">
               <div class="empty-state-icon"><Inbox class="h-8 w-8" /></div>
               <p class="empty-state-text">暂无定时备份计划</p>
             </div>
             <!-- Card List -->
             <div v-else class="grid gap-3">
-              <div v-for="row in scheduleList" :key="row.id" class="content-card-interactive hover-lift p-4 flex items-center gap-4">
+              <div v-for="row in filteredScheduleList" :key="row.id" class="content-card-interactive hover-lift p-4 flex items-center gap-4">
                 <!-- Icon -->
                 <div class="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" :class="row.backupLevel === 'system' ? 'bg-[var(--accent-soft)]' : row.backupLevel === 'redis' ? 'bg-amber-500/10' : 'bg-blue-500/10'">
                   <Settings v-if="row.backupLevel === 'system'" class="h-5 w-5 text-[var(--text-tertiary)]" />
@@ -323,10 +333,10 @@
                     {{ selectedCreateDb.name }}
                     <Badge
                       variant="outline"
-                      :class="selectedCreateDb.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'"
+                      :class="getTypeBadgeClass(selectedCreateDb.type)"
                       class="text-[10px] px-1.5 py-0 shrink-0"
                     >
-                      {{ selectedCreateDb.type === 'redis' ? 'Redis' : 'MySQL' }}
+                      {{ selectedCreateDb.type === 'redis' ? 'Redis' : getTypeLabel(selectedCreateDb.type) }}
                     </Badge>
                     <span class="text-[var(--text-tertiary)] text-xs shrink-0">{{ selectedCreateDb.host || '本地' }}</span>
                   </span>
@@ -344,10 +354,10 @@
                     <div class="flex items-center gap-2 shrink-0">
                       <Badge
                         variant="outline"
-                        :class="db.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'"
+                        :class="getTypeBadgeClass(db.type)"
                         class="text-[10px] px-1.5 py-0"
                       >
-                        {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}
+                        {{ db.type === 'redis' ? 'Redis' : getTypeLabel(db.type) }}
                       </Badge>
                       <span class="text-[var(--text-tertiary)] text-xs">{{ db.host || '本地' }}</span>
                     </div>
@@ -356,8 +366,8 @@
               </SelectContent>
             </Select>
           </div>
-          <!-- MySQL 备份：选择具体要备份的数据库名 -->
-          <div v-if="createForm.backupLevel === 'mysql'" class="flex flex-col gap-1.5">
+          <!-- MySQL/MariaDB/PostgreSQL 备份：选择具体要备份的数据库名 -->
+          <div v-if="needsDbSelection(createForm.backupLevel)" class="flex flex-col gap-1.5">
             <label class="text-sm font-medium text-[var(--text-primary)]">选择要备份的数据库 <span class="text-[var(--danger)]">*</span></label>
             <Select v-model="createForm.targetMysqlDbName">
               <SelectTrigger class="border-[var(--border)] shadow-none">
@@ -436,10 +446,10 @@
                     {{ selectedScheduleDb.name }}
                     <Badge
                       variant="outline"
-                      :class="selectedScheduleDb.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'"
+                      :class="getTypeBadgeClass(selectedScheduleDb.type)"
                       class="text-[10px] px-1.5 py-0 shrink-0"
                     >
-                      {{ selectedScheduleDb.type === 'redis' ? 'Redis' : 'MySQL' }}
+                      {{ selectedScheduleDb.type === 'redis' ? 'Redis' : getTypeLabel(selectedScheduleDb.type) }}
                     </Badge>
                     <span class="text-[var(--text-tertiary)] text-xs shrink-0">{{ selectedScheduleDb.host || '本地' }}</span>
                   </span>
@@ -457,10 +467,10 @@
                     <div class="flex items-center gap-2 shrink-0">
                       <Badge
                         variant="outline"
-                        :class="db.type === 'redis' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 'bg-blue-500/5 text-blue-600 border-blue-500/20'"
+                        :class="getTypeBadgeClass(db.type)"
                         class="text-[10px] px-1.5 py-0"
                       >
-                        {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}
+                        {{ db.type === 'redis' ? 'Redis' : getTypeLabel(db.type) }}
                       </Badge>
                       <span class="text-[var(--text-tertiary)] text-xs">{{ db.host || '本地' }}</span>
                     </div>
@@ -469,7 +479,7 @@
               </SelectContent>
             </Select>
           </div>
-          <div v-if="scheduleForm.backupLevel === 'mysql' && scheduleForm.targetDb" class="flex flex-col gap-1.5">
+          <div v-if="needsDbSelection(scheduleForm.backupLevel) && scheduleForm.targetDb" class="flex flex-col gap-1.5">
             <label class="text-sm font-medium text-[var(--text-primary)]">目标数据库 <span class="text-[var(--danger)]">*</span></label>
             <Select v-model="scheduleForm.targetMysqlDbName">
               <SelectTrigger class="border-[var(--border)] shadow-none">
@@ -600,7 +610,7 @@ import { ref, onMounted, onActivated, watch, computed, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppContext } from '../stores/context'
 import { sourceParam } from '@/lib/instance'
-import { formatLogTime } from '@/lib/utils'
+import { formatLogTime, getTypeLabel, getTypeBadgeClass, isSqlType } from '@/lib/utils'
 import { useMessage } from '../composables/useMessage'
 import {
   Upload, Clock, Plus, Settings, Database,
@@ -621,8 +631,9 @@ import { Input } from '@/components/ui/Input.vue'
 import { Textarea } from '@/components/ui/Textarea.vue'
 import { Switch } from '@/components/ui/Switch.vue'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/Select.vue'
+import { STORAGE_KEYS, safeStorage } from '@/lib/storageKeys'
 
-const STORAGE_KEY = 'backup_view_filters'
+const STORAGE_KEY = STORAGE_KEYS.BACKUP_FILTERS
 
 const store = useAppContext()
 const { connectionId } = storeToRefs(store)
@@ -679,19 +690,30 @@ const totalItems = ref(0)
 const loading = ref(false)
 const searchQuery = ref('')
 let searchTimer = null
+const scheduleSearchQuery = ref('')
+const scheduleLevelFilter = ref('')
 
 const levelOptions = [
   { label: '全部', value: '' },
   { label: 'MySQL', value: 'mysql' },
+  { label: 'MariaDB', value: 'mariadb' },
+  { label: 'PostgreSQL', value: 'postgresql' },
   { label: 'Redis', value: 'redis' },
+  { label: 'SQLite', value: 'sqlite' },
   { label: '系统', value: 'system' }
 ]
 
 const createLevelOptions = [
   { label: 'MySQL备份', value: 'mysql' },
+  { label: 'MariaDB备份', value: 'mariadb' },
+  { label: 'PostgreSQL备份', value: 'postgresql' },
   { label: 'Redis备份', value: 'redis' },
+  { label: 'SQLite备份', value: 'sqlite' },
   { label: '系统备份', value: 'system' }
 ]
+
+// 需要选择具体数据库的类型（一个实例下有多个数据库）
+const needsDbSelection = (level) => level === 'mysql' || level === 'mariadb' || level === 'postgresql'
 
 const createForm = ref({
   name: '',
@@ -718,6 +740,21 @@ const loadingScheduleMysqlDatabases = ref(false)
 
 const pageItems = computed(() => {
   return backupList.value
+})
+
+const filteredScheduleList = computed(() => {
+  let list = scheduleList.value
+  if (scheduleLevelFilter.value) {
+    list = list.filter(s => s.backupLevel === scheduleLevelFilter.value)
+  }
+  if (scheduleSearchQuery.value) {
+    const q = scheduleSearchQuery.value.toLowerCase()
+    list = list.filter(s =>
+      (s.name || '').toLowerCase().includes(q) ||
+      (s.database || '').toLowerCase().includes(q)
+    )
+  }
+  return list
 })
 
 const selectedIds = computed(() => new Set(selectedBackups.value.map(b => b.id)))
@@ -752,7 +789,7 @@ const visiblePageNumbers = computed(() => {
 })
 
 const hasActiveFilters = computed(() => {
-  return backupLevelFilter.value !== '' || (databaseFilter.value && databaseFilter.value !== 'all') || searchQuery.value !== ''
+  return backupLevelFilter.value !== '' || searchQuery.value !== ''
 })
 
 const allDbOptions = computed(() => {
@@ -772,8 +809,9 @@ const allDbOptions = computed(() => {
 const filteredCreateDbs = computed(() => {
   const level = createForm.value.backupLevel
   return allDbOptions.value.filter(db => {
-    if (level === 'mysql') return db.type !== 'redis'
     if (level === 'redis') return db.type === 'redis'
+    if (level === 'system') return true
+    if (level === 'mysql' || level === 'mariadb' || level === 'postgresql' || level === 'sqlite') return db.type === level
     return true
   })
 })
@@ -781,8 +819,9 @@ const filteredCreateDbs = computed(() => {
 const filteredScheduleDbs = computed(() => {
   const level = scheduleForm.value.backupLevel
   return allDbOptions.value.filter(db => {
-    if (level === 'mysql') return db.type !== 'redis'
     if (level === 'redis') return db.type === 'redis'
+    if (level === 'system') return true
+    if (level === 'mysql' || level === 'mariadb' || level === 'postgresql' || level === 'sqlite') return db.type === level
     return true
   })
 })
@@ -805,7 +844,7 @@ const restoreMessage = computed(() => {
   const isSystem = row.backupLevel === 'system'
   const isRedis = row.backupLevel === 'redis'
   const target = row.database || '系统配置'
-  return `确定要从备份 "${row.name}" 恢复${isRedis ? 'Redis数据' : isSystem ? '系统配置' : 'MySQL数据库 "' + target + '"'} 吗？恢复操作不可撤销！`
+  return `确定要从备份 "${row.name}" 恢复${isRedis ? 'Redis数据' : isSystem ? '系统配置' : getTypeLabel(row.backupLevel) + '数据库 "' + target + '"'} 吗？恢复操作不可撤销！`
 })
 
 const parseDbUid = (uid) => {
@@ -842,23 +881,21 @@ const saveFilterState = () => {
   try {
     const state = {
       backupLevelFilter: backupLevelFilter.value,
-      databaseFilter: databaseFilter.value,
       sortField: sortField.value,
       sortOrder: sortOrder.value,
       pageSize: pageSize.value,
       searchQuery: searchQuery.value
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    safeStorage.set(STORAGE_KEY, JSON.stringify(state))
   } catch (e) { /* ignore */ }
 }
 
 const loadFilterState = () => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
+    const saved = safeStorage.get(STORAGE_KEY)
     if (saved) {
       const state = JSON.parse(saved)
       if (state.backupLevelFilter !== undefined) backupLevelFilter.value = state.backupLevelFilter
-      if (state.databaseFilter) databaseFilter.value = state.databaseFilter
       if (state.sortField) sortField.value = state.sortField
       if (state.sortOrder) sortOrder.value = state.sortOrder
       if (state.pageSize) pageSize.value = state.pageSize
@@ -904,7 +941,6 @@ const onSearchInput = () => {
 
 const clearAllFilters = () => {
   backupLevelFilter.value = ''
-  databaseFilter.value = 'all'
   searchQuery.value = ''
   currentPage.value = 1
   saveFilterState()
@@ -925,14 +961,6 @@ const loadBackups = () => {
   params.set('sort_field', sortField.value)
   params.set('sort_order', sortOrder.value)
 
-  if (databaseFilter.value && databaseFilter.value !== 'all') {
-    const parsed = parseDbUid(databaseFilter.value)
-    if (parsed) {
-      params.set('server_id', String(parsed.id))
-      if (parsed.isRemote) params.set('source', 'remote')
-      if (parsed.name) params.set('database', parsed.name)
-    }
-  }
   if (backupLevelFilter.value) params.set('level', backupLevelFilter.value)
   if (searchQuery.value) params.set('search', searchQuery.value)
 
@@ -979,18 +1007,6 @@ const loadAvailableDatabases = () => {
     const locals = (localRes.code === 0 ? localRes.data : []) || []
     const remotes = (remoteRes.code === 0 ? remoteRes.data : []) || []
     availableDatabases.value = [...locals.map(r => ({ ...r, isRemote: false })), ...remotes.map(r => ({ ...r, isRemote: true }))]
-    if (databaseFilter.value && databaseFilter.value !== 'all') {
-      const parsed = parseDbUid(databaseFilter.value)
-      if (parsed) {
-        const allOpts = [...locals.map(r => ({ ...r, isRemote: false })), ...remotes.map(r => ({ ...r, isRemote: true }))]
-        const valid = allOpts.some(opt => opt.isRemote === parsed.isRemote && opt.id === parsed.id && (!parsed.name || opt.name === parsed.name))
-        if (!valid) {
-          databaseFilter.value = 'all'
-          saveFilterState()
-          loadBackups()
-        }
-      }
-    }
   }).catch((e) => { console.error(e) })
 }
 
@@ -1014,29 +1030,41 @@ const loadInstanceDatabases = () => {
 
 // 加载创建备份选择的连接的数据库列表
 const loadCreateMysqlDatabases = (selectedDb) => {
-  if (!selectedDb || selectedDb.type === 'redis') {
+  if (!selectedDb || !needsDbSelection(selectedDb.type)) {
     mysqlDatabaseOptions.value = []
     createForm.value.targetMysqlDbName = ''
     return
   }
   loadingMysqlDatabases.value = true
   const source = selectedDb.isRemote ? 'remote' : 'local'
-  fetch(`/api/mysql/databases?server_id=${selectedDb.id}&source=${source}`)
+  // PostgreSQL 使用独立接口，MySQL/MariaDB 共用 MySQL 接口
+  const apiUrl = selectedDb.type === 'postgresql'
+    ? `/api/postgresql/databases?server_id=${selectedDb.id}&source=${source}`
+    : `/api/mysql/databases?server_id=${selectedDb.id}&source=${source}`
+  fetch(apiUrl)
     .then(res => res.json())
     .then(data => {
       if (data.code === 0 && data.data) {
-        const filtered = data.data.filter(n => !['information_schema', 'performance_schema', 'mysql', 'sys'].includes(n))
+        let filtered = data.data
+        // MySQL/MariaDB 过滤系统库
+        if (selectedDb.type !== 'postgresql') {
+          filtered = filtered.filter(n => !['information_schema', 'performance_schema', 'mysql', 'sys'].includes(n))
+        }
         const isRoot = selectedDb.username === 'root'
-        // 只有 root 用户才显示「全部」选项
-        mysqlDatabaseOptions.value = isRoot ? ['__ALL__', ...filtered] : filtered
-        // 尝试自动选中：优先选择用户当前正在看的数据库（store.dbName）
+        // 只有 MySQL/MariaDB root 用户才显示「全部」选项
+        if (selectedDb.type !== 'postgresql' && isRoot) {
+          mysqlDatabaseOptions.value = ['__ALL__', ...filtered]
+        } else {
+          mysqlDatabaseOptions.value = filtered
+        }
+        // 尝试自动选中
         if (store.dbName && filtered.includes(store.dbName)) {
           createForm.value.targetMysqlDbName = store.dbName
         } else if (selectedDb.database && filtered.includes(selectedDb.database)) {
           createForm.value.targetMysqlDbName = selectedDb.database
         } else if (filtered.length > 0) {
           createForm.value.targetMysqlDbName = filtered[0]
-        } else if (isRoot) {
+        } else if (selectedDb.type !== 'postgresql' && isRoot) {
           createForm.value.targetMysqlDbName = '__ALL__'
         } else {
           createForm.value.targetMysqlDbName = ''
@@ -1061,22 +1089,31 @@ const onScheduleDbChange = (newVal) => {
   scheduleMysqlDatabaseOptions.value = []
   if (!newVal) return
   const selectedDb = findDbByUid(newVal)
-  if (!selectedDb || selectedDb.type === 'redis') return
+  if (!selectedDb || !needsDbSelection(selectedDb.type)) return
   loadingScheduleMysqlDatabases.value = true
   const source = selectedDb.isRemote ? 'remote' : 'local'
-  fetch(`/api/mysql/databases?server_id=${selectedDb.id}&source=${source}`)
+  const apiUrl = selectedDb.type === 'postgresql'
+    ? `/api/postgresql/databases?server_id=${selectedDb.id}&source=${source}`
+    : `/api/mysql/databases?server_id=${selectedDb.id}&source=${source}`
+  fetch(apiUrl)
     .then(res => res.json())
     .then(data => {
       if (data.code === 0 && data.data) {
-        const filtered = data.data.filter(n => !['information_schema', 'performance_schema', 'mysql', 'sys'].includes(n))
+        let filtered = data.data
+        if (selectedDb.type !== 'postgresql') {
+          filtered = filtered.filter(n => !['information_schema', 'performance_schema', 'mysql', 'sys'].includes(n))
+        }
         const isRoot = selectedDb.username === 'root'
-        // 只有 root 用户才显示「全部」选项
-        scheduleMysqlDatabaseOptions.value = isRoot ? ['__ALL__', ...filtered] : filtered
+        if (selectedDb.type !== 'postgresql' && isRoot) {
+          scheduleMysqlDatabaseOptions.value = ['__ALL__', ...filtered]
+        } else {
+          scheduleMysqlDatabaseOptions.value = filtered
+        }
         if (store.dbName && filtered.includes(store.dbName)) {
           scheduleForm.value.targetMysqlDbName = store.dbName
         } else if (filtered.length > 0) {
           scheduleForm.value.targetMysqlDbName = filtered[0]
-        } else if (isRoot) {
+        } else if (selectedDb.type !== 'postgresql' && isRoot) {
           scheduleForm.value.targetMysqlDbName = '__ALL__'
         } else {
           scheduleForm.value.targetMysqlDbName = ''
@@ -1098,8 +1135,10 @@ const cronLabel = (cron) => {
 const processNavRequest = () => {
   if (!props.navRequest) return
   const nav = props.navRequest
-  const dbFilter = (nav.isRemote ? 'r:' : 'l:') + String(nav.id) + (nav.name ? ':' + nav.name : '')
-  databaseFilter.value = dbFilter
+  // 根据导航的数据库类型设置备份级别筛选
+  if (nav.type) {
+    backupLevelFilter.value = nav.type
+  }
   saveFilterState()
   loadBackups()
   emit('navAccepted')
@@ -1108,7 +1147,6 @@ const processNavRequest = () => {
 watch(connectionId, () => {
   activeMainTab.value = 'records'
   backupLevelFilter.value = ''
-  databaseFilter.value = 'all'
   searchQuery.value = ''
   currentPage.value = 1
   sortField.value = 'createdAt'
@@ -1132,7 +1170,7 @@ watch(() => scheduleForm.value.backupLevel, () => {
 
 const handleCreate = () => {
   const defaultLevel = database.value
-    ? (database.value.type === 'redis' ? 'redis' : 'mysql')
+    ? (database.value.type === 'redis' ? 'redis' : database.value.type || 'mysql')
     : 'system'
   
   // 构建 default target db uid
@@ -1289,7 +1327,7 @@ const submitCreate = () => {
     .then(res => res.json())
     .then(data => {
       if (data.code === 0) {
-        const label = isSystem ? '系统' : isRedis ? 'Redis' : 'MySQL'
+        const label = isSystem ? '系统' : isRedis ? 'Redis' : getTypeLabel(createForm.value.backupLevel)
         success(label + '备份创建成功')
         showCreateDialog.value = false
         loadBackups()
@@ -1367,29 +1405,37 @@ const doRestore = () => {
 const openScheduleDialog = (row) => {
   editScheduleData.value = row || null
   scheduleMysqlDatabaseOptions.value = []
-  
-  const getTargetDbUid = (dbName, level) => {
-    if (!dbName || level === 'system') return ''
-    const foundDb = allDbOptions.value.find(db => db.name === dbName)
-    return foundDb ? (foundDb.isRemote ? 'r:' : 'l:') + foundDb.id + ':' + foundDb.name : ''
+
+  const getTargetDbUid = (serverId, source, backupLevel) => {
+    if (!serverId) return ''
+    const isRemote = source === 'remote'
+    // 精确匹配：serverId + source
+    const foundDb = allDbOptions.value.find(db =>
+      db.id === Number(serverId) && db.isRemote === isRemote
+    )
+    if (foundDb) return (foundDb.isRemote ? 'r:' : 'l:') + foundDb.id + ':' + foundDb.name
+    // 回退：按类型匹配第一个
+    const fallbackDb = allDbOptions.value.find(db => db.type === backupLevel)
+    if (fallbackDb) return (fallbackDb.isRemote ? 'r:' : 'l:') + fallbackDb.id + ':' + fallbackDb.name
+    return ''
   }
-  
+
   if (row) {
-    const targetDbUid = getTargetDbUid(row.database, row.backupLevel)
+    const targetDbUid = getTargetDbUid(row.serverId, row.source, row.backupLevel)
     scheduleForm.value = {
       name: row.name,
       backupLevel: row.backupLevel || 'mysql',
       targetDb: targetDbUid,
-      targetMysqlDbName: row.backupLevel === 'mysql' ? (row.database || '__ALL__') : '',
+      targetMysqlDbName: needsDbSelection(row.backupLevel) ? (row.database || '__ALL__') : '',
       cron: row.cron || 'daily',
       retainCount: row.retainCount || 7
     }
-    if (targetDbUid && row.backupLevel === 'mysql') {
+    if (targetDbUid && needsDbSelection(row.backupLevel)) {
       onScheduleDbChange(targetDbUid)
     }
   } else {
     const dbName = database.value ? (store.dbName || '') : ''
-    const targetDbUid = getTargetDbUid(dbName, 'mysql')
+    const targetDbUid = database.value ? getTargetDbUid(database.value.id, database.value.isRemote ? 'remote' : 'local', 'mysql') : ''
     scheduleForm.value = {
       name: '',
       backupLevel: 'mysql',
@@ -1424,7 +1470,7 @@ const submitSchedule = () => {
       scheduling.value = false
       return
     }
-    if (selectedDb.type !== 'redis' && !scheduleForm.value.targetMysqlDbName) {
+    if (isSqlType(selectedDb.type) && !scheduleForm.value.targetMysqlDbName) {
       warning('请选择目标数据库')
       scheduling.value = false
       return
@@ -1515,7 +1561,10 @@ onMounted(() => {
 })
 
 onActivated(() => {
-  loadBackups()
-  loadSchedules()
+  // 仅在无数据时重新加载，避免 KeepAlive 切换时重复请求
+  if (backupList.value.length === 0) {
+    loadBackups()
+    loadSchedules()
+  }
 })
 </script>

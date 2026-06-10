@@ -46,22 +46,22 @@
 
         <div class="flex flex-col gap-1.5">
           <label class="text-[12px] font-medium" style="color: var(--text-secondary)">类型 <span style="color: var(--danger)">*</span></label>
-          <div class="flex gap-1">
+          <div class="flex gap-1 flex-wrap">
             <button
+              v-for="t in [
+                { key: 'mysql', label: 'MySQL' },
+                { key: 'mariadb', label: 'MariaDB' },
+                { key: 'postgresql', label: 'PostgreSQL' },
+                { key: 'redis', label: 'Redis' },
+                { key: 'sqlite', label: 'SQLite' },
+              ]"
+              :key="t.key"
               type="button"
               class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
-              :class="form.type === 'mysql' ? 'tab-active' : 'tab-inactive'"
-              @click="onTypeChange('mysql')"
+              :class="form.type === t.key ? 'tab-active' : 'tab-inactive'"
+              @click="onTypeChange(t.key)"
             >
-              MySQL
-            </button>
-            <button
-              type="button"
-              class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
-              :class="form.type === 'redis' ? 'tab-active' : 'tab-inactive'"
-              @click="onTypeChange('redis')"
-            >
-              Redis
+              {{ t.label }}
             </button>
           </div>
         </div>
@@ -141,6 +141,7 @@ import { Textarea } from '@/components/ui/Textarea.vue'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/Select.vue'
 import { Badge } from '@/components/ui/Badge.vue'
 import { databaseApi } from '../api/database'
+import { getTypeLabel } from '@/lib/utils'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -200,6 +201,12 @@ const onTypeChange = (type) => {
   if (type === 'redis') {
     form.port = 6379
     form.version = ''
+  } else if (type === 'postgresql') {
+    form.port = 5432
+    form.version = ''
+  } else if (type === 'sqlite') {
+    form.port = 0
+    form.version = ''
   } else {
     form.port = 3306
     form.version = ''
@@ -225,7 +232,7 @@ const resetForm = () => {
 
 const onSelectDetect = (inst) => {
   if (!inst) return
-  const typeLabel = inst.type === 'mysql' ? 'MySQL' : 'Redis'
+  const typeLabel = getTypeLabel(inst.type)
   const rand = Math.floor(Math.random() * 9000 + 1000)
   form.name = `${typeLabel}_${rand}`
   form.type = inst.type

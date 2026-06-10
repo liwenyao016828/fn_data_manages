@@ -2,13 +2,26 @@ import axios from 'axios'
 
 const baseURL = '/api/health'
 
-export const healthApi = {
-  getAll: () => axios.get(`${baseURL}/check`),
-  getOne: (uid) => axios.get(`${baseURL}/check`, { params: { uid } }),
-  forceCheck: (uid) => axios.post(`${baseURL}/check`, { uid }),
-  forceCheckAll: () => axios.post(`${baseURL}/check`, {}),
-  forceCheckByUID: (uid) => axios.post(`${baseURL}/check/${uid}`),
+const makeSignal = () => new AbortController()
 
-  getConfig: () => axios.get(`${baseURL}/config`),
-  updateConfig: (config) => axios.put(`${baseURL}/config`, config),
+const isAbort = (e) =>
+  !!e &&
+  (axios.isCancel?.(e) ||
+    e.code === 'ERR_CANCELED' ||
+    e.name === 'CanceledError' ||
+    e.name === 'AbortError' ||
+    (typeof e.message === 'string' && /cancel|abort/i.test(e.message)))
+
+export const healthApi = {
+  getAll: (signal) => axios.get(`${baseURL}/check`, { signal }),
+  getOne: (uid, signal) => axios.get(`${baseURL}/check`, { params: { uid }, signal }),
+  forceCheck: (uid, signal) => axios.post(`${baseURL}/check`, { uid }, { signal }),
+  forceCheckAll: (signal) => axios.post(`${baseURL}/check`, {}, { signal }),
+  forceCheckByUID: (uid, signal) => axios.post(`${baseURL}/check/${uid}`, {}, { signal }),
+
+  getConfig: (signal) => axios.get(`${baseURL}/config`, { signal }),
+  updateConfig: (config, signal) => axios.put(`${baseURL}/config`, config, { signal }),
+
+  makeSignal,
+  isAbort,
 }

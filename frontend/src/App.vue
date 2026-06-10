@@ -11,7 +11,9 @@ import { Button } from '@/components/ui/Button.vue'
 import { ScrollArea } from '@/components/ui/ScrollArea.vue'
 import { Toaster } from '@/components/ui/Sonner.vue'
 import MessageToast from '@/components/ui/MessageToast.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { useMessage } from './composables/useMessage'
+import { STORAGE_KEYS, safeStorage } from './lib/storageKeys'
 import DataManageView from './components/DataManageView.vue'
 import BackupView from './components/BackupView.vue'
 import SettingsView from './components/SettingsView.vue'
@@ -31,7 +33,7 @@ const activeMenu = ref('dashboard')
 const navRequest = ref(null)
 const showSwitcher = ref(false)
 const sidebarCollapsed = ref(false)
-const compactMode = ref(localStorage.getItem('compactMode') === 'true')
+const compactMode = ref(safeStorage.get(STORAGE_KEYS.UI_COMPACT_MODE) === 'true')
 const instances = ref([])
 const systemInfo = ref({ username: '', hostname: '', os: '' })
 const progressWidth = ref(0)
@@ -40,18 +42,30 @@ const progressVisible = ref(false)
 provide('sidebarCollapsed', sidebarCollapsed)
 
 onMounted(() => {
-  window.addEventListener('toggle-sidebar', () => {
-    sidebarCollapsed.value = !sidebarCollapsed.value
-  })
-  window.addEventListener('compact-mode-change', (e) => {
-    compactMode.value = e.detail
-  })
-  healthStore.startPolling(15000)
+  window.addEventListener('toggle-sidebar', sidebarToggleHandler)
+  window.addEventListener('compact-mode-change', compactModeHandler)
+  // #16 从 localStorage 读取健康轮询间隔，缺省 15s
+  // 范围 5s-5min；非法值回退到 15s
+  const stored = safeStorage.get(STORAGE_KEYS.HEALTH_POLL_INTERVAL_MS)
+  const parsed = stored ? parseInt(stored, 10) : NaN
+  const healthInterval = Number.isFinite(parsed) && parsed >= 5000 && parsed <= 300000
+    ? parsed
+    : 15000
+  healthStore.startPolling(healthInterval)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('toggle-sidebar', sidebarToggleHandler)
+  window.removeEventListener('compact-mode-change', compactModeHandler)
   healthStore.stopPolling()
 })
+
+const sidebarToggleHandler = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+const compactModeHandler = (e) => {
+  compactMode.value = e.detail
+}
 
 const avatarText = computed(() => {
   if (isActive.value && name.value) {
@@ -404,6 +418,7 @@ onMounted(async () => {
 
     <Toaster position="top-center" :duration="4000" />
     <MessageToast :message="message" />
+    <ConfirmDialog />
 
     <!-- Switcher Backdrop -->
     <Transition name="fade">

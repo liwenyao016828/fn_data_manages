@@ -13,11 +13,11 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-[12px] font-medium" style="color: var(--text-secondary)">类型 <span style="color: var(--danger)">*</span></label>
-            <div class="flex gap-1">
+            <div class="flex gap-1 flex-wrap">
               <button
                 type="button"
                 class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
-                :class="form.type === 'mysql' ? 'tab-active' : 'tab-inactive'"
+                :style="form.type === 'mysql' ? { background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent)' } : { background: 'var(--muted)', color: 'var(--text-tertiary)', border: '1px solid transparent' }"
                 @click="form.type = 'mysql'"
               >
                 MySQL
@@ -25,27 +25,51 @@
               <button
                 type="button"
                 class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
-                :class="form.type === 'redis' ? 'tab-active' : 'tab-inactive'"
+                :style="form.type === 'mariadb' ? { background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent)' } : { background: 'var(--muted)', color: 'var(--text-tertiary)', border: '1px solid transparent' }"
+                @click="form.type = 'mariadb'"
+              >
+                MariaDB
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :style="form.type === 'postgresql' ? { background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', border: '1px solid #6366f1' } : { background: 'var(--muted)', color: 'var(--text-tertiary)', border: '1px solid transparent' }"
+                @click="form.type = 'postgresql'"
+              >
+                PostgreSQL
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :style="form.type === 'redis' ? { background: 'var(--warning-soft)', color: 'var(--warning)', border: '1px solid var(--warning)' } : { background: 'var(--muted)', color: 'var(--text-tertiary)', border: '1px solid transparent' }"
                 @click="form.type = 'redis'"
               >
                 Redis
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :style="form.type === 'sqlite' ? { background: 'var(--success-soft)', color: 'var(--success)', border: '1px solid var(--success)' } : { background: 'var(--muted)', color: 'var(--text-tertiary)', border: '1px solid transparent' }"
+                @click="form.type = 'sqlite'"
+              >
+                SQLite
               </button>
             </div>
           </div>
         </div>
 
         <div class="grid grid-cols-3 gap-4">
-          <div class="col-span-2 flex flex-col gap-1.5">
-            <label class="text-[12px] font-medium" style="color: var(--text-secondary)">主机地址 <span style="color: var(--danger)">*</span></label>
-            <Input v-model="form.host" placeholder="localhost" />
+          <div :class="form.type === 'sqlite' ? 'col-span-3' : 'col-span-2'" class="flex flex-col gap-1.5">
+            <label class="text-[12px] font-medium" style="color: var(--text-secondary)">{{ form.type === 'sqlite' ? '文件路径' : '主机地址' }} <span style="color: var(--danger)">*</span></label>
+            <Input v-model="form.host" :placeholder="form.type === 'sqlite' ? '/path/to/database.db' : 'localhost'" />
           </div>
-          <div class="flex flex-col gap-1.5">
+          <div v-if="form.type !== 'sqlite'" class="flex flex-col gap-1.5">
             <label class="text-[12px] font-medium" style="color: var(--text-secondary)">端口 <span style="color: var(--danger)">*</span></label>
             <Input v-model="form.port" type="number" :min="1" :max="65535" />
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div v-if="form.type !== 'sqlite'" class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1.5">
             <label class="text-[12px] font-medium" style="color: var(--text-secondary)">用户名 <span style="color: var(--danger)">*</span></label>
             <Input v-model="form.username" placeholder="用户名" />
@@ -78,7 +102,7 @@
             <div class="flex items-center gap-2 mt-2">
               <span class="text-[11px]" style="color: var(--warning)">{{ duplicateInstance.name }}</span>
               <Badge v-if="duplicateInstance.isRemote" variant="outline" class="badge-status badge-status-warning text-[10px] h-[16px]">远程</Badge>
-              <span class="text-[11px] font-mono-data" style="color: var(--warning)">{{ duplicateInstance.type === 'mysql' ? 'MySQL' : 'Redis' }}</span>
+              <span class="text-[11px] font-mono-data" style="color: var(--warning)">{{ getTypeLabel(duplicateInstance.type) }}</span>
             </div>
             <button class="btn-ghost mt-1 text-[11px]" style="color: var(--warning)" @click="goToDuplicate">
               跳转到该连接 →
@@ -121,6 +145,7 @@ import { Textarea } from '@/components/ui/Textarea.vue'
 import { Badge } from '@/components/ui/Badge.vue'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/Select.vue'
 import { databaseApi } from '../api/database'
+import { getTypeLabel } from '@/lib/utils'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -149,6 +174,24 @@ const form = reactive({
   ssl: false,
   permission: '%',
   isRemote: false
+})
+
+const getDefaultPort = (type) => {
+  if (type === 'redis') return 6379
+  if (type === 'postgresql') return 5432
+  if (type === 'sqlite') return 0
+  return 3306 // mysql, mariadb
+}
+
+watch(() => form.type, (newType) => {
+  form.port = getDefaultPort(newType)
+  if (newType === 'sqlite') {
+    form.host = ''
+    form.username = ''
+    form.password = ''
+  } else if (!form.host || form.host === '') {
+    form.host = 'localhost'
+  }
 })
 
 const duplicateInstance = computed(() => {
@@ -188,7 +231,7 @@ watch(() => props.data, (val) => {
     form.name = val.name || ''
     form.type = val.type || 'mysql'
     form.host = val.host || 'localhost'
-    form.port = val.port || (val.type === 'redis' ? 6379 : 3306)
+    form.port = val.port || getDefaultPort(val.type)
     form.username = val.username || ''
     form.password = val.password || ''
     form.version = val.version || ''
@@ -222,9 +265,9 @@ watch(() => props.modelValue, (val) => {
 })
 
 const testConnection = () => {
-  if (!form.host) { toast.warning('请输入主机地址'); return }
-  if (!form.port) { toast.warning('请输入端口'); return }
-  if (!form.username) { toast.warning('请输入用户名'); return }
+  if (!form.host) { toast.warning(form.type === 'sqlite' ? '请输入文件路径' : '请输入主机地址'); return }
+  if (form.type !== 'sqlite' && !form.port) { toast.warning('请输入端口'); return }
+  if (form.type !== 'sqlite' && !form.username) { toast.warning('请输入用户名'); return }
 
   testLoading.value = true
   testResult.value = null
@@ -236,7 +279,7 @@ const testConnection = () => {
     port: parseInt(form.port) || 3306,
     username: form.username,
     password: passwordChanged ? form.password : undefined,
-    database: form.database || form.name || '__test__',
+    database: form.database || undefined,
     version: form.version,
     description: '',
     ssl: form.ssl,
@@ -252,11 +295,12 @@ const testConnection = () => {
     if (res.data.code === 0) {
       toast.success('连接成功' + (res.data.version ? ` (${res.data.version})` : ''))
     } else {
-      toast.error(res.data.msg || '连接失败')
+      const detail = res.data.msg || '连接失败'
+      toast.error(detail)
     }
-  }).catch(() => {
+  }).catch(err => {
     testResult.value = false
-    toast.error('连接失败')
+    toast.error('连接失败: ' + (err.message || '网络错误'))
   }).finally(() => {
     testLoading.value = false
   })
@@ -269,9 +313,9 @@ const handleClose = () => {
 const handleSubmit = () => {
   if (!form.name) { toast.warning('请输入名称'); return }
   if (!form.type) { toast.warning('请选择类型'); return }
-  if (!form.host) { toast.warning('请输入主机地址'); return }
-  if (!form.port) { toast.warning('请输入端口'); return }
-  if (!form.username) { toast.warning('请输入用户名'); return }
+  if (!form.host) { toast.warning(form.type === 'sqlite' ? '请输入文件路径' : '请输入主机地址'); return }
+  if (form.type !== 'sqlite' && !form.port) { toast.warning('请输入端口'); return }
+  if (form.type !== 'sqlite' && !form.username) { toast.warning('请输入用户名'); return }
 
   if (duplicateInstance.value) {
     toast.warning(`该主机(${form.host})、用户名(${form.username})和端口(${form.port})的数据库连接已存在`)
@@ -289,7 +333,7 @@ const handleSubmit = () => {
       port: parseInt(form.port) || 3306,
       username: form.username,
       password: passwordChanged ? form.password : undefined,
-      database: form.database || form.name,
+      database: form.database || undefined,
       version: form.version,
       description: form.description,
       ssl: form.ssl
@@ -327,7 +371,7 @@ const handleSubmit = () => {
     port: parseInt(form.port) || 3306,
     username: form.username,
     password: localPasswordChanged ? form.password : undefined,
-    database: form.database || form.name,
+    database: form.database || undefined,
     version: form.version,
     description: form.description,
     ssl: form.ssl,
@@ -344,10 +388,11 @@ const handleSubmit = () => {
       emit('success')
       emit('update:modelValue', false)
     } else {
-      toast.error(res.data.msg || (props.type === 'create' ? '创建失败' : '更新失败'))
+      const detail = res.data.msg || (props.type === 'create' ? '创建失败' : '更新失败')
+      toast.error(detail)
     }
   }).catch(err => {
-    toast.error((props.type === 'create' ? '创建失败' : '更新失败') + ': ' + err.message)
+    toast.error((props.type === 'create' ? '创建失败' : '更新失败') + ': ' + (err.message || '网络错误'))
   }).finally(() => {
     loading.value = false
   })
