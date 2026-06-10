@@ -2,46 +2,22 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
-// fileLocks 保证对同一文件的并发写入被串行化，避免产生孤儿 .tmp 文件
-var fileLocks sync.Map
-
-func lockForFile(path string) *sync.Mutex {
-	v, _ := fileLocks.LoadOrStore(path, &sync.Mutex{})
-	return v.(*sync.Mutex)
-}
-
 func saveData() {
-	// #7 拆分锁：分别取四个域的快照，避开单一全局锁
-	dbMu.RLock()
+	mutex.Lock()
 	dbCopy := make([]Database, len(databases))
 	copy(dbCopy, databases)
-	// 兼容旧数据：解密已加密的密码（内网明文存储）
-	for i := range dbCopy {
-		dbCopy[i].Password = decryptPassword(dbCopy[i].Password)
-	}
-	dbMu.RUnlock()
-
-	remoteMu.RLock()
 	rsCopy := make([]RemoteServer, len(remoteServers))
 	copy(rsCopy, remoteServers)
-	for i := range rsCopy {
-		rsCopy[i].Password = decryptPassword(rsCopy[i].Password)
-	}
-	remoteMu.RUnlock()
-
-	backupMu.RLock()
 	bkCopy := make([]Backup, len(backups))
 	copy(bkCopy, backups)
 	schedCopy := make([]ScheduledBackup, len(scheduledBackups))
 	copy(schedCopy, scheduledBackups)
-	backupMu.RUnlock()
+	mutex.Unlock()
 
 	dataDir := os.Getenv("TRIM_PKGVAR")
 	if dataDir == "" {
@@ -49,9 +25,19 @@ func saveData() {
 	}
 	os.MkdirAll(dataDir, 0755)
 
+	for i := range dbCopy {
+		if !isPasswordEncrypted(dbCopy[i].Password) {
+			dbCopy[i].Password = encryptPassword(dbCopy[i].Password)
+		}
+	}
 	data, _ := json.Marshal(dbCopy)
 	atomicWriteFile(filepath.Join(dataDir, "databases.json"), data, 0644)
 
+	for i := range rsCopy {
+		if !isPasswordEncrypted(rsCopy[i].Password) {
+			rsCopy[i].Password = encryptPassword(rsCopy[i].Password)
+		}
+	}
 	remoteData, _ := json.Marshal(rsCopy)
 	atomicWriteFile(filepath.Join(dataDir, "remote_servers.json"), remoteData, 0644)
 
@@ -62,54 +48,15 @@ func saveData() {
 	atomicWriteFile(filepath.Join(dataDir, "scheduled_backups.json"), schedData, 0644)
 }
 
-// atomicWriteFile 原子写入文件，流程：
-// 1. 写入 path.<pid>.<nanos>.tmp 临时文件
-// 2. 关闭后 fsync 强制刷盘
-// 3. 尝试 rename 覆盖目标（POSIX 原子，Windows 上目标存在时需先 remove）
-// 4. 失败兜底：remove 目标后再 rename
-// 5. 用 per-file 互斥锁防止并发写导致 .tmp 冲突
 func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
-	lock := lockForFile(path)
-	lock.Lock()
-	defer lock.Unlock()
-
-	// 临时文件名带 pid+ns 避免与历史孤儿冲突
-	tmpPath := fmt.Sprintf("%s.%d.%d.tmp", path, os.Getpid(), time.Now().UnixNano())
-
-	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
-	if err != nil {
-		return fmt.Errorf("open tmp: %w", err)
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, perm); err != nil {
+		return err
 	}
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		os.Remove(tmpPath)
-		return fmt.Errorf("write tmp: %w", err)
-	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		os.Remove(tmpPath)
-		return fmt.Errorf("sync tmp: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("close tmp: %w", err)
-	}
-
-	// 优先尝试 rename（POSIX 原子）
-	if err := os.Rename(tmpPath, path); err == nil {
-		return nil
-	}
-
-	// 兜底：删除目标后 rename（Windows 等）
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		os.Remove(tmpPath)
-		return fmt.Errorf("remove old: %w", err)
+		return err
 	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("rename after remove: %w", err)
-	}
-	return nil
+	return os.Rename(tmpPath, path)
 }
 
 func loadData() {
@@ -118,56 +65,55 @@ func loadData() {
 		dataDir = "./data"
 	}
 
-	// 加载函数：单文件加载并保留原文件作为备份
-	loadJSONFile := func(filename string, dst interface{}) bool {
-		path := filepath.Join(dataDir, filename)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return false // 文件不存在时静默忽略
-		}
-		if err := json.Unmarshal(data, dst); err != nil {
-			// 解析失败：保留原文件为 .bak，启动时仅警告
-			bakPath := path + ".bak"
-			if _, cpErr := os.Stat(bakPath); cpErr == nil {
-				// 已存在备份，覆盖它
-				os.WriteFile(bakPath, data, 0644)
-			} else {
-				os.Rename(path, bakPath)
-			}
-			sysLogError("STORE", fmt.Sprintf("%s 解析失败: %v (已备份为 %s)", filename, err, bakPath))
-			return false
-		}
-		return true
-	}
-
-	if loadJSONFile("databases.json", &databases) {
-		// 兼容旧数据：解密已加密的密码
+	data, err := os.ReadFile(filepath.Join(dataDir, "databases.json"))
+	if err == nil {
+		json.Unmarshal(data, &databases)
+		migrated := false
 		for i := range databases {
-			databases[i].Password = decryptPassword(databases[i].Password)
+			if databases[i].Password != "" && !isPasswordEncrypted(databases[i].Password) {
+				migrated = true
+			} else {
+				databases[i].Password = decryptPassword(databases[i].Password)
+			}
 		}
 		if len(databases) > 0 {
 			nextID = databases[len(databases)-1].ID + 1
 		}
-		saveData() // 回写为明文
+		if migrated {
+			saveData()
+		}
 	}
 
-	if loadJSONFile("remote_servers.json", &remoteServers) {
+	remoteData, err := os.ReadFile(filepath.Join(dataDir, "remote_servers.json"))
+	if err == nil {
+		json.Unmarshal(remoteData, &remoteServers)
+		migrated := false
 		for i := range remoteServers {
-			remoteServers[i].Password = decryptPassword(remoteServers[i].Password)
+			if remoteServers[i].Password != "" && !isPasswordEncrypted(remoteServers[i].Password) {
+				migrated = true
+			} else {
+				remoteServers[i].Password = decryptPassword(remoteServers[i].Password)
+			}
 		}
 		if len(remoteServers) > 0 {
 			nextRemoteID = remoteServers[len(remoteServers)-1].ID + 1
 		}
-		saveData() // 回写为明文
+		if migrated {
+			saveData()
+		}
 	}
 
-	if loadJSONFile("backups.json", &backups) {
+	backupData, err := os.ReadFile(filepath.Join(dataDir, "backups.json"))
+	if err == nil {
+		json.Unmarshal(backupData, &backups)
 		if len(backups) > 0 {
 			nextBackupID = backups[len(backups)-1].ID + 1
 		}
 	}
 
-	if loadJSONFile("scheduled_backups.json", &scheduledBackups) {
+	schedData, err := os.ReadFile(filepath.Join(dataDir, "scheduled_backups.json"))
+	if err == nil {
+		json.Unmarshal(schedData, &scheduledBackups)
 		if len(scheduledBackups) > 0 {
 			nextSchedID = scheduledBackups[len(scheduledBackups)-1].ID + 1
 		}
@@ -187,7 +133,10 @@ func loadData() {
 	}
 
 	metricsHistory = make(map[uint][]MetricsSnapshot)
-	loadJSONFile("metrics_history.json", &metricsHistory)
+	metricsData, err := os.ReadFile(filepath.Join(dataDir, "metrics_history.json"))
+	if err == nil {
+		json.Unmarshal(metricsData, &metricsHistory)
+	}
 
 	migrateMetricsHistory()
 }
@@ -232,17 +181,16 @@ func saveMetricsHistory() {
 	}
 	os.MkdirAll(dataDir, 0755)
 
-	// #7 使用 metricsMu 而非全局 mutex
-	metricsMu.RLock()
+	mutex.Lock()
 	data, _ := json.Marshal(metricsHistory)
-	metricsMu.RUnlock()
+	mutex.Unlock()
 
 	atomicWriteFile(filepath.Join(dataDir, "metrics_history.json"), data, 0644)
 }
 
 func addMetricsSnapshot(s MetricsSnapshot) {
-	metricsMu.Lock()
-	defer metricsMu.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	if metricsHistory == nil {
 		metricsHistory = make(map[uint][]MetricsSnapshot)
@@ -260,8 +208,8 @@ func addMetricsSnapshot(s MetricsSnapshot) {
 }
 
 func getMetricsHistory(serverID uint, timeRangeSec int64) []MetricsSnapshot {
-	metricsMu.RLock()
-	defer metricsMu.RUnlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	history, ok := metricsHistory[serverID]
 	if !ok {

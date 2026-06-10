@@ -7,7 +7,7 @@
 
       <div class="flex flex-col gap-4">
         <div v-if="type === 'create'" class="flex flex-col gap-1.5">
-          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">选择已检测到的实例</label>
+          <label class="text-sm font-medium">选择已检测到的实例</label>
           <Select v-model="selectedDetect" @update:model-value="onSelectDetect">
             <SelectTrigger class="w-full">
               <SelectValue placeholder="选择已检测到的实例自动填充" />
@@ -20,19 +20,21 @@
               >
                 <span class="flex items-center gap-2">
                   {{ inst.name }}
-                  <span class="text-[11px]" style="color: var(--text-tertiary)">{{ inst.host }}:{{ inst.port }}</span>
-                  <span
+                  <span class="text-xs text-muted-foreground">{{ inst.host }}:{{ inst.port }}</span>
+                  <Badge
                     v-if="inst.status === '已认证'"
-                    class="badge-status badge-status-success text-[10px] px-1.5 py-0"
+                    variant="secondary"
+                    class="bg-emerald-500/10 text-emerald-600 border-emerald-200 text-[10px] px-1.5 py-0"
                   >
                     已认证
-                  </span>
-                  <span
+                  </Badge>
+                  <Badge
                     v-else
-                    class="badge-status badge-status-warning text-[10px] px-1.5 py-0"
+                    variant="outline"
+                    class="bg-amber-500/10 text-amber-600 border-amber-200 text-[10px] px-1.5 py-0"
                   >
                     需密码
-                  </span>
+                  </Badge>
                 </span>
               </SelectItem>
             </SelectContent>
@@ -40,61 +42,59 @@
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">名称 <span style="color: var(--danger)">*</span></label>
+          <label class="text-sm font-medium">名称 <span class="text-destructive">*</span></label>
           <Input v-model="form.name" placeholder="数据库实例名称" :disabled="type === 'edit'" />
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">类型 <span style="color: var(--danger)">*</span></label>
-          <div class="flex gap-1 flex-wrap">
-            <button
-              v-for="t in [
-                { key: 'mysql', label: 'MySQL' },
-                { key: 'mariadb', label: 'MariaDB' },
-                { key: 'postgresql', label: 'PostgreSQL' },
-                { key: 'redis', label: 'Redis' },
-                { key: 'sqlite', label: 'SQLite' },
-              ]"
-              :key="t.key"
-              type="button"
-              class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
-              :class="form.type === t.key ? 'tab-active' : 'tab-inactive'"
-              @click="onTypeChange(t.key)"
+          <label class="text-sm font-medium">类型 <span class="text-destructive">*</span></label>
+          <div class="flex gap-1">
+            <Button
+              :variant="form.type === 'mysql' ? 'default' : 'outline'"
+              size="sm"
+              @click="onTypeChange('mysql')"
             >
-              {{ t.label }}
-            </button>
+              MySQL
+            </Button>
+            <Button
+              :variant="form.type === 'redis' ? 'default' : 'outline'"
+              size="sm"
+              @click="onTypeChange('redis')"
+            >
+              Redis
+            </Button>
           </div>
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">主机地址 <span style="color: var(--danger)">*</span></label>
+          <label class="text-sm font-medium">主机地址 <span class="text-destructive">*</span></label>
           <Input v-model="form.host" placeholder="localhost 或 127.0.0.1" />
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">端口 <span style="color: var(--danger)">*</span></label>
+          <label class="text-sm font-medium">端口 <span class="text-destructive">*</span></label>
           <Input v-model="form.port" type="number" min="1" max="65535" />
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">用户名 <span style="color: var(--danger)">*</span></label>
+          <label class="text-sm font-medium">用户名 <span class="text-destructive">*</span></label>
           <Input v-model="form.username" placeholder="root" />
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">密码</label>
+          <label class="text-sm font-medium">密码</label>
           <div class="flex gap-2">
             <Input v-model="form.password" :type="showPwd ? 'text' : 'password'" placeholder="数据库密码" class="flex-1" />
-            <button class="btn-secondary h-8 w-8 p-0 flex items-center justify-center" @click="showPwd = !showPwd">
+            <Button variant="outline" size="sm" @click="showPwd = !showPwd">
               <Eye v-if="!showPwd" class="h-4 w-4" />
               <EyeOff v-else class="h-4 w-4" />
-            </button>
-            <button class="btn-secondary h-8 px-2 text-[11px]" @click="randomPassword">随机</button>
+            </Button>
+            <Button variant="outline" size="sm" @click="randomPassword">随机</Button>
           </div>
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">权限 <span style="color: var(--danger)">*</span></label>
+          <label class="text-sm font-medium">权限 <span class="text-destructive">*</span></label>
           <Select v-model="form.permission">
             <SelectTrigger class="w-full">
               <SelectValue placeholder="选择权限" />
@@ -114,18 +114,18 @@
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">描述信息</label>
+          <label class="text-sm font-medium">描述信息</label>
           <Textarea v-model="form.description" placeholder="可选" :rows="2" />
         </div>
       </div>
 
-      <div class="flex justify-end gap-2 mt-4">
-        <button class="btn-ghost" @click="handleClose">取消</button>
-        <button class="btn-primary" @click="handleSubmit" :disabled="loading">
+      <DialogFooter>
+        <Button variant="outline" @click="handleClose">取消</Button>
+        <Button @click="handleSubmit" :disabled="loading">
           <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />
           确认
-        </button>
-      </div>
+        </Button>
+      </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
@@ -141,7 +141,6 @@ import { Textarea } from '@/components/ui/Textarea.vue'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/Select.vue'
 import { Badge } from '@/components/ui/Badge.vue'
 import { databaseApi } from '../api/database'
-import { getTypeLabel } from '@/lib/utils'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -201,12 +200,6 @@ const onTypeChange = (type) => {
   if (type === 'redis') {
     form.port = 6379
     form.version = ''
-  } else if (type === 'postgresql') {
-    form.port = 5432
-    form.version = ''
-  } else if (type === 'sqlite') {
-    form.port = 0
-    form.version = ''
   } else {
     form.port = 3306
     form.version = ''
@@ -232,7 +225,7 @@ const resetForm = () => {
 
 const onSelectDetect = (inst) => {
   if (!inst) return
-  const typeLabel = getTypeLabel(inst.type)
+  const typeLabel = inst.type === 'mysql' ? 'MySQL' : 'Redis'
   const rand = Math.floor(Math.random() * 9000 + 1000)
   form.name = `${typeLabel}_${rand}`
   form.type = inst.type

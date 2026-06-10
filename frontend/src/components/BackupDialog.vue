@@ -8,55 +8,61 @@
       <template v-if="!importMode">
         <div class="flex items-center justify-between mb-4">
           <span class="flex items-center gap-3">
-            <span class="badge-status badge-status-success text-[11px]">
+            <Badge variant="secondary" class="bg-emerald-500/10 text-emerald-600 border-emerald-200">
               {{ database.name }}
-            </span>
-            <span v-if="bakList.length" class="text-[11px]" style="color: var(--text-tertiary)">共 {{ bakList.length }} 个备份</span>
+            </Badge>
+            <span v-if="bakList.length" class="text-xs text-muted-foreground">共 {{ bakList.length }} 个备份</span>
           </span>
-          <button class="btn-primary" @click="showCreate = true">
+          <Button size="sm" @click="showCreate = true">
             <Plus class="h-4 w-4" />
             创建备份
-          </button>
+          </Button>
         </div>
 
-        <div v-if="bakList.length > 0" class="flex flex-col gap-2">
-          <div
-            v-for="row in bakList"
-            :key="row.id"
-            class="rounded-xl p-3.5 flex items-center gap-3 transition-all duration-200"
-            style="background: var(--surface); border: 1px solid var(--border-subtle)"
-          >
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="text-[13px] font-medium truncate" style="color: var(--text-primary)">{{ row.name }}</span>
-                <span
-                  class="badge-status text-[10px]"
-                  :class="row.backupLevel === 'system' || row.backupLevel === 'redis' ? 'badge-status-warning' : 'badge-status-info'"
-                >
-                  {{ row.backupLevel === 'system' ? '系统' : getTypeLabel(row.backupLevel) }}
-                </span>
-                <span
-                  class="badge-status text-[10px]"
-                  :class="row.backupType === 'import' ? 'badge-status-neutral' : row.backupType === 'scheduled' ? 'badge-status-warning' : 'badge-status-info'"
-                >
-                  {{ row.backupType === 'import' ? '导入' : row.backupType === 'scheduled' ? '定时' : '手动' }}
-                </span>
-              </div>
-              <div class="flex items-center gap-3 mt-1">
-                <span class="text-[11px]" style="color: var(--text-tertiary)">{{ formatSize(row.fileSize) }}</span>
-                <span class="text-[11px]" style="color: var(--text-tertiary)">{{ formatLogTime(row.createdAt) }}</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-1 shrink-0">
-              <button class="btn-ghost" @click="handleRestore(row)">恢复</button>
-              <button class="btn-ghost" @click="handleDownload(row)">下载</button>
-              <button class="btn-ghost-danger" @click="confirmDelete(row)">删除</button>
-            </div>
-          </div>
+        <div v-if="bakList.length > 0" class="rounded-xl border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead class="min-w-[180px]">备份名称</TableHead>
+                <TableHead class="w-[80px]">级别</TableHead>
+                <TableHead class="w-[80px]">来源</TableHead>
+                <TableHead class="w-[90px]">大小</TableHead>
+                <TableHead class="min-w-[160px]">创建时间</TableHead>
+                <TableHead class="text-center w-[200px]">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="row in bakList" :key="row.id">
+                <TableCell>{{ row.name }}</TableCell>
+                <TableCell>
+                  <Badge v-if="row.backupLevel === 'system'" variant="outline" class="bg-amber-500/10 text-amber-600 border-amber-200">系统</Badge>
+                  <Badge v-else-if="row.backupLevel === 'redis'" variant="outline" class="bg-amber-500/10 text-amber-600 border-amber-200">Redis</Badge>
+                  <Badge v-else variant="outline" class="bg-blue-500/10 text-blue-600 border-blue-200">MySQL</Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    :variant="row.backupType === 'import' ? 'secondary' : row.backupType === 'scheduled' ? 'outline' : 'default'"
+                    class="text-xs"
+                  >
+                    {{ row.backupType === 'import' ? '导入' : row.backupType === 'scheduled' ? '定时' : '手动' }}
+                  </Badge>
+                </TableCell>
+                <TableCell>{{ formatSize(row.fileSize) }}</TableCell>
+                <TableCell>{{ formatLogTime(row.createdAt) }}</TableCell>
+                <TableCell>
+                  <div class="flex items-center gap-1">
+                    <Button variant="link" size="sm" class="h-auto p-0 text-primary" @click="handleRestore(row)">恢复</Button>
+                    <Button variant="link" size="sm" class="h-auto p-0 text-primary" @click="handleDownload(row)">下载</Button>
+                    <Button variant="link" size="sm" class="h-auto p-0 text-destructive" @click="confirmDelete(row)">删除</Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
-        <div v-else class="empty-state py-10">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="empty-state-icon"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-          <span class="empty-state-text">暂无备份记录</span>
+        <div v-else class="flex flex-col items-center justify-center py-10 text-muted-foreground">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-3 opacity-30"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          <span class="text-sm">暂无备份记录</span>
         </div>
 
         <Dialog :open="showCreate" @update:open="showCreate = $event">
@@ -66,20 +72,20 @@
             </DialogHeader>
             <div class="flex flex-col gap-4">
               <div class="flex flex-col gap-1.5">
-                <label class="text-[12px] font-medium" style="color: var(--text-secondary)">备份名称</label>
+                <label class="text-sm font-medium">备份名称</label>
                 <Input v-model="createForm.name" placeholder="留空自动生成" />
               </div>
               <div class="flex flex-col gap-1.5">
-                <label class="text-[12px] font-medium" style="color: var(--text-secondary)">描述</label>
+                <label class="text-sm font-medium">描述</label>
                 <Textarea v-model="createForm.description" :rows="2" placeholder="可选" />
               </div>
             </div>
             <div class="flex justify-end gap-2 mt-4">
-              <button class="btn-ghost" @click="showCreate = false">取消</button>
-              <button class="btn-primary" @click="submitCreate" :disabled="creating">
+              <Button variant="outline" @click="showCreate = false">取消</Button>
+              <Button @click="submitCreate" :disabled="creating">
                 <Loader2 v-if="creating" class="h-4 w-4 animate-spin" />
                 确认
-              </button>
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -88,19 +94,20 @@
       <template v-else>
         <div class="py-2.5 flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-[12px] font-medium" style="color: var(--text-secondary)">目标数据库 <span style="color: var(--danger)">*</span></label>
+            <label class="text-sm font-medium text-muted-foreground">目标数据库 <span class="text-red-500">*</span></label>
             <Select v-model="importDbName">
               <SelectTrigger class="w-full">
                 <template v-if="selectedImportDb">
                   <span class="flex items-center gap-1.5 truncate">
                     {{ selectedImportDb.name }}
-                    <span
-                      class="badge-status text-[10px] px-1.5 py-0 shrink-0"
-                      :class="selectedImportDb.type === 'redis' ? 'badge-status-warning' : 'badge-status-info'"
+                    <Badge
+                      :variant="selectedImportDb.type === 'redis' ? 'outline' : 'default'"
+                      :class="selectedImportDb.type === 'redis' ? 'bg-amber-500/10 text-amber-600 border-amber-200' : 'bg-blue-500/10 text-blue-600 border-blue-200'"
+                      class="text-[10px] px-1.5 py-0 shrink-0"
                     >
-                      {{ selectedImportDb.type === 'redis' ? 'Redis' : getTypeLabel(selectedImportDb.type) }}
-                    </span>
-                    <span class="text-[11px] shrink-0" style="color: var(--text-tertiary)">{{ selectedImportDb.host || 'local' }}</span>
+                      {{ selectedImportDb.type === 'redis' ? 'Redis' : 'MySQL' }}
+                    </Badge>
+                    <span class="text-xs text-muted-foreground shrink-0">{{ selectedImportDb.host || 'local' }}</span>
                   </span>
                 </template>
                 <SelectValue v-else placeholder="请选择要导入的数据库" />
@@ -114,13 +121,14 @@
                   <div class="flex items-center justify-between w-full gap-2">
                     <span class="flex-1 truncate">{{ db.name }}</span>
                     <div class="flex items-center gap-2 shrink-0">
-                      <span
-                        class="badge-status text-[10px] px-1.5 py-0"
-                        :class="db.type === 'redis' ? 'badge-status-warning' : 'badge-status-info'"
+                      <Badge
+                        :variant="db.type === 'redis' ? 'outline' : 'default'"
+                        :class="db.type === 'redis' ? 'bg-amber-500/10 text-amber-600 border-amber-200' : 'bg-blue-500/10 text-blue-600 border-blue-200'"
+                        class="text-[10px] px-1.5 py-0"
                       >
-                        {{ db.type === 'redis' ? 'Redis' : getTypeLabel(db.type) }}
-                      </span>
-                      <span class="text-[11px]" style="color: var(--text-tertiary)">{{ db.host || 'local' }}</span>
+                        {{ db.type === 'redis' ? 'Redis' : 'MySQL' }}
+                      </Badge>
+                      <span class="text-xs text-muted-foreground">{{ db.host || 'local' }}</span>
                     </div>
                   </div>
                 </SelectItem>
@@ -128,34 +136,33 @@
             </Select>
           </div>
           <div
-            class="rounded-xl p-10 text-center cursor-pointer transition-all duration-200"
-            style="border: 2px dashed var(--border); background: var(--surface)"
+            class="border-2 border-dashed border-input rounded-lg p-10 text-center cursor-pointer transition-colors hover:border-primary"
             @click="triggerUpload"
             @dragover.prevent
             @drop.prevent="handleDrop"
           >
             <input ref="fileInput" type="file" accept=".sql,.sql.gz,.gz,.tar.gz,.rdb,.json" class="hidden" @change="handleFileChange" />
-            <Upload class="h-12 w-12 mx-auto" style="color: var(--text-tertiary); opacity: 0.5" />
-            <p class="text-[13px] mt-4 mb-1" style="color: var(--text-secondary)">将备份文件拖拽到此处，或者 <span style="color: var(--accent); cursor: pointer">点击上传</span></p>
-            <p class="text-[11px]" style="color: var(--text-tertiary); opacity: 0.7">支持 .sql, .sql.gz, .tar.gz, .rdb, .json 文件</p>
+            <Upload class="h-12 w-12 mx-auto text-muted-foreground/50" />
+            <p class="text-sm text-muted-foreground mt-4 mb-1">将备份文件拖拽到此处，或者 <span class="text-primary cursor-pointer">点击上传</span></p>
+            <p class="text-xs text-muted-foreground/70">支持 .sql, .sql.gz, .tar.gz, .rdb, .json 文件</p>
           </div>
           <div v-if="selectedFile" class="flex items-center gap-3 mt-4">
-            <span class="badge-status badge-status-neutral gap-1 pr-1">
+            <Badge variant="secondary" class="gap-1 pr-1">
               {{ selectedFile.name }} ({{ formatSize(selectedFile.size) }})
-              <button class="ml-1" style="color: var(--danger)" @click="clearFile">
+              <button class="ml-1 hover:text-destructive" @click="clearFile">
                 <X class="h-3 w-3" />
               </button>
-            </span>
-            <button class="btn-primary text-[11px] h-7" @click="doImport" :disabled="importing">
+            </Badge>
+            <Button size="sm" @click="doImport" :disabled="importing">
               <Loader2 v-if="importing" class="h-4 w-4 animate-spin" />
               确认导入
-            </button>
+            </Button>
           </div>
         </div>
       </template>
 
       <div v-if="!importMode" class="flex justify-end mt-4">
-        <button class="btn-secondary" @click="$emit('update:modelValue', false)">关闭</button>
+        <Button variant="outline" @click="$emit('update:modelValue', false)">关闭</Button>
       </div>
     </DialogContent>
   </Dialog>
@@ -167,8 +174,8 @@
         <DialogDescription>确定要删除此备份吗？此操作不可撤销。</DialogDescription>
       </DialogHeader>
       <div class="flex justify-end gap-2 mt-2">
-        <button class="btn-ghost" @click="showConfirmDialog = false">取消</button>
-        <button class="btn-danger" @click="doDelete">确定删除</button>
+        <Button variant="outline" @click="showConfirmDialog = false">取消</Button>
+        <Button variant="destructive" @click="doDelete">确定删除</Button>
       </div>
     </DialogContent>
   </Dialog>
@@ -180,8 +187,8 @@
         <DialogDescription>确定从备份 "{{ restoreRow?.name }}" 恢复数据库 "{{ database?.name }}" 吗？恢复不可撤销！</DialogDescription>
       </DialogHeader>
       <div class="flex justify-end gap-2 mt-2">
-        <button class="btn-ghost" @click="showRestoreDialog = false">取消</button>
-        <button class="btn-danger" @click="doRestore">确定恢复</button>
+        <Button variant="outline" @click="showRestoreDialog = false">取消</Button>
+        <Button variant="destructive" @click="doRestore">确定恢复</Button>
       </div>
     </DialogContent>
   </Dialog>
@@ -198,7 +205,7 @@ import { Textarea } from '@/components/ui/Textarea.vue'
 import { Badge } from '@/components/ui/Badge.vue'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table.vue'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/Select.vue'
-import { formatLogTime, getTypeLabel, getTypeBadgeClass } from '@/lib/utils'
+import { formatLogTime } from '@/lib/utils'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -276,7 +283,7 @@ const loadAvailableDatabases = () => {
 const submitCreate = () => {
   creating.value = true
   const dbType = props.database?.type || 'mysql'
-  const backupLevel = dbType === 'redis' ? 'redis' : (dbType === 'mysql' || dbType === 'mariadb' || dbType === 'postgresql' || dbType === 'sqlite') ? dbType : 'mysql'
+  const backupLevel = dbType === 'redis' ? 'redis' : 'mysql'
   fetch('/api/backups', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

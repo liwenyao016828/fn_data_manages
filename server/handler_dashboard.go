@@ -49,18 +49,6 @@ func dashboardMetricsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.ToLower(server.Type) == "postgresql" {
-		online := checkPostgreSQLOnline(server)
-		writePostgreSQLMetrics(w, server, uint(id), timeRangeSec, online)
-		return
-	}
-
-	if strings.ToLower(server.Type) == "sqlite" {
-		online := checkSQLiteOnline(server)
-		writeSQLiteMetrics(w, server, uint(id), timeRangeSec, online)
-		return
-	}
-
 	online := checkMySQLOnline(server)
 	writeMySQLMetrics(w, server, uint(id), timeRangeSec, online)
 }
@@ -94,21 +82,8 @@ func buildRangeStats(history []MetricsSnapshot) map[string]interface{} {
 		return map[string]interface{}{"available": false}
 	}
 
-	// 计算增量时处理计数器重置（MySQL重启后计数器归零）
-	// 逐段累加 delta，遇到负值时使用当前值（说明计数器被重置了）
-	calcDelta := func(getVal func(s MetricsSnapshot) int64) int64 {
-		var total int64
-		for i := 1; i < len(history); i++ {
-			diff := getVal(history[i]) - getVal(history[i-1])
-			if diff < 0 {
-				// 计数器重置，使用当前值作为增量
-				total += getVal(history[i])
-			} else {
-				total += diff
-			}
-		}
-		return total
-	}
+	first := history[0]
+	last := history[len(history)-1]
 
 	var sumThreadsRunning int64
 	var sumBPHitRate float64
@@ -125,14 +100,14 @@ func buildRangeStats(history []MetricsSnapshot) map[string]interface{} {
 	n := int64(len(history))
 
 	result := map[string]interface{}{
-		"available":          true,
-		"deltaBytesReceived": calcDelta(func(s MetricsSnapshot) int64 { return s.BytesReceived }),
-		"deltaBytesSent":     calcDelta(func(s MetricsSnapshot) int64 { return s.BytesSent }),
-		"deltaComSelect":     calcDelta(func(s MetricsSnapshot) int64 { return s.ComSelect }),
-		"deltaComInsert":     calcDelta(func(s MetricsSnapshot) int64 { return s.ComInsert }),
-		"deltaComUpdate":     calcDelta(func(s MetricsSnapshot) int64 { return s.ComUpdate }),
-		"deltaComDelete":     calcDelta(func(s MetricsSnapshot) int64 { return s.ComDelete }),
-		"deltaSlowQueries":   calcDelta(func(s MetricsSnapshot) int64 { return s.SlowQueries }),
+		"available": true,
+		"deltaBytesReceived": last.BytesReceived - first.BytesReceived,
+		"deltaBytesSent":     last.BytesSent - first.BytesSent,
+		"deltaComSelect":     last.ComSelect - first.ComSelect,
+		"deltaComInsert":     last.ComInsert - first.ComInsert,
+		"deltaComUpdate":     last.ComUpdate - first.ComUpdate,
+		"deltaComDelete":     last.ComDelete - first.ComDelete,
+		"deltaSlowQueries":   last.SlowQueries - first.SlowQueries,
 		"avgThreadsRunning":  fmt.Sprintf("%.1f", float64(sumThreadsRunning)/float64(n)),
 		"avgBPHitRate":       fmt.Sprintf("%.2f", float64(0)),
 		"avgBPPagesDirty":    fmt.Sprintf("%.0f", float64(0)),
@@ -362,59 +337,6 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 	var bpHitRate float64
 	if bpReadReq > 0 {
 		bpHitRate = float64(bpReadReq-bpReads) / float64(bpReadReq) * 100
-		if bpHitRate < 0 {
-			bpHitRate = 0
-		}
-		if bpHitRate > 100 {
-			bpHitRate = 100
-		}
-	} else if bpPagesTotal != "" && bpPagesTotal != "0" {
-		// 有缓冲池数据但没有读请求计数，可能是状态变量名大小写问题
-		// 尝试使用 SHOW ENGINE INNODB STATUS 获取命中率
-		var innodbStatus string
-		statusRows, statusErr := db.Query("SHOW ENGINE INNODB STATUS")
-		if statusErr == nil {
-			for statusRows.Next() {
-				var typ, name, statusText string
-				statusRows.Scan(&typ, &name, &statusText)
-				innodbStatus = statusText
-			}
-			statusRows.Close()
-		}
-		if innodbStatus != "" {
-			// 从 BUFFER POOL AND MEMORY 部分解析命中率
-			lines := strings.Split(innodbStatus, "\n")
-			for _, line := range lines {
-				line = strings.TrimSpace(line)
-				if strings.Contains(line, "Buffer pool hit rate") {
-					// 格式: Buffer pool hit rate 1000 / 1000, young-making rate 0 / 0 not 0 / 0
-					parts := strings.Split(line, "Buffer pool hit rate")
-					if len(parts) > 1 {
-						ratePart := strings.TrimSpace(parts[1])
-						// 提取 1000 / 1000 部分
-						if idx := strings.Index(ratePart, "/"); idx > 0 {
-							beforeSlash := strings.TrimSpace(ratePart[:idx])
-							afterSlash := ratePart[idx+1:]
-							if spaceIdx := strings.Index(afterSlash, ","); spaceIdx > 0 {
-								afterSlash = strings.TrimSpace(afterSlash[:spaceIdx])
-							}
-							hit, _ := strconv.ParseInt(beforeSlash, 10, 64)
-							total, _ := strconv.ParseInt(afterSlash, 10, 64)
-							if total > 0 {
-								bpHitRate = float64(hit) / float64(total) * 100
-								if bpHitRate < 0 {
-									bpHitRate = 0
-								}
-								if bpHitRate > 100 {
-									bpHitRate = 100
-								}
-							}
-						}
-					}
-					break
-				}
-			}
-		}
 	}
 
 	maxConns, _ := strconv.ParseInt(varMap["max_connections"], 10, 64)
@@ -422,9 +344,6 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 	var connUsage float64
 	if maxConns > 0 {
 		connUsage = float64(connCurrent) / float64(maxConns) * 100
-		if connUsage > 100 {
-			connUsage = 100
-		}
 	}
 
 	conns, _ := strconv.ParseInt(statusMap["Connections"], 10, 64)
@@ -462,7 +381,7 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 
 	var dataTotalSize string = "-"
 	var diskRemaining string = "-"
-
+	
 	var totalSize float64
 	row := db.QueryRow("SELECT COALESCE(SUM(data_length + index_length), 0) / 1024 / 1024 FROM information_schema.TABLES WHERE table_schema NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')")
 	if err := row.Scan(&totalSize); err == nil && totalSize > 0 {
@@ -472,7 +391,7 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 			dataTotalSize = fmt.Sprintf("%.2f MB", totalSize)
 		}
 	}
-
+	
 	var freeSpace float64
 	row2 := db.QueryRow("SELECT SUM(DATA_FREE) / 1024 / 1024 / 1024 FROM information_schema.FILES WHERE FILE_TYPE = 'TABLESPACE'")
 	if err := row2.Scan(&freeSpace); err == nil && freeSpace > 0 && freeSpace < 1000 {
@@ -491,28 +410,28 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 	writeJSON(w, map[string]interface{}{
 		"code": 0,
 		"data": map[string]interface{}{
-			"type":     "mysql",
-			"online":   true,
-			"host":     server.Host,
-			"port":     server.Port,
-			"version":  varMap["version"],
+			"type":    "mysql",
+			"online":  true,
+			"host":    server.Host,
+			"port":    server.Port,
+			"version": varMap["version"],
 			"rangeSec": timeRangeSec,
 
-			"uptime":         uptime,
-			"uptime_display": formatUptime(uptime),
+			"uptime":          uptime,
+			"uptime_display":  formatUptime(uptime),
 
-			"questions":  questions,
-			"qps":        fmt.Sprintf("%.2f", qps),
-			"com_select": comSelect,
-			"com_insert": comInsert,
-			"com_update": comUpdate,
-			"com_delete": comDelete,
+			"questions":       questions,
+			"qps":             fmt.Sprintf("%.2f", qps),
+			"com_select":      comSelect,
+			"com_insert":      comInsert,
+			"com_update":      comUpdate,
+			"com_delete":      comDelete,
 
-			"threads_running":     running,
-			"threads_connected":   connected,
-			"threads_cached":      statusMap["Threads_cached"],
-			"max_connections":     fmt.Sprintf("%d", maxConns),
-			"connection_usage":    fmt.Sprintf("%.1f", connUsage),
+			"threads_running":   running,
+			"threads_connected": connected,
+			"threads_cached":    statusMap["Threads_cached"],
+			"max_connections":   fmt.Sprintf("%d", maxConns),
+			"connection_usage":  fmt.Sprintf("%.1f", connUsage),
 			"max_used_connection": maxUsedConn,
 			"connections_total":   conns,
 
@@ -528,23 +447,23 @@ func writeMySQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 			"aborted_connects":   abortedConnects,
 			"deadlocks":          deadlocks,
 
-			"innodb_buffer_pool_size":          bpSize,
-			"innodb_buffer_pool_hit_rate":      fmt.Sprintf("%.2f", bpHitRate),
-			"innodb_buffer_pool_pages_free":    bpPagesFree,
-			"innodb_buffer_pool_pages_total":   bpPagesTotal,
-			"innodb_buffer_pool_pages_dirty":   bpPagesDirty,
+			"innodb_buffer_pool_size":        bpSize,
+			"innodb_buffer_pool_hit_rate":    fmt.Sprintf("%.2f", bpHitRate),
+			"innodb_buffer_pool_pages_free":  bpPagesFree,
+			"innodb_buffer_pool_pages_total": bpPagesTotal,
+			"innodb_buffer_pool_pages_dirty": bpPagesDirty,
 			"innodb_buffer_pool_read_requests": fmt.Sprintf("%d", bpReadReq),
 			"innodb_buffer_pool_reads":         fmt.Sprintf("%d", bpReads),
-			"processlist":                      processList,
-			"data_total_size":                  dataTotalSize,
-			"disk_remaining":                   diskRemaining,
+			"processlist": processList,
+			"data_total_size": dataTotalSize,
+			"disk_remaining": diskRemaining,
 
 			"traffic": map[string]interface{}{
 				"echarts": echarts,
 			},
 			"rangeStats": rangeStats,
-			"now":        now,
-			"totals":     totals,
+			"now": now,
+			"totals": totals,
 		},
 	})
 }
@@ -630,20 +549,18 @@ func writeRedisMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 		"online": online,
 	}
 
-	inBytes, _ := strconv.ParseInt(infoMap["total_net_input_bytes"], 10, 64)
-	outBytes, _ := strconv.ParseInt(infoMap["total_net_output_bytes"], 10, 64)
 	totals := map[string]interface{}{
-		"inBytes":  fmt.Sprintf("%d", inBytes),
-		"outBytes": fmt.Sprintf("%d", outBytes),
+		"inBytes":  0,
+		"outBytes": 0,
 	}
 
 	writeJSON(w, map[string]interface{}{
 		"code": 0,
 		"data": map[string]interface{}{
-			"type":     "redis",
-			"host":     server.Host,
-			"port":     server.Port,
-			"version":  infoMap["redis_version"],
+			"type":    "redis",
+			"host":    server.Host,
+			"port":    server.Port,
+			"version": infoMap["redis_version"],
 			"rangeSec": timeRangeSec,
 
 			"uptime":         uptime,
@@ -657,304 +574,23 @@ func writeRedisMetrics(w http.ResponseWriter, server *RemoteServer, serverID uin
 			"used_memory_peak":  memPeak,
 			"mem_fragmentation": infoMap["mem_fragmentation_ratio"],
 
-			"ops_per_sec":       opsPerSec,
-			"total_commands":    infoMap["total_commands_processed"],
-			"total_connections": infoMap["total_connections_received"],
+			"ops_per_sec":        opsPerSec,
+			"total_commands":     infoMap["total_commands_processed"],
+			"total_connections":  infoMap["total_connections_received"],
 
 			"keyspace_hits":   fmt.Sprintf("%d", keyspaceHits),
 			"keyspace_misses": fmt.Sprintf("%d", keyspaceMisses),
 			"hit_rate":        fmt.Sprintf("%.2f", hitRate),
 
-			"rdb_last_save": infoMap["rdb_last_save_time"],
-			"rdb_changes":   infoMap["rdb_changes_since_last_save"],
-			"aof_enabled":   infoMap["aof_enabled"],
+			"rdb_last_save":  infoMap["rdb_last_save_time"],
+			"rdb_changes":    infoMap["rdb_changes_since_last_save"],
+			"aof_enabled":    infoMap["aof_enabled"],
 
 			"traffic": map[string]interface{}{
 				"echarts": buildEChartsConfig(history, true),
 			},
-			"now":    now,
+			"now": now,
 			"totals": totals,
-		},
-	})
-}
-
-func checkPostgreSQLOnline(server *RemoteServer) bool {
-	uid := fmt.Sprintf("l:%d", server.ID)
-	svc := GetHealthService()
-	if svc.IsCacheValid(uid, 60) {
-		if st := svc.GetStatus(uid); st != nil {
-			return st.Online
-		}
-	}
-	db, err := openPostgreSQL(server)
-	if err != nil {
-		return false
-	}
-	defer db.Close()
-	return db.Ping() == nil
-}
-
-func checkSQLiteOnline(server *RemoteServer) bool {
-	uid := fmt.Sprintf("l:%d", server.ID)
-	svc := GetHealthService()
-	if svc.IsCacheValid(uid, 60) {
-		if st := svc.GetStatus(uid); st != nil {
-			return st.Online
-		}
-	}
-	db, err := openSQLite(server)
-	if err != nil {
-		return false
-	}
-	defer db.Close()
-	return db.Ping() == nil
-}
-
-func writePostgreSQLMetrics(w http.ResponseWriter, server *RemoteServer, serverID uint, timeRangeSec int64, online bool) {
-	history := getMetricsHistory(serverID, timeRangeSec)
-	echarts := buildEChartsConfig(history, false)
-	rangeStats := buildRangeStats(history)
-
-	if !online {
-		writeJSON(w, map[string]interface{}{
-			"code": 0,
-			"data": map[string]interface{}{
-				"type":       "postgresql",
-				"online":     false,
-				"host":       server.Host,
-				"port":       server.Port,
-				"traffic":    map[string]interface{}{"echarts": echarts},
-				"rangeStats": rangeStats,
-			},
-		})
-		return
-	}
-
-	db, err := openPostgreSQLWithDB(server, "")
-	if err != nil {
-		writeJSON(w, map[string]interface{}{
-			"code": 0,
-			"data": map[string]interface{}{
-				"type":       "postgresql",
-				"online":     false,
-				"host":       server.Host,
-				"port":       server.Port,
-				"traffic":    map[string]interface{}{"echarts": echarts},
-				"rangeStats": rangeStats,
-			},
-		})
-		return
-	}
-	defer db.Close()
-
-	// 获取版本
-	var version string
-	db.QueryRow("SELECT version()").Scan(&version)
-
-	// 获取运行时间
-	var uptimeSec int64
-	db.QueryRow("SELECT extract(epoch from now() - pg_postmaster_start_time())::bigint").Scan(&uptimeSec)
-
-	// 获取连接数
-	var activeConns int64
-	var maxConns int64
-	db.QueryRow("SELECT count(*) FROM pg_stat_activity").Scan(&activeConns)
-	db.QueryRow("SELECT setting::int FROM pg_settings WHERE name = 'max_connections'").Scan(&maxConns)
-
-	var connUsage float64
-	if maxConns > 0 {
-		connUsage = float64(activeConns) / float64(maxConns) * 100
-		if connUsage > 100 {
-			connUsage = 100
-		}
-	}
-
-	// 获取数据库大小
-	var dbSizeStr string = "-"
-	var totalSize float64
-	db.QueryRow("SELECT sum(pg_database_size(datname))/1024.0/1024.0 FROM pg_database WHERE datistemplate = false").Scan(&totalSize)
-	if totalSize > 0 {
-		if totalSize > 1024 {
-			dbSizeStr = fmt.Sprintf("%.2f GB", totalSize/1024)
-		} else {
-			dbSizeStr = fmt.Sprintf("%.2f MB", totalSize)
-		}
-	}
-
-	// 获取事务统计
-	var xactCommit int64
-	var xactRollback int64
-	var blksRead int64
-	var blksHit int64
-	db.QueryRow("SELECT sum(xact_commit) FROM pg_stat_database").Scan(&xactCommit)
-	db.QueryRow("SELECT sum(xact_rollback) FROM pg_stat_database").Scan(&xactRollback)
-	db.QueryRow("SELECT sum(blks_read) FROM pg_stat_database").Scan(&blksRead)
-	db.QueryRow("SELECT sum(blks_hit) FROM pg_stat_database").Scan(&blksHit)
-
-	var hitRate float64
-	if blksHit+blksRead > 0 {
-		hitRate = float64(blksHit) / float64(blksHit+blksRead) * 100
-	}
-
-	// 获取活动进程
-	var processList []map[string]interface{}
-	pRows, pErr := db.Query("SELECT pid, usename, application_name, client_addr, state, query_start, state_change, query FROM pg_stat_activity ORDER BY query_start DESC NULLS LAST LIMIT 50")
-	if pErr == nil {
-		defer pRows.Close()
-		for pRows.Next() {
-			var pid int
-			var usename, appName, clientAddr, state, query sql.NullString
-			var queryStart, stateChange sql.NullTime
-			pRows.Scan(&pid, &usename, &appName, &clientAddr, &state, &queryStart, &stateChange, &query)
-			row := map[string]interface{}{
-				"id":      pid,
-				"user":    usename.String,
-				"host":    clientAddr.String,
-				"db":      appName.String,
-				"command": state.String,
-				"info":    query.String,
-			}
-			if queryStart.Valid {
-				dur := time.Since(queryStart.Time).Seconds()
-				if dur < 0 {
-					dur = 0
-				}
-				row["time"] = int64(dur)
-			} else {
-				row["time"] = 0
-			}
-			processList = append(processList, row)
-		}
-	}
-
-	now := map[string]interface{}{
-		"online": activeConns,
-	}
-
-	writeJSON(w, map[string]interface{}{
-		"code": 0,
-		"data": map[string]interface{}{
-			"type":     "postgresql",
-			"online":   true,
-			"host":     server.Host,
-			"port":     server.Port,
-			"version":  version,
-			"rangeSec": timeRangeSec,
-
-			"uptime":         uptimeSec,
-			"uptime_display": formatUptime(uptimeSec),
-
-			"threads_connected": fmt.Sprintf("%d", activeConns),
-			"max_connections":   fmt.Sprintf("%d", maxConns),
-			"connection_usage":  fmt.Sprintf("%.1f", connUsage),
-
-			"cache_hit_rate": fmt.Sprintf("%.2f", hitRate),
-			"xact_commit":    fmt.Sprintf("%d", xactCommit),
-			"xact_rollback":  fmt.Sprintf("%d", xactRollback),
-
-			"data_total_size": dbSizeStr,
-			"processlist":     processList,
-
-			"traffic":    map[string]interface{}{"echarts": echarts},
-			"rangeStats": rangeStats,
-			"now":        now,
-			"totals":     map[string]interface{}{"inBytes": 0, "outBytes": 0},
-		},
-	})
-}
-
-func writeSQLiteMetrics(w http.ResponseWriter, server *RemoteServer, serverID uint, timeRangeSec int64, online bool) {
-	history := getMetricsHistory(serverID, timeRangeSec)
-	echarts := buildEChartsConfig(history, false)
-	rangeStats := buildRangeStats(history)
-
-	if !online {
-		writeJSON(w, map[string]interface{}{
-			"code": 0,
-			"data": map[string]interface{}{
-				"type":       "sqlite",
-				"online":     false,
-				"host":       server.Host,
-				"traffic":    map[string]interface{}{"echarts": echarts},
-				"rangeStats": rangeStats,
-			},
-		})
-		return
-	}
-
-	db, err := openSQLite(server)
-	if err != nil {
-		writeJSON(w, map[string]interface{}{
-			"code": 0,
-			"data": map[string]interface{}{
-				"type":       "sqlite",
-				"online":     false,
-				"host":       server.Host,
-				"traffic":    map[string]interface{}{"echarts": echarts},
-				"rangeStats": rangeStats,
-			},
-		})
-		return
-	}
-	defer db.Close()
-
-	// SQLite 版本
-	var version string
-	db.QueryRow("SELECT sqlite_version()").Scan(&version)
-
-	// 表数量
-	var tableCount int64
-	db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").Scan(&tableCount)
-
-	// 数据库文件大小
-	var pageSize, pageCount int64
-	err1 := db.QueryRow("PRAGMA page_size").Scan(&pageSize)
-	err2 := db.QueryRow("PRAGMA page_count").Scan(&pageCount)
-	var dbSizeStr string = "-"
-	if err1 == nil && err2 == nil && pageSize > 0 && pageCount > 0 {
-		dbSizeBytes := pageSize * pageCount
-		if dbSizeBytes > 1024*1024*1024 {
-			dbSizeStr = fmt.Sprintf("%.2f GB", float64(dbSizeBytes)/1024/1024/1024)
-		} else if dbSizeBytes > 1024*1024 {
-			dbSizeStr = fmt.Sprintf("%.2f MB", float64(dbSizeBytes)/1024/1024)
-		} else {
-			dbSizeStr = fmt.Sprintf("%.2f KB", float64(dbSizeBytes)/1024)
-		}
-	}
-
-	// 日志模式
-	var journalMode string
-	db.QueryRow("PRAGMA journal_mode").Scan(&journalMode)
-
-	now := map[string]interface{}{
-		"online": 1,
-	}
-
-	writeJSON(w, map[string]interface{}{
-		"code": 0,
-		"data": map[string]interface{}{
-			"type":     "sqlite",
-			"online":   true,
-			"host":     server.Host,
-			"port":     0,
-			"version":  "SQLite " + version,
-			"rangeSec": timeRangeSec,
-
-			"uptime":         0,
-			"uptime_display": "-",
-
-			"threads_connected": "1",
-			"max_connections":   "-",
-			"connection_usage":  "N/A",
-
-			"table_count":     fmt.Sprintf("%d", tableCount),
-			"data_total_size": dbSizeStr,
-			"journal_mode":    journalMode,
-
-			"traffic":    map[string]interface{}{"echarts": echarts},
-			"rangeStats": rangeStats,
-			"now":        now,
-			"totals":     map[string]interface{}{"inBytes": 0, "outBytes": 0},
 		},
 	})
 }
@@ -974,8 +610,8 @@ func formatUptime(seconds int64) string {
 
 func formatBytes(val string) string {
 	n, err := strconv.ParseInt(val, 10, 64)
-	if err != nil || n < 0 {
-		return "-"
+	if err != nil {
+		return val
 	}
 	units := []string{"B", "KB", "MB", "GB", "TB"}
 	var i int
@@ -1019,57 +655,7 @@ func dashboardHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.ToLower(server.Type) == "postgresql" {
-		writePostgreSQLSnapshot(w, server)
-		return
-	}
-
-	if strings.ToLower(server.Type) == "sqlite" {
-		writeSQLiteSnapshot(w, server)
-		return
-	}
-
 	writeMySQLSnapshot(w, server)
-}
-
-func writePostgreSQLSnapshot(w http.ResponseWriter, server *RemoteServer) {
-	db, err := openPostgreSQLWithDB(server, "")
-	if err != nil {
-		writeJSON(w, map[string]interface{}{"code": 0, "data": map[string]interface{}{"online": false}})
-		return
-	}
-	defer db.Close()
-
-	var conns int64
-	db.QueryRow("SELECT count(*) FROM pg_stat_activity").Scan(&conns)
-
-	var xactCommit int64
-	db.QueryRow("SELECT sum(xact_commit) FROM pg_stat_database").Scan(&xactCommit)
-
-	writeJSON(w, map[string]interface{}{
-		"code": 0,
-		"data": map[string]interface{}{
-			"connections": conns,
-			"questions":   xactCommit,
-		},
-	})
-}
-
-func writeSQLiteSnapshot(w http.ResponseWriter, server *RemoteServer) {
-	db, err := openSQLite(server)
-	if err != nil {
-		writeJSON(w, map[string]interface{}{"code": 0, "data": map[string]interface{}{"online": false}})
-		return
-	}
-	defer db.Close()
-
-	writeJSON(w, map[string]interface{}{
-		"code": 0,
-		"data": map[string]interface{}{
-			"connections": 1,
-			"questions":   0,
-		},
-	})
 }
 
 func writeMySQLSnapshot(w http.ResponseWriter, server *RemoteServer) {
@@ -1103,57 +689,6 @@ func writeMySQLSnapshot(w http.ResponseWriter, server *RemoteServer) {
 	var bpHit float64
 	if bpReadReq > 0 {
 		bpHit = float64(bpReadReq-bpReads) / float64(bpReadReq) * 100
-		if bpHit < 0 {
-			bpHit = 0
-		}
-		if bpHit > 100 {
-			bpHit = 100
-		}
-	}
-
-	bpPagesTotal := statusMap["Innodb_buffer_pool_pages_total"]
-	if bpHit == 0 && bpPagesTotal != "" && bpPagesTotal != "0" {
-		var innodbStatus string
-		statusRows, statusErr := db.Query("SHOW ENGINE INNODB STATUS")
-		if statusErr == nil {
-			for statusRows.Next() {
-				var typ, name, statusText string
-				statusRows.Scan(&typ, &name, &statusText)
-				innodbStatus = statusText
-			}
-			statusRows.Close()
-		}
-		if innodbStatus != "" {
-			lines := strings.Split(innodbStatus, "\n")
-			for _, line := range lines {
-				line = strings.TrimSpace(line)
-				if strings.Contains(line, "Buffer pool hit rate") {
-					parts := strings.Split(line, "Buffer pool hit rate")
-					if len(parts) > 1 {
-						ratePart := strings.TrimSpace(parts[1])
-						if idx := strings.Index(ratePart, "/"); idx > 0 {
-							beforeSlash := strings.TrimSpace(ratePart[:idx])
-							afterSlash := ratePart[idx+1:]
-							if spaceIdx := strings.Index(afterSlash, ","); spaceIdx > 0 {
-								afterSlash = strings.TrimSpace(afterSlash[:spaceIdx])
-							}
-							hit, _ := strconv.ParseInt(beforeSlash, 10, 64)
-							total, _ := strconv.ParseInt(afterSlash, 10, 64)
-							if total > 0 {
-								bpHit = float64(hit) / float64(total) * 100
-								if bpHit < 0 {
-									bpHit = 0
-								}
-								if bpHit > 100 {
-									bpHit = 100
-								}
-							}
-						}
-					}
-					break
-				}
-			}
-		}
 	}
 
 	writeJSON(w, map[string]interface{}{
@@ -1282,22 +817,6 @@ func collectAllMetrics() {
 				}
 			}
 			addMetricsSnapshot(snapshot)
-		} else if strings.ToLower(server.Type) == "postgresql" {
-			db, err := openPostgreSQLWithDB(&server, "")
-			if err == nil {
-				var conns int64
-				db.QueryRow("SELECT count(*) FROM pg_stat_activity").Scan(&conns)
-				snapshot.Connections = conns
-				db.Close()
-			}
-			addMetricsSnapshot(snapshot)
-		} else if strings.ToLower(server.Type) == "sqlite" {
-			db, err := openSQLite(&server)
-			if err == nil {
-				snapshot.Connections = 1
-				db.Close()
-			}
-			addMetricsSnapshot(snapshot)
 		} else {
 			db, err := openMySQL(&server)
 			if err == nil {
@@ -1330,55 +849,6 @@ func collectAllMetrics() {
 				bpReads, _ := strconv.ParseInt(statusMap["Innodb_buffer_pool_reads"], 10, 64)
 				if bpReadReq > 0 {
 					snapshot.BPHitRate = float64(bpReadReq-bpReads) / float64(bpReadReq) * 100
-					if snapshot.BPHitRate < 0 {
-						snapshot.BPHitRate = 0
-					}
-					if snapshot.BPHitRate > 100 {
-						snapshot.BPHitRate = 100
-					}
-				} else if snapshot.BPPagesTotal > 0 {
-					// 有缓冲池数据但没有读请求计数，尝试 SHOW ENGINE INNODB STATUS
-					var innodbStatus string
-					statusRows, statusErr := db.Query("SHOW ENGINE INNODB STATUS")
-					if statusErr == nil {
-						for statusRows.Next() {
-							var typ, name, statusText string
-							statusRows.Scan(&typ, &name, &statusText)
-							innodbStatus = statusText
-						}
-						statusRows.Close()
-					}
-					if innodbStatus != "" {
-						lines := strings.Split(innodbStatus, "\n")
-						for _, line := range lines {
-							line = strings.TrimSpace(line)
-							if strings.Contains(line, "Buffer pool hit rate") {
-								parts := strings.Split(line, "Buffer pool hit rate")
-								if len(parts) > 1 {
-									ratePart := strings.TrimSpace(parts[1])
-									if idx := strings.Index(ratePart, "/"); idx > 0 {
-										beforeSlash := strings.TrimSpace(ratePart[:idx])
-										afterSlash := ratePart[idx+1:]
-										if spaceIdx := strings.Index(afterSlash, ","); spaceIdx > 0 {
-											afterSlash = strings.TrimSpace(afterSlash[:spaceIdx])
-										}
-										hit, _ := strconv.ParseInt(beforeSlash, 10, 64)
-										total, _ := strconv.ParseInt(afterSlash, 10, 64)
-										if total > 0 {
-											snapshot.BPHitRate = float64(hit) / float64(total) * 100
-											if snapshot.BPHitRate < 0 {
-												snapshot.BPHitRate = 0
-											}
-											if snapshot.BPHitRate > 100 {
-												snapshot.BPHitRate = 100
-											}
-										}
-									}
-								}
-								break
-							}
-						}
-					}
 				}
 
 				questions, _ := strconv.ParseInt(statusMap["Questions"], 10, 64)

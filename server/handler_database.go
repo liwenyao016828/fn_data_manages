@@ -6,101 +6,61 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func testMySQLConnection(host string, port int, username, password string) (string, string) {
+func testMySQLConnection(host string, port int, username, password string) string {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=3s&readTimeout=3s&allowNativePasswords=true",
 		username, password, host, port)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		return "", fmt.Sprintf("打开连接失败: %v", err)
+		return ""
 	}
 	defer db.Close()
 
 	var version string
 	if err := db.QueryRow("SELECT VERSION()").Scan(&version); err != nil {
-		return "", fmt.Sprintf("执行VERSION()查询失败: %v", err)
+		return ""
 	}
-	return version, ""
+	return version
 }
 
-func testPostgreSQLConnection(host string, port int, username, password string) (string, string) {
-	sslmode := "disable"
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/postgres?sslmode=%s&connect_timeout=3",
-		username, password, host, port, sslmode)
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		return "", fmt.Sprintf("打开连接失败: %v", err)
-	}
-	defer db.Close()
-
-	var version string
-	if err := db.QueryRow("SELECT version()").Scan(&version); err != nil {
-		return "", fmt.Sprintf("执行version()查询失败: %v", err)
-	}
-	parts := strings.Split(version, ",")
-	if len(parts) > 0 {
-		return strings.TrimSpace(parts[0]), ""
-	}
-	return version, ""
-}
-
-func testSQLiteConnection(filePath string) (string, string) {
-	if filePath == "" {
-		return "", "文件路径为空"
-	}
-	dsn := filePath + "?mode=ro&_busy_timeout=3000"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return "", fmt.Sprintf("打开SQLite文件失败: %v", err)
-	}
-	defer db.Close()
-
-	var version string
-	if err := db.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
-		return "", fmt.Sprintf("执行sqlite_version()查询失败: %v", err)
-	}
-	return "SQLite " + version, ""
-}
-
-func testRedisConnection(host string, port int, username, password string) (bool, string) {
+func testRedisConnection(host string, port int, username, password string) bool {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	if err != nil {
-		return false, fmt.Sprintf("TCP连接失败: %v", err)
+		return false
 	}
 	defer conn.Close()
 
 	if username != "" && password != "" {
 		resp, err := redisDo(conn, "AUTH", username, password)
 		if err != nil {
-			return false, fmt.Sprintf("AUTH认证失败: %v", err)
+			return false
 		}
 		if s, ok := resp.(string); ok && s != "OK" {
-			return false, fmt.Sprintf("AUTH认证返回非OK: %s", s)
+			return false
 		}
 	} else if password != "" {
 		resp, err := redisDo(conn, "AUTH", password)
 		if err != nil {
-			return false, fmt.Sprintf("AUTH认证失败: %v", err)
+			return false
 		}
 		if s, ok := resp.(string); ok && s != "OK" {
-			return false, fmt.Sprintf("AUTH认证返回非OK: %s", s)
+			return false
 		}
 	}
 
 	resp, err := redisDo(conn, "PING")
 	if err != nil {
-		return false, fmt.Sprintf("PING命令失败: %v", err)
+		return false
 	}
 	if pong, ok := resp.(string); ok && pong == "PONG" {
-		return true, ""
+		return true
 	}
-	return false, fmt.Sprintf("PING返回非PONG: %v", resp)
+	return false
 }
 
 func dbHandler(w http.ResponseWriter, r *http.Request) {
@@ -157,32 +117,21 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var version string
-		var errMsg string
-		if dbType == "mysql" || dbType == "mariadb" {
-			version, errMsg = testMySQLConnection(host, port, username, password)
+		if dbType == "mysql" {
+			version = testMySQLConnection(host, port, username, password)
 		} else if dbType == "redis" {
-			var ok bool
-			ok, errMsg = testRedisConnection(host, port, username, password)
-			if ok {
+			if testRedisConnection(host, port, username, password) {
 				version = "connected"
 			}
-		} else if dbType == "postgresql" {
-			version, errMsg = testPostgreSQLConnection(host, port, username, password)
-		} else if dbType == "sqlite" {
-			version, errMsg = testSQLiteConnection(host)
 		}
 		if version != "" {
 			sysLogInfo("CONNECTION", fmt.Sprintf("连接测试成功 %s (%s:%d, %s)", req.Name, host, port, dbType))
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "msg": "success", "version": version})
 		} else {
-			detail := errMsg
-			if detail == "" {
-				detail = "连接失败"
-			}
-			sysLogError("CONNECTION", fmt.Sprintf("连接测试失败 %s (%s:%d, %s): %s", req.Name, host, port, dbType, detail))
+			sysLogWarn("CONNECTION", fmt.Sprintf("连接测试失败 %s (%s:%d, %s)", req.Name, host, port, dbType))
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"code": 400, "msg": detail})
+			json.NewEncoder(w).Encode(map[string]interface{}{"code": 400, "msg": "连接失败"})
 		}
 		return
 	}
@@ -191,8 +140,6 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 	for _, db := range databases {
 		if db.Name == req.Name {
 			mutex.Unlock()
-			errMsg := fmt.Sprintf("添加连接失败: 名称 '%s' 已存在 (ID=%d)", req.Name, db.ID)
-			sysLogError("CONNECTION", errMsg)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]interface{}{"code": 400, "msg": "名称已存在"})
@@ -200,8 +147,6 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if db.Host == req.Host && db.Port == req.Port && db.Username == req.Username {
 			mutex.Unlock()
-			errMsg := fmt.Sprintf("添加连接失败: 相同主机(%s)、端口(%d)和用户名(%s)的本地连接已存在 (名称='%s', ID=%d)", req.Host, req.Port, req.Username, db.Name, db.ID)
-			sysLogError("CONNECTION", errMsg)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]interface{}{"code": 400, "msg": "相同主机、端口和用户名的连接已存在"})
@@ -211,8 +156,6 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 	for _, rs := range remoteServers {
 		if rs.Host == req.Host && rs.Port == req.Port && rs.Username == req.Username {
 			mutex.Unlock()
-			errMsg := fmt.Sprintf("添加连接失败: 相同主机(%s)、端口(%d)和用户名(%s)的远程连接已存在 (名称='%s', ID=%d)", req.Host, req.Port, req.Username, rs.Name, rs.ID)
-			sysLogError("CONNECTION", errMsg)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]interface{}{"code": 400, "msg": "相同主机、端口和用户名的远程连接已存在"})
@@ -269,14 +212,11 @@ func createHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			mutex.Unlock()
 		}
-		if ver == "" && dsk == "" {
-			sysLogWarn("CONNECTION", fmt.Sprintf("添加连接后获取服务器信息失败 %s (%s:%d, %s)", req.Name, req.Host, req.Port, req.Type))
-		}
 	}()
 
 	saveData()
 
-	sysLogInfo("CONNECTION", fmt.Sprintf("添加本地连接成功 %s (%s:%d, 类型=%s, 用户=%s)", req.Name, req.Host, req.Port, req.Type, req.Username))
+	sysLogInfo("CONNECTION", fmt.Sprintf("添加本地连接 %s (%s:%d)", req.Name, req.Host, req.Port))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -499,13 +439,8 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{"code": 404, "msg": "not found"})
 		return
 	}
-	reveal := r.URL.Query().Get("reveal") == "true"
 	maskedResult := *result
-	if reveal {
-		maskedResult.Password = result.Password // 明文返回
-	} else {
-		maskedResult.Password = maskPassword(result.Password)
-	}
+	maskedResult.Password = maskPassword(result.Password)
 	mutex.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -527,6 +462,23 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 		filtered = append(filtered, db)
 	}
 	mutex.Unlock()
+
+	// 为每个MySQL实例获取数据库列表（在掩码化密码之前）
+	for i := range filtered {
+		if strings.ToLower(filtered[i].Type) == "mysql" {
+			server := &RemoteServer{
+				Host:     filtered[i].Host,
+				Port:     filtered[i].Port,
+				Username: filtered[i].Username,
+				Password: filtered[i].Password,
+				Type:     filtered[i].Type,
+			}
+			_, _, dbs := fetchServerInfo(server)
+			if len(dbs) > 0 {
+				filtered[i].Databases = dbs
+			}
+		}
+	}
 
 	// 掩码化密码后再返回
 	for i := range filtered {
@@ -581,9 +533,7 @@ func fetchServerInfo(server *RemoteServer) (string, string, []string) {
 	version, disk := "", ""
 	var databases []string
 
-	serverType := strings.ToLower(server.Type)
-
-	if serverType == "redis" {
+	if strings.ToLower(server.Type) == "redis" {
 		conn, err := openRedis(server)
 		if err != nil {
 			return "", "", nil
@@ -607,57 +557,7 @@ func fetchServerInfo(server *RemoteServer) (string, string, []string) {
 			}
 		}
 		conn.Close()
-	} else if serverType == "postgresql" {
-		db, err := openPostgreSQL(server)
-		if err != nil {
-			return "", "", nil
-		}
-		defer db.Close()
-		db.QueryRow("SELECT version()").Scan(&version)
-		parts := strings.Split(version, ",")
-		if len(parts) > 0 {
-			version = strings.TrimSpace(parts[0])
-		}
-		var dbSize sql.NullFloat64
-		db.QueryRow("SELECT ROUND(SUM(pg_database_size(datname)) / 1024.0 / 1024.0, 2) FROM pg_database WHERE datistemplate = false").Scan(&dbSize)
-		if dbSize.Valid && dbSize.Float64 > 0 {
-			if dbSize.Float64 > 1024 {
-				disk = fmt.Sprintf("%.2fG", dbSize.Float64/1024)
-			} else {
-				disk = fmt.Sprintf("%.2fM", dbSize.Float64)
-			}
-		}
-		rows, err := db.Query("SELECT datname FROM pg_database WHERE datistemplate = false")
-		if err == nil {
-			defer rows.Close()
-			var dbName string
-			for rows.Next() {
-				if err := rows.Scan(&dbName); err == nil {
-					databases = append(databases, dbName)
-				}
-			}
-		}
-	} else if serverType == "sqlite" {
-		db, err := openSQLite(server)
-		if err != nil {
-			return "", "", nil
-		}
-		defer db.Close()
-		var ver string
-		if err := db.QueryRow("SELECT sqlite_version()").Scan(&ver); err == nil {
-			version = "SQLite " + ver
-		}
-		// SQLite 文件大小
-		if fi, err := os.Stat(server.Host); err == nil {
-			sizeMB := float64(fi.Size()) / 1024.0 / 1024.0
-			if sizeMB > 1024 {
-				disk = fmt.Sprintf("%.2fG", sizeMB/1024)
-			} else {
-				disk = fmt.Sprintf("%.2fM", sizeMB)
-			}
-		}
 	} else {
-		// MySQL / MariaDB
 		fmt.Printf("[fetchServerInfo] 连接MySQL: host=%s, port=%d, user=%s\n", server.Host, server.Port, server.Username)
 		db, err := openMySQL(server)
 		if err != nil {

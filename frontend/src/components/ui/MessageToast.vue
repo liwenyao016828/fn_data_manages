@@ -33,38 +33,40 @@ const getIcon = () => {
     case 'success': return CheckCircle
     case 'error': return XCircle
     case 'warning': return AlertCircle
-    case 'info': return Info
     default: return Info
   }
 }
 
-const getBadgeClass = () => {
+const getStyles = () => {
   switch (localMessage.value.type) {
-    case 'success': return 'badge-status badge-status-success'
-    case 'error': return 'badge-status badge-status-error'
-    case 'warning': return 'badge-status badge-status-warning'
-    case 'info': return 'badge-status badge-status-info'
-    default: return 'badge-status badge-status-neutral'
-  }
-}
-
-const getIconClass = () => {
-  switch (localMessage.value.type) {
-    case 'success': return 'icon-success'
-    case 'error': return 'icon-error'
-    case 'warning': return 'icon-warning'
-    case 'info': return 'icon-info'
-    default: return 'icon-secondary'
-  }
-}
-
-const getTextClass = () => {
-  switch (localMessage.value.type) {
-    case 'success': return 'text-success'
-    case 'error': return 'text-error'
-    case 'warning': return 'text-warning'
-    case 'info': return 'text-info'
-    default: return 'text-body'
+    case 'success':
+      return {
+        bg: 'bg-emerald-50',
+        border: 'border-emerald-200',
+        text: 'text-emerald-700',
+        icon: 'text-emerald-500'
+      }
+    case 'error':
+      return {
+        bg: 'bg-red-50',
+        border: 'border-red-200',
+        text: 'text-red-700',
+        icon: 'text-red-500'
+      }
+    case 'warning':
+      return {
+        bg: 'bg-amber-50',
+        border: 'border-amber-200',
+        text: 'text-amber-700',
+        icon: 'text-amber-500'
+      }
+    default:
+      return {
+        bg: 'bg-slate-50',
+        border: 'border-slate-200',
+        text: 'text-slate-700',
+        icon: 'text-slate-500'
+      }
   }
 }
 </script>
@@ -73,45 +75,36 @@ const getTextClass = () => {
   <Transition name="message">
     <div
       v-if="localMessage.show"
-      :class="['toast-card', getBadgeClass(), 'shadow-lg flex items-center gap-3 min-w-[280px] max-w-[400px]']"
-      role="status"
-      aria-live="polite"
+      :class="[
+        'fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg border shadow-lg flex items-center gap-3 min-w-[280px] max-w-[400px]',
+        getStyles().bg,
+        getStyles().border,
+        getStyles().text
+      ]"
     >
       <component
         :is="getIcon()"
-        :class="['h-4 w-4 shrink-0', getIconClass()]"
+        :class="['h-4 w-4 shrink-0', getStyles().icon]"
       />
-      <span :class="['text-sm font-medium flex-1', getTextClass()]">{{ localMessage.text }}</span>
+      <span class="text-sm font-medium flex-1">{{ localMessage.text }}</span>
       <button
-        class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors icon-muted"
+        class="p-1 rounded hover:bg-black/5 transition-colors"
         @click="close"
-        aria-label="关闭"
       >
-        <X class="h-3.5 w-3.5" />
+        <X class="h-3.5 w-3.5 opacity-60 hover:opacity-100" />
       </button>
     </div>
   </Transition>
 </template>
 
 <style scoped>
-.toast-card {
-  position: fixed;
-  top: 5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  border-width: 1px;
-  backdrop-filter: blur(8px);
-}
 .message-enter-active,
 .message-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.2s ease;
 }
+
 .message-enter-from,
 .message-leave-to {
   opacity: 0;
-  transform: translateX(-50%) translateY(-8px);
 }
 </style>

@@ -50,7 +50,6 @@ func backupDetailHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	idStr := path[len("/api/backups/"):]
 	if idStr == "" || idStr == "import" {
-		writeJSON(w, map[string]interface{}{"code": 400, "msg": "invalid backup id"})
 		return
 	}
 
@@ -291,17 +290,13 @@ func createBackup(w http.ResponseWriter, r *http.Request) {
 				mutex.Unlock()
 			}
 		}
-		// 最后如果还是无效，返回错误
+		// 最后如果还是无效，返回错误（避免 mysqldump 卡住）
 		if newBackup.Database == "" || strings.Contains(newBackup.Database, ":") {
-			dbType := "MySQL"
-			if newBackup.BackupLevel == "postgresql" {
-				dbType = "PostgreSQL"
-			}
-			writeJSON(w, map[string]interface{}{"code": 400, "msg": fmt.Sprintf("请选择具体要备份的%s数据库名", dbType)})
+			writeJSON(w, map[string]interface{}{"code": 400, "msg": "请选择具体要备份的MySQL数据库名"})
 			return
 		}
-		// 非 root 用户不允许备份全部数据库（仅 MySQL/MariaDB）
-		if newBackup.Database == "__ALL__" && newBackup.BackupLevel != "postgresql" {
+		// 非 root 用户不允许备份全部数据库
+		if newBackup.Database == "__ALL__" {
 			server := findAnyServer(newBackup.ServerID, source)
 			if server != nil && server.Username != "root" {
 				writeJSON(w, map[string]interface{}{"code": 403, "msg": "当前账号权限不足，仅 root 用户可以备份全部数据库"})
@@ -318,7 +313,6 @@ func createBackup(w http.ResponseWriter, r *http.Request) {
 		newBackup.FileName = name + ".json"
 		newBackup.FileSize = int64(len(content))
 		if err := os.WriteFile(filepath.Join(bakDir, newBackup.FileName), []byte(content), 0644); err != nil {
-			sysLogError("BACKUP", "写入系统备份文件失败")
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "写入系统备份文件失败: " + err.Error()})
 			return
 		}
@@ -339,20 +333,17 @@ func createBackup(w http.ResponseWriter, r *http.Request) {
 		}
 		conn, err := openRedis(server)
 		if err != nil {
-			sysLogError("BACKUP", fmt.Sprintf("备份Redis连接失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + err.Error()})
 			return
 		}
 		_, err = redisDo(conn, "SAVE")
 		conn.Close()
 		if err != nil {
-			sysLogError("BACKUP", fmt.Sprintf("备份Redis SAVE失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "Redis SAVE失败: " + err.Error()})
 			return
 		}
 		rdbFileName, err := doRedisRdbCopy(server, name, bakDir)
 		if err != nil {
-			sysLogError("BACKUP", fmt.Sprintf("备份Redis RDB复制失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "复制RDB文件失败: " + err.Error()})
 			return
 		}
@@ -367,23 +358,10 @@ func createBackup(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]interface{}{"code": 404, "msg": "服务器不存在"})
 			return
 		}
-		var fileName string
-		var fileSize int64
-		var err error
-		if newBackup.BackupLevel == "postgresql" {
-			fileName, fileSize, err = doPostgreSQLBackup(server, newBackup.Database, bakDir, name)
-			if err != nil {
-				sysLogError("BACKUP", fmt.Sprintf("备份PostgreSQL失败 (连接: %s:%d)", server.Host, server.Port))
-				writeJSON(w, map[string]interface{}{"code": 1, "msg": "备份失败: " + err.Error()})
-				return
-			}
-		} else {
-			fileName, fileSize, err = doMySQLBackup(server, newBackup.Database, bakDir, name)
-			if err != nil {
-				sysLogError("BACKUP", fmt.Sprintf("备份MySQL失败 (连接: %s:%d)", server.Host, server.Port))
-				writeJSON(w, map[string]interface{}{"code": 1, "msg": "备份失败: " + err.Error()})
-				return
-			}
+		fileName, fileSize, err := doMySQLBackup(server, newBackup.Database, bakDir, name)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"code": 1, "msg": "备份失败: " + err.Error()})
+			return
 		}
 		newBackup.FileName = fileName
 		newBackup.FileSize = fileSize
@@ -501,11 +479,9 @@ func downloadBackup(w http.ResponseWriter, r *http.Request, idStr string) {
 
 	mutex.Lock()
 	var fileName string
-	var backupName string
 	for _, b := range backups {
 		if b.ID == uint(id) {
 			fileName = b.FileName
-			backupName = b.Name
 			break
 		}
 	}
@@ -518,11 +494,19 @@ func downloadBackup(w http.ResponseWriter, r *http.Request, idStr string) {
 		return
 	}
 
-	sysLogInfo("BACKUP", fmt.Sprintf("下载备份 %s", backupName))
-
 	bakDir := getDataDir() + "/backups"
 	filePath := filepath.Join(bakDir, fileName)
-	http.ServeFile(w, r, filePath)
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]interface{}{"code": 404, "msg": "file not found"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
+	w.Write(data)
 }
 
 func importBackup(w http.ResponseWriter, r *http.Request) {
@@ -612,8 +596,6 @@ func importBackup(w http.ResponseWriter, r *http.Request) {
 
 	saveData()
 
-	sysLogInfo("BACKUP", fmt.Sprintf("导入备份: %s", newBackup.Name))
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "msg": "导入成功", "data": newBackup})
@@ -684,12 +666,10 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 	case "system":
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			sysLogError("BACKUP", "恢复系统备份读取失败")
 			writeJSON(w, map[string]interface{}{"code": 500, "msg": "读取备份文件失败: " + err.Error()})
 			return
 		}
 		if err := restoreSystemBackup(string(content)); err != nil {
-			sysLogError("BACKUP", "系统备份恢复失败")
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "系统恢复失败: " + err.Error()})
 			return
 		}
@@ -719,14 +699,12 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 
 		input, err := os.ReadFile(filePath)
 		if err != nil {
-			sysLogError("BACKUP", "恢复Redis备份读取失败")
 			writeJSON(w, map[string]interface{}{"code": 500, "msg": "读取备份文件失败: " + err.Error()})
 			return
 		}
 
 		conn, err := openRedis(server)
 		if err != nil {
-			sysLogError("BACKUP", fmt.Sprintf("恢复Redis连接失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + err.Error()})
 			return
 		}
@@ -751,7 +729,6 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 
 		destPath := filepath.Join(rdbDir, rdbFile)
 		if err := os.WriteFile(destPath, input, 0644); err != nil {
-			sysLogError("BACKUP", "恢复Redis写入RDB文件失败")
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "写入RDB文件失败: " + err.Error()})
 			return
 		}
@@ -761,7 +738,6 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 	default:
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			sysLogError("BACKUP", "恢复MySQL备份读取失败")
 			writeJSON(w, map[string]interface{}{"code": 500, "msg": "读取备份文件失败: " + err.Error()})
 			return
 		}
@@ -791,7 +767,6 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 
 		db, err := openMySQL(server)
 		if err != nil {
-			sysLogError("BACKUP", fmt.Sprintf("恢复MySQL连接失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接数据库失败: " + err.Error()})
 			return
 		}
@@ -800,7 +775,6 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 			_, err := db.Exec(fmt.Sprintf("USE `%s`", escapeBacktick(backup.Database)))
 			if err != nil {
 				db.Close()
-				sysLogError("BACKUP", fmt.Sprintf("恢复MySQL选择数据库失败: %s", backup.Database))
 				writeJSON(w, map[string]interface{}{"code": 1, "msg": "选择数据库失败: " + err.Error()})
 				return
 			}
@@ -809,7 +783,6 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 		droppedTables, dropErr := dropAllTablesInDB(db)
 		if dropErr != nil {
 			db.Close()
-			sysLogError("BACKUP", fmt.Sprintf("恢复MySQL清空数据库失败: %s", backup.Database))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "清空数据库失败: " + dropErr.Error()})
 			return
 		}
@@ -856,7 +829,6 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 							return
 						}
 						fmt.Printf("mysql client restore failed: %s, %s\n", cmdErr.Error(), string(output))
-						sysLogError("BACKUP", fmt.Sprintf("恢复MySQL客户端执行失败: %s", backup.Database))
 					}
 				}
 			}
@@ -864,7 +836,6 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 
 		db, err = openMySQL(server)
 		if err != nil {
-			sysLogError("BACKUP", fmt.Sprintf("恢复MySQL回退连接失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接数据库失败: " + err.Error()})
 			return
 		}
@@ -873,7 +844,6 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 		if backup.Database != "" {
 			_, err := db.Exec(fmt.Sprintf("USE `%s`", escapeBacktick(backup.Database)))
 			if err != nil {
-				sysLogError("BACKUP", fmt.Sprintf("恢复MySQL回退选择数据库失败: %s", backup.Database))
 				writeJSON(w, map[string]interface{}{"code": 1, "msg": "选择数据库失败: " + err.Error()})
 				return
 			}
@@ -906,7 +876,6 @@ func restoreBackup(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(errorMessages) > 0 && successCount == 0 {
-			sysLogError("BACKUP", fmt.Sprintf("恢复MySQL所有SQL执行失败: %s", backup.Database))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": fmt.Sprintf("恢复失败，所有SQL执行出错: %s", strings.Join(errorMessages, "; "))})
 			return
 		}
@@ -1006,156 +975,12 @@ func dropAllTablesInDB(db *sql.DB) (int, error) {
 	return dropped, nil
 }
 
-func doPostgreSQLBackup(server *RemoteServer, dbName string, bakDir string, name string) (string, int64, error) {
-	if dbName == "" {
-		return "", 0, fmt.Errorf("请选择要备份的PostgreSQL数据库")
-	}
-
-	// 优先使用 pg_dump
-	if pgDumpPath, err := exec.LookPath("pg_dump"); err == nil {
-		args := []string{
-			"-h", server.Host,
-			"-p", fmt.Sprintf("%d", server.Port),
-			"-U", server.Username,
-			"-d", dbName,
-			"--no-password",
-		}
-		cmd := exec.Command(pgDumpPath, args...)
-		cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", server.Password))
-		output, err := cmd.CombinedOutput()
-		if err == nil && len(output) > 0 {
-			fileName := name + ".sql"
-			filePath := filepath.Join(bakDir, fileName)
-			if writeErr := os.WriteFile(filePath, output, 0644); writeErr != nil {
-				return "", 0, fmt.Errorf("写入备份文件失败: %w", writeErr)
-			}
-			return fileName, int64(len(output)), nil
-		}
-		if err != nil {
-			sysLogError("BACKUP", fmt.Sprintf("pg_dump失败 (连接: %s:%d): %s", server.Host, server.Port, string(output)))
-		}
-	}
-
-	// 回退：使用 Go 代码导出
-	db, err := openPostgreSQL(server)
-	if err != nil {
-		return "", 0, fmt.Errorf("连接数据库失败: %w", err)
-	}
-	defer db.Close()
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("-- PostgreSQL Backup\n-- Database: %s\n-- Created: %s\n\n", dbName, time.Now().Format("2006-01-02 15:04:05")))
-
-	// 切换到目标数据库
-	_, err = db.Exec(fmt.Sprintf("SET search_path TO public"))
-	if err != nil {
-		return "", 0, fmt.Errorf("设置schema失败: %w", err)
-	}
-
-	// 获取表列表
-	rows, err := db.Query(`
-		SELECT table_name FROM information_schema.tables
-		WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-		ORDER BY table_name`)
-	if err != nil {
-		return "", 0, fmt.Errorf("获取表列表失败: %w", err)
-	}
-	var tables []string
-	for rows.Next() {
-		var tbl string
-		rows.Scan(&tbl)
-		tables = append(tables, tbl)
-	}
-	rows.Close()
-
-	for _, tbl := range tables {
-		var createStmt string
-		// 获取约束定义（约束信息是辅助的，失败不影响备份主流程）
-		// 使用 ? 占位符避免表名注入
-		row := db.QueryRow("SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c JOIN pg_class t ON c.conrelid = t.oid WHERE t.relname = $1", tbl)
-		if row != nil {
-			if err := row.Scan(&createStmt); err != nil {
-				sysLogWarn("BACKUP", fmt.Sprintf("获取表 %s 约束失败(可忽略): %v", tbl, err))
-			}
-		}
-		_ = createStmt
-
-		// 获取建表语句（使用 ? 占位符避免表名注入；MySQL/PostgreSQL/SQLite 驱动均支持）
-		var tableDef string
-		err := db.QueryRow(`
-			SELECT 'CREATE TABLE ' || quote_ident($1) || ' (' || string_agg(
-				quote_ident(column_name) || ' ' || data_type ||
-				CASE WHEN character_maximum_length IS NOT NULL THEN '(' || character_maximum_length || ')' ELSE '' END ||
-				CASE WHEN is_nullable = 'NO' THEN ' NOT NULL' ELSE '' END,
-				', ' ORDER BY ordinal_position
-			) || ');'
-			FROM information_schema.columns
-			WHERE table_schema = 'public' AND table_name = $1
-		`, tbl).Scan(&tableDef)
-		if err != nil {
-			continue
-		}
-		sb.WriteString(fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", tbl))
-		sb.WriteString(tableDef + "\n\n")
-
-		// 导出数据
-		dataRows, err := db.Query(fmt.Sprintf("SELECT * FROM %s", tbl))
-		if err != nil {
-			continue
-		}
-		cols, _ := dataRows.Columns()
-		if len(cols) > 0 {
-			vals := make([]interface{}, len(cols))
-			ptrs := make([]interface{}, len(cols))
-			for i := range vals {
-				ptrs[i] = &vals[i]
-			}
-			for dataRows.Next() {
-				dataRows.Scan(ptrs...)
-				var valStrs []string
-				for i, v := range vals {
-					if v == nil {
-						valStrs = append(valStrs, "NULL")
-					} else {
-						s := fmt.Sprintf("%v", v)
-						if _, ok := v.(string); ok || v != nil {
-							// 检查是否是字符串类型
-							switch v.(type) {
-							case string:
-								valStrs = append(valStrs, "'"+strings.ReplaceAll(s, "'", "'''")+"'")
-							case []byte:
-								valStrs = append(valStrs, "'"+strings.ReplaceAll(string(v.([]byte)), "'", "'''")+"'")
-							default:
-								valStrs = append(valStrs, s)
-							}
-						} else {
-							valStrs = append(valStrs, s)
-						}
-					}
-					_ = i
-				}
-				sb.WriteString(fmt.Sprintf("INSERT INTO %s VALUES (%s);\n", tbl, strings.Join(valStrs, ", ")))
-			}
-		}
-		dataRows.Close()
-		sb.WriteString("\n")
-	}
-
-	content := sb.String()
-	fileName := name + ".sql"
-	filePath := filepath.Join(bakDir, fileName)
-	if writeErr := os.WriteFile(filePath, []byte(content), 0644); writeErr != nil {
-		return "", 0, fmt.Errorf("写入备份文件失败: %w", writeErr)
-	}
-	return fileName, int64(len(content)), nil
-}
-
 func doMySQLBackup(server *RemoteServer, dbName string, bakDir string, name string) (string, int64, error) {
 	if dbName == "__ALL__" {
 		// 备份所有库
 		return doMySQLBackupAllDatabases(server, bakDir, name)
 	}
-
+	
 	if mysqldumpPath, err := exec.LookPath("mysqldump"); err == nil {
 		tmpFile, err := os.CreateTemp("", "mysqldump-*.cnf")
 		if err != nil {
@@ -1194,7 +1019,6 @@ func doMySQLBackup(server *RemoteServer, dbName string, bakDir string, name stri
 		}
 		if err != nil {
 			fmt.Printf("mysqldump failed: %s, output: %s\n", err.Error(), string(output))
-			sysLogError("BACKUP", fmt.Sprintf("mysqldump失败 (连接: %s:%d)", server.Host, server.Port))
 		}
 	}
 
@@ -1495,7 +1319,6 @@ func backupRetentionHandler(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]interface{}{"code": 500, "msg": "配置保存失败: " + err.Error()})
 			return
 		}
-		sysLogInfo("BACKUP", fmt.Sprintf("更新备份保留策略: %v天", config["days"]))
 		writeJSON(w, map[string]interface{}{"code": 0, "msg": "配置已保存"})
 	}
 }
@@ -1574,7 +1397,6 @@ func doMySQLBackupAllDatabases(server *RemoteServer, bakDir string, name string)
 		}
 		if err != nil {
 			fmt.Printf("mysqldump (all databases) failed: %s, output: %s\n", err.Error(), string(output))
-			sysLogError("BACKUP", fmt.Sprintf("mysqldump全库备份失败 (连接: %s:%d)", server.Host, server.Port))
 		}
 	}
 
@@ -1584,16 +1406,16 @@ func doMySQLBackupAllDatabases(server *RemoteServer, bakDir string, name string)
 
 	for _, dbName := range userDBs {
 		sb.WriteString(fmt.Sprintf("-- ===== Database: %s =====\n\n", dbName))
-
+		
 		// 切换到该库
 		_, _ = db.Exec(fmt.Sprintf("USE `%s`", escapeBacktick(dbName)))
-
+		
 		// 获取表列表
 		tblRows, err := db.Query("SHOW TABLES")
 		if err != nil {
 			continue
 		}
-
+		
 		var tables []string
 		for tblRows.Next() {
 			var tbl string
@@ -1601,31 +1423,31 @@ func doMySQLBackupAllDatabases(server *RemoteServer, bakDir string, name string)
 			tables = append(tables, tbl)
 		}
 		tblRows.Close()
-
+		
 		for _, tbl := range tables {
 			var tableName, createStmt string
 			if err := db.QueryRow(fmt.Sprintf("SHOW CREATE TABLE `%s`", escapeBacktick(tbl))).Scan(&tableName, &createStmt); err != nil {
 				continue
 			}
 			sb.WriteString(fmt.Sprintf("DROP TABLE IF EXISTS `%s`.`%s`;\n%s;\n\n", escapeBacktick(dbName), escapeBacktick(tbl), createStmt))
-
+			
 			dataRows, err := db.Query(fmt.Sprintf("SELECT * FROM `%s`.`%s`", escapeBacktick(dbName), escapeBacktick(tbl)))
 			if err != nil {
 				continue
 			}
-
+			
 			cols, _ := dataRows.Columns()
 			vals := make([]interface{}, len(cols))
 			valPointers := make([]interface{}, len(cols))
 			for i := range vals {
 				valPointers[i] = &vals[i]
 			}
-
+			
 			for dataRows.Next() {
 				if err := dataRows.Scan(valPointers...); err != nil {
 					continue
 				}
-
+				
 				var valueStrings []string
 				for _, v := range vals {
 					if v == nil {
@@ -1641,7 +1463,7 @@ func doMySQLBackupAllDatabases(server *RemoteServer, bakDir string, name string)
 						}
 					}
 				}
-
+				
 				sb.WriteString(fmt.Sprintf("INSERT INTO `%s`.`%s` VALUES (%s);\n", escapeBacktick(dbName), escapeBacktick(tbl), strings.Join(valueStrings, ", ")))
 			}
 			sb.WriteString("\n")

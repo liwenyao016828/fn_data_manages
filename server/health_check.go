@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -226,7 +225,7 @@ func (s *HealthCheckService) checkAll() {
 				Password:    db.Password,
 				SSL:         db.SSL,
 				Description: db.Description,
-				Disk:        db.Database,
+				Disk:        db.Disk,
 			},
 		})
 	}
@@ -298,15 +297,9 @@ func (s *HealthCheckService) checkOne(uid string, id uint, source string, server
 
 	start := time.Now()
 
-	dbType := strings.ToLower(server.Type)
-	if dbType == "redis" {
+	if strings.ToLower(server.Type) == "redis" {
 		s.checkRedis(server, timeout, status)
-	} else if dbType == "postgresql" {
-		s.checkPostgreSQL(server, timeout, status)
-	} else if dbType == "sqlite" {
-		s.checkSQLite(server, timeout, status)
 	} else {
-		// mysql, mariadb 等 MySQL 协议数据库
 		s.checkMySQL(server, timeout, status)
 	}
 
@@ -378,12 +371,6 @@ func (s *HealthCheckService) checkRedis(server RemoteServer, timeout time.Durati
 	if server.Username != "" && server.Password != "" {
 		resp, err := redisDo(conn, "AUTH", server.Username, server.Password)
 		if err != nil {
-			// MISCONF 错误表示 Redis 在线但持久化有问题，仍视为在线
-			if strings.Contains(err.Error(), "MISCONF") {
-				status.Online = true
-				status.Error = "Redis持久化异常: " + err.Error()
-				return
-			}
 			status.Online = false
 			status.Error = fmt.Sprintf("认证失败: %v", err)
 			return
@@ -396,12 +383,6 @@ func (s *HealthCheckService) checkRedis(server RemoteServer, timeout time.Durati
 	} else if server.Password != "" {
 		resp, err := redisDo(conn, "AUTH", server.Password)
 		if err != nil {
-			// MISCONF 错误表示 Redis 在线但持久化有问题，仍视为在线
-			if strings.Contains(err.Error(), "MISCONF") {
-				status.Online = true
-				status.Error = "Redis持久化异常: " + err.Error()
-				return
-			}
 			status.Online = false
 			status.Error = fmt.Sprintf("认证失败: %v", err)
 			return
@@ -415,12 +396,6 @@ func (s *HealthCheckService) checkRedis(server RemoteServer, timeout time.Durati
 
 	resp, err := redisDo(conn, "PING")
 	if err != nil {
-		// MISCONF 错误表示 Redis 在线但持久化有问题，仍视为在线
-		if strings.Contains(err.Error(), "MISCONF") {
-			status.Online = true
-			status.Error = "Redis持久化异常: " + err.Error()
-			return
-		}
 		status.Online = false
 		status.Error = err.Error()
 		return
@@ -431,101 +406,6 @@ func (s *HealthCheckService) checkRedis(server RemoteServer, timeout time.Durati
 	}
 	status.Online = false
 	status.Error = "unexpected PING response"
-}
-
-func (s *HealthCheckService) checkPostgreSQL(server RemoteServer, timeout time.Duration, status *HealthStatus) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("[health] checkPostgreSQL panic: %v\n", r)
-			status.Online = false
-			status.Error = fmt.Sprintf("panic: %v", r)
-		}
-	}()
-
-	sslmode := "disable"
-	if server.SSL {
-		sslmode = "require"
-	}
-	timeoutSec := int(timeout.Seconds())
-	// 尝试连接指定的数据库，如果没有则回退到 postgres 默认库
-	dbName := server.Disk
-	if dbName == "" {
-		dbName = "postgres"
-	}
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&connect_timeout=%d",
-		url.QueryEscape(server.Username), url.QueryEscape(server.Password),
-		server.Host, server.Port, dbName, sslmode, timeoutSec)
-
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		status.Online = false
-		status.Error = err.Error()
-		return
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		// 如果指定数据库连接失败，尝试连接默认的 postgres 库
-		if dbName != "postgres" {
-			dsn2 := fmt.Sprintf("postgres://%s:%s@%s:%d/postgres?sslmode=%s&connect_timeout=%d",
-				url.QueryEscape(server.Username), url.QueryEscape(server.Password),
-				server.Host, server.Port, sslmode, timeoutSec)
-			db2, err2 := sql.Open("postgres", dsn2)
-			if err2 == nil {
-				defer db2.Close()
-				if db2.Ping() == nil {
-					status.Online = true
-					return
-				}
-			}
-		}
-		status.Online = false
-		status.Error = err.Error()
-		return
-	}
-	status.Online = true
-}
-
-func (s *HealthCheckService) checkSQLite(server RemoteServer, timeout time.Duration, status *HealthStatus) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("[health] checkSQLite panic: %v\n", r)
-			status.Online = false
-			status.Error = fmt.Sprintf("panic: %v", r)
-		}
-	}()
-
-	dbPath := server.Host
-	if dbPath == "" {
-		status.Online = false
-		status.Error = "未指定数据库文件路径"
-		return
-	}
-
-	// 检查文件是否存在
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		status.Online = false
-		status.Error = "数据库文件不存在"
-		return
-	}
-
-	dsn := fmt.Sprintf("file:%s?mode=ro", dbPath)
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		status.Online = false
-		status.Error = err.Error()
-		return
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		status.Online = false
-		status.Error = err.Error()
-		return
-	}
-	status.Online = true
 }
 
 func (s *HealthCheckService) setStatus(uid string, status *HealthStatus) {

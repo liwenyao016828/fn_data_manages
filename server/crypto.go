@@ -3,48 +3,74 @@ package main
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"strings"
+	"os"
+	"regexp"
 )
 
-// legacyDecryptKey 旧版本默认密钥，仅用于把存量密文回写为明文。
-// 内网环境不引入新加密，但需要保留解密能力做一次性迁移。
-const legacyDecryptKey = "dm-key-2026-secure"
+const encryptionPassphrase = "dm-key-2026-secure"
 
-// decryptPassword 兼容旧版本加密格式的密码解密。
-// 新数据以明文存储（内网环境），老数据若带 enc:v1: 前缀则用 legacy key 解密。
-// 解密失败或明文输入都原样返回，保证存量数据不丢。
-func decryptPassword(s string) string {
-	if s == "" {
+var encryptionKey []byte
+
+func initCrypto() {
+	passphrase := os.Getenv("DM_ENCRYPT_KEY")
+	if passphrase == "" {
+		passphrase = "dm-key-2026-secure"
+	}
+	h := sha256.Sum256([]byte(passphrase))
+	encryptionKey = h[:]
+}
+
+func encryptPassword(plaintext string) string {
+	if plaintext == "" {
 		return ""
 	}
-	if !strings.HasPrefix(s, "enc:v1:") {
-		// 已经是明文
-		return s
+	block, _ := aes.NewCipher(encryptionKey)
+	aesGCM, _ := cipher.NewGCM(block)
+	nonce := make([]byte, aesGCM.NonceSize())
+	rand.Read(nonce)
+	ciphertext := aesGCM.Seal(nonce, nonce, []byte(plaintext), nil)
+	return base64.StdEncoding.EncodeToString(ciphertext)
+}
+
+func decryptPassword(encoded string) string {
+	if encoded == "" {
+		return ""
 	}
-	ct := strings.TrimPrefix(s, "enc:v1:")
-	raw, err := base64.StdEncoding.DecodeString(ct)
+	ciphertext, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		return s
+		return encoded
 	}
-	h := sha256.Sum256([]byte(legacyDecryptKey))
-	block, err := aes.NewCipher(h[:])
+	block, _ := aes.NewCipher(encryptionKey)
+	aesGCM, _ := cipher.NewGCM(block)
+	nonceSize := aesGCM.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return encoded
+	}
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return s
+		return encoded
 	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return s
+	return string(plaintext)
+}
+
+func isPasswordEncrypted(s string) bool {
+	if s == "" {
+		return false
 	}
-	ns := gcm.NonceSize()
-	if len(raw) < ns {
-		return s
+	if _, err := base64.StdEncoding.DecodeString(s); err != nil {
+		return false
 	}
-	nonce, body := raw[:ns], raw[ns:]
-	pt, err := gcm.Open(nil, nonce, body, nil)
-	if err != nil {
-		return s
+	return len(s) > 32
+}
+
+func validateIdentity(s string) string {
+	matched, _ := regexp.MatchString(`^[a-zA-Z0-9_\-\.]+$`, s)
+	if !matched {
+		return ""
 	}
-	return string(pt)
+	return s
 }

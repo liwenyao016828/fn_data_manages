@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os/exec"
 	"strings"
 )
 
@@ -92,36 +93,37 @@ type dockerPortInfo struct {
 
 func getDockerPortMapping() map[string]dockerPortInfo {
 	result := make(map[string]dockerPortInfo)
-	if !isDockerAvailable() {
+
+	dockerPath, err := exec.LookPath("docker")
+	if err != nil {
 		return result
 	}
 
-	var list []struct {
-		Names []string `json:"Names"`
-		Ports []struct {
-			PrivatePort int `json:"PrivatePort"`
-			PublicPort  int `json:"PublicPort"`
-		} `json:"Ports"`
-	}
-	if _, err := dockerUnixSocketGetJSON("/containers/json?all=0&size=0", &list); err != nil {
+	cmd := exec.Command(dockerPath, "ps", "--format", "{{.Names}}\t{{.Ports}}")
+	out, err := cmd.Output()
+	if err != nil {
 		return result
 	}
 
-	for _, c := range list {
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		name := parts[0]
+		ports := parts[1]
+
 		info := dockerPortInfo{}
-		for _, p := range c.Ports {
-			switch p.PrivatePort {
-			case 3306, 3307, 3308, 3309, 3310, 3316:
-				info.MysqlPort = p.PublicPort
-			case 6379, 6380, 6381:
-				info.RedisPort = p.PublicPort
-			}
+		mysqlPort := extractHostPort(ports, "mysql")
+		redisPort := extractHostPort(ports, "redis")
+		if mysqlPort > 0 {
+			info.MysqlPort = mysqlPort
+		}
+		if redisPort > 0 {
+			info.RedisPort = redisPort
 		}
 		if info.MysqlPort > 0 || info.RedisPort > 0 {
-			name := ""
-			if len(c.Names) > 0 {
-				name = strings.TrimPrefix(c.Names[0], "/")
-			}
 			result[name] = info
 		}
 	}
@@ -135,8 +137,7 @@ func detectMySQLPort(host, username, password string, knownPort int) int {
 		if port == knownPort {
 			continue
 		}
-		ver, _ := testMySQLConnection(host, port, username, password)
-		if ver != "" {
+		if testMySQLConnection(host, port, username, password) != "" {
 			return port
 		}
 	}
@@ -149,8 +150,7 @@ func detectRedisPort(host, password string, knownPort int) int {
 		if port == knownPort {
 			continue
 		}
-		ok, _ := testRedisConnection(host, port, "", password)
-		if ok {
+		if testRedisConnection(host, port, "", password) {
 			return port
 		}
 	}
