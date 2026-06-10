@@ -1,13 +1,12 @@
 package main
 
 import (
-	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
 	"github.com/sirupsen/logrus"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/example/db-manager/core/app/model"
@@ -61,7 +60,19 @@ func main() {
 
 	router.RegisterRoutes(r)
 
-	distPath := filepath.Join(".", "frontend", "dist")
+	execPath, _ := os.Executable()
+	execDir := filepath.Dir(execPath)
+
+	distPath := filepath.Join(execDir, "frontend", "dist")
+	if _, err := os.Stat(distPath); os.IsNotExist(err) {
+		distPath = filepath.Join(execDir, "ui", "dist")
+	}
+	if _, err := os.Stat(distPath); os.IsNotExist(err) {
+		distPath = filepath.Join(".", "frontend", "dist")
+	}
+
+	logger.Infof("Serving frontend from: %s", distPath)
+
 	r.NoRoute(func(c *gin.Context) {
 		path := filepath.Join(distPath, filepath.Clean(c.Request.URL.Path))
 		if fi, err := os.Stat(path); err == nil && !fi.IsDir() {

@@ -18,7 +18,7 @@ export const TableHeader = defineComponent({
   name: 'TableHeader',
   props: { class: { type: String, default: '' } },
   setup(props, { slots }) {
-    return () => h('thead', { class: cn('[&_tr]:border-b', props.class) }, slots)
+    return () => h('thead', { class: cn('[&_tr]:border-b border-border-subtle', props.class) }, slots)
   },
 })
 
@@ -35,7 +35,7 @@ export const TableFooter = defineComponent({
   props: { class: { type: String, default: '' } },
   setup(props, { slots }) {
     return () => h('tfoot', {
-      class: cn('border-t bg-[#F5F5F5] font-medium [&>tr]:last:border-b-0', props.class),
+      class: cn('border-t border-border-subtle bg-muted/50 font-medium [&>tr]:last:border-b-0', props.class),
     }, slots)
   },
 })
@@ -45,7 +45,7 @@ export const TableRow = defineComponent({
   props: { class: { type: String, default: '' } },
   setup(props, { slots }) {
     return () => h('tr', {
-      class: cn('border-b transition-colors hover:bg-[#FAFAFA] data-[state=selected]:bg-[#F5F5F5]', props.class),
+      class: cn('border-b border-border-subtle transition-colors hover:bg-accent/5 data-[state=selected]:bg-accent/10', props.class),
     }, slots)
   },
 })
@@ -56,7 +56,7 @@ export const TableHead = defineComponent({
   setup(props, { slots }) {
     return () => h('th', {
       class: cn(
-        'h-10 px-2 text-left align-middle font-medium text-[#8C8C8C] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-0.5',
+        'h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs uppercase tracking-wider [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-0.5',
         props.class,
       ),
     }, slots)
@@ -69,7 +69,7 @@ export const TableCell = defineComponent({
   setup(props, { slots }) {
     return () => h('td', {
       class: cn(
-        'p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-0.5',
+        'p-3 align-middle text-sm [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-0.5',
         props.class,
       ),
     }, slots)
@@ -83,6 +83,24 @@ export const TableCaption = defineComponent({
     return () => h('caption', {
       class: cn('mt-4 text-sm text-muted-foreground', props.class),
     }, slots)
+  },
+})
+
+export const TableEmpty = defineComponent({
+  name: 'TableEmpty',
+  props: {
+    colspan: { type: Number, default: 99 },
+    class: { type: String, default: '' },
+  },
+  setup(props, { slots }) {
+    return () => h('tr', { class: cn('hover:bg-transparent', props.class) }, [
+      h('td', {
+        colspan: props.colspan,
+        class: 'py-12 text-center text-muted-foreground',
+      }, [
+        h('div', { class: 'flex flex-col items-center justify-center' }, slots.default?.()),
+      ]),
+    ])
   },
 })
 </script>

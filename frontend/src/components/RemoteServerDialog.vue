@@ -7,91 +7,127 @@
 
       <div class="flex flex-col gap-4">
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">名称 <span class="text-destructive">*</span></label>
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">名称 <span style="color: var(--danger)">*</span></label>
           <Input v-model="form.name" placeholder="服务器名称" />
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">类型 <span class="text-destructive">*</span></label>
-          <div class="flex gap-1">
-            <Button
-              :variant="form.type === 'mysql' ? 'default' : 'outline'"
-              size="sm"
-              @click="onTypeChange('mysql')"
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">类型 <span style="color: var(--danger)">*</span></label>
+          <div class="flex gap-1 flex-wrap">
+            <button
+              v-for="t in [
+                { key: 'mysql', label: 'MySQL' },
+                { key: 'mariadb', label: 'MariaDB' },
+                { key: 'postgresql', label: 'PostgreSQL' },
+                { key: 'redis', label: 'Redis' },
+                { key: 'sqlite', label: 'SQLite' },
+              ]"
+              :key="t.key"
+              type="button"
+              class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+              :class="form.type === t.key ? 'tab-active' : 'tab-inactive'"
+              @click="onTypeChange(t.key)"
             >
-              MySQL
-            </Button>
-            <Button
-              :variant="form.type === 'mariadb' ? 'default' : 'outline'"
-              size="sm"
-              @click="onTypeChange('mariadb')"
-            >
-              MariaDB
-            </Button>
-            <Button
-              :variant="form.type === 'redis' ? 'default' : 'outline'"
-              size="sm"
-              @click="onTypeChange('redis')"
-            >
-              Redis
-            </Button>
+              {{ t.label }}
+            </button>
           </div>
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">数据库版本 <span class="text-destructive">*</span></label>
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">数据库版本 <span style="color: var(--danger)">*</span></label>
           <div class="flex gap-1">
             <template v-if="form.type === 'mysql' || form.type === 'mariadb'">
-              <Button
-                :variant="form.version === '8.x' ? 'default' : 'outline'"
-                size="sm"
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '8.x' ? 'tab-active' : 'tab-inactive'"
                 @click="form.version = '8.x'"
               >
                 8.x
-              </Button>
-              <Button
-                :variant="form.version === '5.7' ? 'default' : 'outline'"
-                size="sm"
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '5.7' ? 'tab-active' : 'tab-inactive'"
                 @click="form.version = '5.7'"
               >
                 5.7
-              </Button>
-              <Button
-                :variant="form.version === '5.6' ? 'default' : 'outline'"
-                size="sm"
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '5.6' ? 'tab-active' : 'tab-inactive'"
                 @click="form.version = '5.6'"
               >
                 5.6
-              </Button>
+              </button>
+            </template>
+            <template v-if="form.type === 'postgresql'">
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '16.x' ? 'tab-active' : 'tab-inactive'"
+                @click="form.version = '16.x'"
+              >
+                16.x
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '15.x' ? 'tab-active' : 'tab-inactive'"
+                @click="form.version = '15.x'"
+              >
+                15.x
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '14.x' ? 'tab-active' : 'tab-inactive'"
+                @click="form.version = '14.x'"
+              >
+                14.x
+              </button>
             </template>
             <template v-if="form.type === 'redis'">
-              <Button
-                :variant="form.version === '7.x' ? 'default' : 'outline'"
-                size="sm"
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '7.x' ? 'tab-active' : 'tab-inactive'"
                 @click="form.version = '7.x'"
               >
                 7.x
-              </Button>
-              <Button
-                :variant="form.version === '6.x' ? 'default' : 'outline'"
-                size="sm"
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '6.x' ? 'tab-active' : 'tab-inactive'"
                 @click="form.version = '6.x'"
               >
                 6.x
-              </Button>
+              </button>
+            </template>
+            <template v-if="form.type === 'sqlite'">
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 h-8 text-[12px] font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                :class="form.version === '3.x' ? 'tab-active' : 'tab-inactive'"
+                @click="form.version = '3.x'"
+              >
+                3.x
+              </button>
             </template>
           </div>
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">数据库地址 <span class="text-destructive">*</span></label>
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">数据库地址 <span style="color: var(--danger)">*</span></label>
           <div class="flex gap-2">
             <Input v-model="form.host" placeholder="请输入数据库地址" class="flex-1" />
             <Tooltip>
               <TooltipTrigger as-child>
-                <Button variant="ghost" size="icon" @click="form.host = '127.0.0.1'">
+                <button class="btn-ghost h-8 w-8 p-0 flex items-center justify-center" @click="form.host = '127.0.0.1'">
                   <Monitor class="h-4 w-4" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent>使用当前服务器地址</TooltipContent>
             </Tooltip>
@@ -99,49 +135,49 @@
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">端口 <span class="text-destructive">*</span></label>
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">端口 <span style="color: var(--danger)">*</span></label>
           <Input v-model.number="form.port" type="number" placeholder="3306" />
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">用户名 <span class="text-destructive">*</span></label>
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">用户名 <span style="color: var(--danger)">*</span></label>
           <Input v-model="form.username" placeholder="root" />
-          <p class="text-xs text-muted-foreground">root 用户或者拥有 root 权限的数据库用户</p>
+          <p class="text-[11px]" style="color: var(--text-tertiary)">root 用户或者拥有 root 权限的数据库用户</p>
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">密码</label>
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">密码</label>
           <div class="flex gap-2">
             <Input v-model="form.password" :type="showPwd ? 'text' : 'password'" placeholder="请输入密码" class="flex-1" />
-            <Button variant="outline" size="icon" @click="showPwd = !showPwd">
+            <button class="btn-secondary h-8 w-8 p-0 flex items-center justify-center" @click="showPwd = !showPwd">
               <Eye v-if="!showPwd" class="h-4 w-4" />
               <EyeOff v-else class="h-4 w-4" />
-            </Button>
+            </button>
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2.5">
           <Switch :checked="form.ssl" @update:checked="form.ssl = $event" />
-          <label class="text-sm font-medium">使用 SSL</label>
+          <label class="text-[12px] font-medium" style="color: var(--text-primary)">使用 SSL</label>
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium">描述信息</label>
+          <label class="text-[12px] font-medium" style="color: var(--text-secondary)">描述信息</label>
           <Textarea v-model="form.description" placeholder="可选" :rows="2" />
         </div>
       </div>
 
-      <DialogFooter>
-        <Button variant="outline" @click="handleCancel">取消</Button>
-        <Button variant="outline" @click="handleTest" :disabled="testing">
+      <div class="flex justify-end gap-2 mt-4">
+        <button class="btn-ghost" @click="handleCancel">取消</button>
+        <button class="btn-secondary" @click="handleTest" :disabled="testing">
           <Loader2 v-if="testing" class="h-4 w-4 animate-spin" />
           连接测试
-        </Button>
-        <Button @click="handleSubmit" :disabled="loading">
+        </button>
+        <button class="btn-primary" @click="handleSubmit" :disabled="loading">
           <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />
           确认
-        </Button>
-      </DialogFooter>
+        </button>
+      </div>
     </DialogContent>
   </Dialog>
 </template>
@@ -191,6 +227,12 @@ const onTypeChange = (type) => {
   form.type = type
   if (type === 'redis') {
     form.port = 6379
+    form.version = ''
+  } else if (type === 'postgresql') {
+    form.port = 5432
+    form.version = ''
+  } else if (type === 'sqlite') {
+    form.port = 0
     form.version = ''
   } else {
     form.port = 23366

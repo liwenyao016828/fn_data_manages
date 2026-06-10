@@ -90,6 +90,8 @@ func restoreSystemBackupJSON(content string) error {
 			return fmt.Errorf("恢复 %s 失败: %w", filename, err)
 		}
 	}
+	loadData()
+	sysLogInfo("BACKUP", "系统配置恢复成功，已重新加载配置")
 	return nil
 }
 
@@ -121,6 +123,8 @@ func restoreSystemBackupLegacy(content string) error {
 			return fmt.Errorf("恢复 %s 失败: %w", filename, err)
 		}
 	}
+	loadData()
+	sysLogInfo("BACKUP", "系统配置恢复成功，已重新加载配置")
 	return nil
 }
 
@@ -148,23 +152,25 @@ func listScheduledBackups(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr != "" {
 		id, _ := strconv.ParseUint(idStr, 10, 32)
-		mutex.Lock()
+		// #7 backupMu.RLock 替代全局 mutex
+		backupMu.RLock()
 		for _, s := range scheduledBackups {
 			if s.ID == uint(id) {
-				mutex.Unlock()
-				writeJSON(w, map[string]interface{}{"code": 0, "data": s})
+				copy := s
+				backupMu.RUnlock()
+				writeJSON(w, map[string]interface{}{"code": 0, "data": copy})
 				return
 			}
 		}
-		mutex.Unlock()
+		backupMu.RUnlock()
 		writeJSON(w, map[string]interface{}{"code": 404, "msg": "not found"})
 		return
 	}
 
-	mutex.Lock()
+	backupMu.RLock()
 	result := make([]ScheduledBackup, len(scheduledBackups))
 	copy(result, scheduledBackups)
-	mutex.Unlock()
+	backupMu.RUnlock()
 
 	writeJSON(w, map[string]interface{}{"code": 0, "data": result})
 }
@@ -178,9 +184,12 @@ func createScheduledBackup(w http.ResponseWriter, r *http.Request) {
 
 	idFromReq := getUint(req, "id")
 	if idFromReq > 0 {
-		mutex.Lock()
-		for i, s := range scheduledBackups {
-			if s.ID == idFromReq {
+		// #7 backupMu 替代全局 mutex
+		backupMu.Lock()
+		updated := false
+		var scheduleName string
+		for i := range scheduledBackups {
+			if scheduledBackups[i].ID == idFromReq {
 				if name, ok := req["name"].(string); ok && name != "" {
 					scheduledBackups[i].Name = name
 				}
@@ -196,14 +205,19 @@ func createScheduledBackup(w http.ResponseWriter, r *http.Request) {
 				if rc, ok := req["retainCount"].(float64); ok {
 					scheduledBackups[i].RetainCount = int(rc)
 				}
-				mutex.Unlock()
-				saveData()
-				writeJSON(w, map[string]interface{}{"code": 0, "msg": "updated"})
-				return
+				scheduleName = scheduledBackups[i].Name
+				updated = true
+				break
 			}
 		}
-		mutex.Unlock()
-		writeJSON(w, map[string]interface{}{"code": 404, "msg": "not found"})
+		backupMu.Unlock()
+		if !updated {
+			writeJSON(w, map[string]interface{}{"code": 404, "msg": "not found"})
+			return
+		}
+		saveData()
+		sysLogInfo("BACKUP", fmt.Sprintf("更新定时备份计划: %s", scheduleName))
+		writeJSON(w, map[string]interface{}{"code": 0, "msg": "updated"})
 		return
 	}
 
@@ -213,7 +227,6 @@ func createScheduledBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s := ScheduledBackup{
-		ID:          nextSchedID,
 		Name:        name,
 		BackupLevel: getString(req, "backupLevel"),
 		ServerID:    getUint(req, "serverId"),
@@ -238,12 +251,17 @@ func createScheduledBackup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	mutex.Lock()
+	// #7 idMu + backupMu 替代全局 mutex
+	idMu.Lock()
+	s.ID = nextSchedID
 	nextSchedID++
+	idMu.Unlock()
+	backupMu.Lock()
 	scheduledBackups = append(scheduledBackups, s)
-	mutex.Unlock()
+	backupMu.Unlock()
 
 	saveData()
+	sysLogInfo("BACKUP", fmt.Sprintf("创建定时备份计划: %s (%s, %s)", s.Name, s.Cron, s.BackupLevel))
 	writeJSON(w, map[string]interface{}{"code": 0, "msg": "success", "data": s})
 }
 
@@ -254,22 +272,31 @@ func deleteScheduledBackup(w http.ResponseWriter, r *http.Request, idStr string)
 		return
 	}
 
-	mutex.Lock()
-	for i, s := range scheduledBackups {
-		if s.ID == uint(id) {
+	// #7 backupMu 替代全局 mutex
+	backupMu.Lock()
+	deleted := false
+	var deletedName string
+	for i := range scheduledBackups {
+		if scheduledBackups[i].ID == uint(id) {
+			deletedName = scheduledBackups[i].Name
 			scheduledBackups = append(scheduledBackups[:i], scheduledBackups[i+1:]...)
-			mutex.Unlock()
-			saveData()
-			writeJSON(w, map[string]interface{}{"code": 0, "msg": "deleted"})
-			return
+			deleted = true
+			break
 		}
 	}
-	mutex.Unlock()
-	writeJSON(w, map[string]interface{}{"code": 404, "msg": "not found"})
+	backupMu.Unlock()
+	if !deleted {
+		writeJSON(w, map[string]interface{}{"code": 404, "msg": "not found"})
+		return
+	}
+	saveData()
+	sysLogInfo("BACKUP", fmt.Sprintf("删除定时备份计划: %s", deletedName))
+	writeJSON(w, map[string]interface{}{"code": 0, "msg": "deleted"})
 }
 
 func checkScheduledBackups() {
-	mutex.Lock()
+	// #7 backupMu 替代全局 mutex
+	backupMu.RLock()
 	now := time.Now()
 	var toRun []ScheduledBackup
 	for _, s := range scheduledBackups {
@@ -278,7 +305,7 @@ func checkScheduledBackups() {
 		}
 		toRun = append(toRun, s)
 	}
-	mutex.Unlock()
+	backupMu.RUnlock()
 
 	for _, s := range toRun {
 		lastRun, _ := time.Parse("2006-01-02 15:04:05", s.LastRun)
@@ -308,12 +335,23 @@ func parseSchedule(cron string) time.Duration {
 }
 
 func runScheduledBackup(s ScheduledBackup) {
-	fmt.Printf("runScheduledBackup called: Name=%s, ID=%d, BackupLevel=%s, ServerID=%d, Source=%s, Database=%s\n", 
-		s.Name, s.ID, s.BackupLevel, s.ServerID, s.Source, s.Database)
+	sysLogInfo("BACKUP", fmt.Sprintf("执行定时备份: %s", s.Name))
 	name := fmt.Sprintf("auto_%s_%s", s.Name, time.Now().Format("20060102_150405"))
 	bakDir := getDataDir() + "/backups"
-	fmt.Printf("Backup directory: %s\n", bakDir)
 	os.MkdirAll(bakDir, 0755)
+
+	// 标记开始：先短暂拿锁，更新 LastRun 提示"正在运行"
+	// #7 使用 backupMu 而非全局 mutex
+	backupMu.Lock()
+	for i := range scheduledBackups {
+		if scheduledBackups[i].ID == s.ID {
+			scheduledBackups[i].LastRun = time.Now().Format("2006-01-02 15:04:05")
+			break
+		}
+	}
+	backupMu.Unlock()
+	// #9 释放锁后执行长时间备份操作（exec.Command / 文件 I/O），
+	// 避免阻塞其它 goroutine 访问 backups/scheduledBackups
 
 	var content string
 	fileName := name + ".json"
@@ -326,6 +364,7 @@ func runScheduledBackup(s ScheduledBackup) {
 		server := findRedisServer(s.ServerID, s.Source)
 		if server != nil {
 			if server.Host != "127.0.0.1" && server.Host != "localhost" {
+				sysLogWarn("BACKUP", "定时备份Redis远程实例不支持RDB备份")
 				content = fmt.Sprintf("-- Redis Auto Backup FAILED: remote Redis not supported\n")
 				fileName = name + ".rdb"
 			} else {
@@ -335,17 +374,20 @@ func runScheduledBackup(s ScheduledBackup) {
 					conn.Close()
 					rdbFileName, rdbErr := doRedisRdbCopy(server, name, bakDir)
 					if rdbErr != nil {
+						sysLogError("BACKUP", fmt.Sprintf("定时备份Redis RDB复制失败 (连接: %s:%d)", server.Host, server.Port))
 						content = fmt.Sprintf("-- Redis Auto Backup FAILED: %s\n", rdbErr.Error())
 						fileName = name + ".rdb"
 					} else {
 						fileName = rdbFileName
 					}
 				} else {
+					sysLogError("BACKUP", fmt.Sprintf("定时备份Redis连接失败 (连接: %s:%d)", server.Host, server.Port))
 					content = fmt.Sprintf("-- Redis Auto Backup FAILED: %s\n", err.Error())
 					fileName = name + ".rdb"
 				}
 			}
 		} else {
+			sysLogWarn("BACKUP", fmt.Sprintf("定时备份Redis服务器未找到: ID=%d", s.ServerID))
 			content = fmt.Sprintf("-- Redis Auto Backup FAILED: server not found\n")
 			fileName = name + ".rdb"
 		}
@@ -356,11 +398,13 @@ func runScheduledBackup(s ScheduledBackup) {
 			var err error
 			fileName, fileSize, err = doMySQLBackup(server, s.Database, bakDir, name)
 			if err != nil {
+				sysLogError("BACKUP", fmt.Sprintf("定时备份MySQL失败 (连接: %s:%d)", server.Host, server.Port))
 				content = fmt.Sprintf("-- MySQL Auto Backup FAILED: %s\n-- Error: %s\n", s.Name, err.Error())
 				fileName = name + ".sql"
 			}
 			_ = fileSize
 		} else {
+			sysLogWarn("BACKUP", fmt.Sprintf("定时备份MySQL服务器未找到: ID=%d", s.ServerID))
 			content = fmt.Sprintf("-- MySQL Auto Backup FAILED: server not found\n")
 			fileName = name + ".sql"
 		}
@@ -397,17 +441,16 @@ func runScheduledBackup(s ScheduledBackup) {
 	}
 	normalizeBackup(&newBak)
 
-	mutex.Lock()
+	// #7 使用 backupMu + idMu 而非全局 mutex
+	idMu.Lock()
+	assignedID := nextBackupID
 	nextBackupID++
+	idMu.Unlock()
+	newBak.ID = assignedID
+	backupMu.Lock()
 	backups = append(backups, newBak)
 
-	for i := range scheduledBackups {
-		if scheduledBackups[i].ID == s.ID {
-			scheduledBackups[i].LastRun = time.Now().Format("2006-01-02 15:04:05")
-			break
-		}
-	}
-
+	var toDeletePaths []string
 	if s.RetainCount > 0 {
 		count := 0
 		for _, b := range backups {
@@ -415,13 +458,13 @@ func runScheduledBackup(s ScheduledBackup) {
 				count++
 			}
 		}
-		toDelete := count - s.RetainCount
-		if toDelete > 0 {
+		overage := count - s.RetainCount
+		if overage > 0 {
 			deleted := 0
 			newBackups := make([]Backup, 0, len(backups))
 			for _, b := range backups {
-				if b.Database == s.Database && b.BackupType == "scheduled" && b.ServerID == s.ServerID && b.BackupLevel == s.BackupLevel && deleted < toDelete {
-					os.Remove(filepath.Join(bakDir, b.FileName))
+				if b.Database == s.Database && b.BackupType == "scheduled" && b.ServerID == s.ServerID && b.BackupLevel == s.BackupLevel && deleted < overage {
+					toDeletePaths = append(toDeletePaths, filepath.Join(bakDir, b.FileName))
 					deleted++
 					continue
 				}
@@ -430,7 +473,12 @@ func runScheduledBackup(s ScheduledBackup) {
 			backups = newBackups
 		}
 	}
-	mutex.Unlock()
+	backupMu.Unlock()
+
+	// 锁外执行文件删除与持久化
+	for _, p := range toDeletePaths {
+		_ = os.Remove(p)
+	}
 	saveData()
 }
 
@@ -478,6 +526,7 @@ func runScheduledBackupHandler(w http.ResponseWriter, r *http.Request) {
 
 	go runScheduledBackup(*target)
 
+	sysLogInfo("BACKUP", fmt.Sprintf("手动执行定时备份: %s", target.Name))
 	writeJSON(w, map[string]interface{}{"code": 0, "msg": "已开始执行备份"})
 }
 
@@ -520,25 +569,30 @@ func cleanupExpiredBackups() {
 
 	cutoff := time.Now().AddDate(0, 0, -days)
 
-	mutex.Lock()
+	// #7 backupMu 替代全局 mutex；文件删除延后到锁外
+	backupMu.Lock()
 	bakDir := dataDir + "/backups"
 	var remaining []Backup
 	deleted := 0
+	var toDeletePaths []string
 	for _, b := range backups {
 		createdAt, err := time.Parse("2006-01-02 15:04:05", b.CreatedAt)
 		if err != nil || createdAt.After(cutoff) {
 			remaining = append(remaining, b)
 			continue
 		}
-		os.Remove(filepath.Join(bakDir, b.FileName))
+		toDeletePaths = append(toDeletePaths, filepath.Join(bakDir, b.FileName))
 		deleted++
 	}
 	if deleted > 0 {
 		backups = remaining
-		mutex.Unlock()
+		backupMu.Unlock()
+		for _, p := range toDeletePaths {
+			_ = os.Remove(p)
+		}
 		saveData()
 		sysLogInfo("BACKUP", fmt.Sprintf("清理了 %d 个过期备份（保留天数: %d）", deleted, days))
 	} else {
-		mutex.Unlock()
+		backupMu.Unlock()
 	}
 }

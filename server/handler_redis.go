@@ -168,6 +168,7 @@ func redisKeysHandler(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := openRedis(server)
 	if err != nil {
+		sysLogError("REDIS", fmt.Sprintf("Redis命令执行连接失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + err.Error()})
 		return
 	}
@@ -477,6 +478,7 @@ func redisExecuteHandler(w http.ResponseWriter, r *http.Request) {
 
 	result, err := redisDo(conn, args...)
 	if err != nil {
+		sysLogWarn("REDIS", fmt.Sprintf("Redis命令执行失败: %s (连接: %s:%d)", cmd, server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "命令执行失败: " + err.Error()})
 		return
 	}
@@ -515,6 +517,7 @@ func redisConfigHandler(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := openRedis(server)
 	if err != nil {
+		sysLogError("REDIS", fmt.Sprintf("Redis配置连接失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + err.Error()})
 		return
 	}
@@ -526,6 +529,7 @@ func redisConfigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		resp, err := redisDo(conn, "CONFIG", "GET", param)
 		if err != nil {
+			sysLogWarn("REDIS", fmt.Sprintf("Redis配置获取失败 (连接: %s:%d)", server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "获取配置失败: " + err.Error()})
 			return
 		}
@@ -535,10 +539,17 @@ func redisConfigHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		result := make(map[string]string)
+		sensitiveKeys := map[string]bool{
+			"requirepass": true, "masterauth": true, "requirepass-file": true,
+		}
 		for i := 0; i+1 < len(arr); i += 2 {
 			key, _ := arr[i].(string)
 			val, _ := arr[i+1].(string)
-			result[key] = val
+			if sensitiveKeys[key] && val != "" {
+				result[key] = "******"
+			} else {
+				result[key] = val
+			}
 		}
 		writeJSON(w, map[string]interface{}{"code": 0, "data": result})
 	} else if r.Method == "PUT" {
@@ -550,11 +561,24 @@ func redisConfigHandler(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]interface{}{"code": 400, "msg": err.Error()})
 			return
 		}
+		// 安全检查：限制可修改的配置参数
+		dangerousParams := map[string]bool{
+			"dir": true, "dbfilename": true, "appendfilename": true,
+			"requirepass": true, "masterauth": true,
+			"slave-read-only": true, "replica-read-only": true,
+		}
+		paramLower := strings.ToLower(req.Param)
+		if dangerousParams[paramLower] {
+			writeJSON(w, map[string]interface{}{"code": 403, "msg": "不允许修改该配置参数: " + req.Param})
+			return
+		}
 		_, err := redisDo(conn, "CONFIG", "SET", req.Param, req.Value)
 		if err != nil {
+			sysLogError("REDIS", fmt.Sprintf("Redis配置修改失败: %s = %s (连接: %s:%d)", req.Param, req.Value, server.Host, server.Port))
 			writeJSON(w, map[string]interface{}{"code": 1, "msg": "设置配置失败: " + err.Error()})
 			return
 		}
+		sysLogInfo("REDIS", fmt.Sprintf("修改Redis配置: %s = %s (连接: %s:%d)", req.Param, req.Value, server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 0, "msg": "配置已更新"})
 	}
 }
@@ -624,10 +648,11 @@ func redisLogsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := os.ReadFile(logPath)
-	if err != nil {
+	containerName := findContainerName(uint(id), source)
+	data, readErr := readLocalOrContainerFile(containerName, logPath, server.Host, server.Port)
+	if readErr != nil {
 		writeJSON(w, map[string]interface{}{"code": 0, "data": []map[string]string{
-			{"time": time.Now().Format("2006-01-02 15:04:05"), "level": "Note", "message": "无法读取日志文件: " + err.Error()},
+			{"time": time.Now().Format("2006-01-02 15:04:05"), "level": "Note", "message": "无法读取日志文件: " + readErr.Error()},
 		}})
 		return
 	}
@@ -677,6 +702,11 @@ func redisLogsHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	maxLogLines := 500
+	if len(logs) > maxLogLines {
+		logs = logs[len(logs)-maxLogLines:]
+	}
+
 	if len(logs) == 0 {
 		logs = append(logs, map[string]string{
 			"time":    time.Now().Format("2006-01-02 15:04:05"),
@@ -710,6 +740,7 @@ func systemLogsClearHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sysLogInfo("SYSTEM", "清空系统日志")
 	writeJSON(w, map[string]interface{}{"code": 0, "msg": "日志已清空"})
 }
 
@@ -742,13 +773,34 @@ func systemLogWriteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	level := req.Level
-	if level == "" {
-		level = "info"
+	if len(req.Message) > 500 {
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": "消息长度不能超过500字符"})
+		return
+	}
+
+	allowedSources := map[string]bool{
+		"SYSTEM": true, "USER": true, "CONNECTION": true,
+		"HEALTH": true, "BACKUP": true, "MYSQL": true, "REDIS": true,
 	}
 	source := req.Source
 	if source == "" {
 		source = "USER"
+	}
+	if !allowedSources[source] {
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": "无效的source值"})
+		return
+	}
+
+	allowedLevels := map[string]bool{
+		"info": true, "warning": true, "error": true,
+	}
+	level := req.Level
+	if level == "" {
+		level = "info"
+	}
+	if !allowedLevels[level] {
+		writeJSON(w, map[string]interface{}{"code": 400, "msg": "无效的level值"})
+		return
 	}
 
 	sysLog(level, source, req.Message)
@@ -835,6 +887,7 @@ func redisBackupHandler(w http.ResponseWriter, r *http.Request) {
 
 	conn, connErr := openRedis(server)
 	if connErr != nil {
+		sysLogError("REDIS", fmt.Sprintf("Redis备份连接失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + connErr.Error()})
 		return
 	}
@@ -842,6 +895,7 @@ func redisBackupHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := redisDo(conn, "SAVE")
 	conn.Close()
 	if err != nil {
+		sysLogError("REDIS", fmt.Sprintf("Redis SAVE失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "Redis SAVE失败: " + err.Error()})
 		return
 	}
@@ -854,6 +908,7 @@ func redisBackupHandler(w http.ResponseWriter, r *http.Request) {
 
 	backupFileName, err := doRedisRdbCopy(server, name, bakDir)
 	if err != nil {
+		sysLogError("REDIS", fmt.Sprintf("Redis RDB文件复制失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": err.Error()})
 		return
 	}
@@ -861,7 +916,7 @@ func redisBackupHandler(w http.ResponseWriter, r *http.Request) {
 	if source == "" {
 		source = "local"
 	}
-	
+
 	newBackup := Backup{
 		ID:          nextBackupID,
 		Name:        name,
@@ -888,6 +943,7 @@ func redisBackupHandler(w http.ResponseWriter, r *http.Request) {
 
 	saveData()
 
+	sysLogInfo("BACKUP", fmt.Sprintf("创建Redis备份: %s (连接: %s:%d)", newBackup.Name, server.Host, server.Port))
 	writeJSON(w, map[string]interface{}{"code": 0, "msg": "备份成功", "data": newBackup})
 }
 
@@ -941,6 +997,8 @@ func redisRestoreHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sysLogInfo("BACKUP", fmt.Sprintf("恢复Redis备份: %s (连接: %s:%d)", backup.Name, server.Host, server.Port))
+
 	if server.Host != "127.0.0.1" && server.Host != "localhost" {
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "远程Redis实例不支持文件系统恢复，请使用 Redis CLI 手动恢复"})
 		return
@@ -951,12 +1009,14 @@ func redisRestoreHandler(w http.ResponseWriter, r *http.Request) {
 
 	input, err := os.ReadFile(backupPath)
 	if err != nil {
+		sysLogError("REDIS", "Redis恢复读取备份文件失败")
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "读取备份文件失败: " + err.Error()})
 		return
 	}
 
 	conn, err := openRedis(server)
 	if err != nil {
+		sysLogError("REDIS", fmt.Sprintf("Redis恢复连接失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + err.Error()})
 		return
 	}
@@ -981,6 +1041,7 @@ func redisRestoreHandler(w http.ResponseWriter, r *http.Request) {
 	destPath := filepath.Join(rdbDir, rdbFile)
 	err = os.WriteFile(destPath, input, 0644)
 	if err != nil {
+		sysLogError("REDIS", "Redis恢复写入RDB文件失败")
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "写入RDB文件失败: " + err.Error()})
 		return
 	}
@@ -1020,12 +1081,15 @@ func redisRestartHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sysLogInfo("REDIS", fmt.Sprintf("重启Redis (连接: %s:%d)", server.Host, server.Port))
+
 	containerName := findContainerName(uint(id), source)
 
 	if containerName != "" {
 		if dockerPath, err := exec.LookPath("docker"); err == nil {
 			out, err := exec.Command(dockerPath, "restart", containerName).CombinedOutput()
 			if err != nil {
+				sysLogError("REDIS", fmt.Sprintf("Docker重启Redis失败: %s (连接: %s:%d)", containerName, server.Host, server.Port))
 				writeJSON(w, map[string]interface{}{"code": 1, "msg": "Docker重启失败: " + strings.TrimSpace(string(out))})
 				return
 			}
@@ -1036,6 +1100,7 @@ func redisRestartHandler(w http.ResponseWriter, r *http.Request) {
 
 	conn, connErr := openRedis(server)
 	if connErr != nil {
+		sysLogError("REDIS", fmt.Sprintf("Redis重启连接失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + connErr.Error()})
 		return
 	}
@@ -1059,6 +1124,7 @@ func redisRestartHandler(w http.ResponseWriter, r *http.Request) {
 
 	conn2, connErr2 := openRedis(server)
 	if connErr2 != nil {
+		sysLogError("REDIS", fmt.Sprintf("Redis重启连接失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + connErr2.Error()})
 		return
 	}
@@ -1098,6 +1164,7 @@ func redisRestartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if startErr != "" {
+		sysLogError("REDIS", fmt.Sprintf("Redis自动启动失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 0, "msg": "Redis已安全关闭，自动重启失败(" + startErr + ")，请手动启动"})
 		return
 	}
@@ -1136,12 +1203,15 @@ func redisStopHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sysLogInfo("REDIS", fmt.Sprintf("停止Redis (连接: %s:%d)", server.Host, server.Port))
+
 	containerName := findContainerName(uint(id), source)
 
 	if containerName != "" {
 		if dockerPath, err := exec.LookPath("docker"); err == nil {
 			out, err := exec.Command(dockerPath, "stop", containerName).CombinedOutput()
 			if err != nil {
+				sysLogError("REDIS", fmt.Sprintf("Docker停止Redis失败: %s (连接: %s:%d)", containerName, server.Host, server.Port))
 				writeJSON(w, map[string]interface{}{"code": 1, "msg": "Docker停止失败: " + strings.TrimSpace(string(out))})
 				return
 			}
@@ -1152,6 +1222,7 @@ func redisStopHandler(w http.ResponseWriter, r *http.Request) {
 
 	conn, connErr := openRedis(server)
 	if connErr != nil {
+		sysLogError("REDIS", fmt.Sprintf("Redis停止连接失败 (连接: %s:%d)", server.Host, server.Port))
 		writeJSON(w, map[string]interface{}{"code": 1, "msg": "连接Redis失败: " + connErr.Error()})
 		return
 	}
@@ -1175,14 +1246,21 @@ func logConfigHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		data, err := os.ReadFile(configPath)
+		defaultPath := filepath.Join(getDataDir(), "logs")
 		if err != nil {
-			writeJSON(w, map[string]interface{}{"code": 0, "data": map[string]interface{}{"enabled": true}})
+			writeJSON(w, map[string]interface{}{"code": 0, "data": map[string]interface{}{"enabled": true, "path": defaultPath, "retentionDays": 30}})
 			return
 		}
 		var config map[string]interface{}
 		if err := json.Unmarshal(data, &config); err != nil {
-			writeJSON(w, map[string]interface{}{"code": 0, "data": map[string]interface{}{"enabled": true}})
+			writeJSON(w, map[string]interface{}{"code": 0, "data": map[string]interface{}{"enabled": true, "path": defaultPath, "retentionDays": 30}})
 			return
+		}
+		if _, ok := config["path"]; !ok {
+			config["path"] = defaultPath
+		}
+		if _, ok := config["retentionDays"]; !ok {
+			config["retentionDays"] = 30
 		}
 		writeJSON(w, map[string]interface{}{"code": 0, "data": config})
 		return
@@ -1210,6 +1288,7 @@ func logConfigHandler(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]interface{}{"code": 500, "msg": "配置保存失败: " + err.Error()})
 			return
 		}
+		sysLogInfo("SYSTEM", fmt.Sprintf("修改日志配置: enabled=%v, path=%s, retentionDays=%v", filtered["enabled"], filtered["path"], filtered["retentionDays"]))
 		writeJSON(w, map[string]interface{}{"code": 0, "msg": "配置已保存"})
 		return
 	}

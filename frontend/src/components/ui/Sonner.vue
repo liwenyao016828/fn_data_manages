@@ -26,10 +26,10 @@ export const Toaster = defineComponent({
       position: props.position,
       toastOptions: {
         classNames: {
-          toast: 'group toast group-[.toaster]:bg-white group-[.toaster]:text-[#1A1A1A] group-[.toaster]:border-[#E8E8E8] group-[.toaster]:shadow-lg',
-          description: 'group-[.toast]:text-[#8C8C8C]',
-          actionButton: 'group-[.toast]:bg-[#1A1A1A] group-[.toast]:text-white',
-          cancelButton: 'group-[.toast]:bg-[#F5F5F5] group-[.toast]:text-[#8C8C8C]',
+          toast: 'group toast group-[.toaster]:bg-card group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg',
+          description: 'group-[.toast]:text-muted-foreground',
+          actionButton: 'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
+          cancelButton: 'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
         },
       },
     })

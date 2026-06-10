@@ -7,86 +7,87 @@
 
       <div class="flex flex-col gap-0">
         <div class="mb-6">
-          <h3 class="text-sm font-semibold text-foreground mb-3">容器连接</h3>
-          <div class="bg-muted/50 border border-border rounded-md p-4">
+          <h3 class="text-[12px] font-semibold mb-3" style="color: var(--text-primary)">容器连接</h3>
+          <div class="rounded-xl p-4" style="background: var(--muted); border: 1px solid var(--border-subtle)">
             <div class="flex items-center mb-3 last:mb-0">
-              <span class="w-12 text-sm text-muted-foreground shrink-0">地址</span>
+              <span class="w-12 text-[12px] shrink-0" style="color: var(--text-tertiary)">地址</span>
               <div class="flex-1 flex items-center justify-between">
-                <span class="text-sm font-medium text-foreground">{{ containerAddress }}</span>
-                <Button variant="ghost" size="icon" class="h-7 w-7" @click="copyText(containerAddress)">
+                <span class="text-[13px] font-medium" style="color: var(--text-primary)">{{ containerAddress }}</span>
+                <button class="btn-ghost h-6 w-6 p-0 flex items-center justify-center" @click="copyText(containerAddress)">
                   <Copy class="h-3.5 w-3.5" />
-                </Button>
+                </button>
               </div>
             </div>
             <div class="flex items-center">
-              <span class="w-12 text-sm text-muted-foreground shrink-0">端口</span>
+              <span class="w-12 text-[12px] shrink-0" style="color: var(--text-tertiary)">端口</span>
               <div class="flex-1 flex items-center justify-between">
-                <span class="text-sm font-medium text-foreground">{{ containerPort }}</span>
-                <Button variant="ghost" size="icon" class="h-7 w-7" @click="copyText(containerPort)">
+                <span class="text-[13px] font-medium" style="color: var(--text-primary)">{{ containerPort }}</span>
+                <button class="btn-ghost h-6 w-6 p-0 flex items-center justify-center" @click="copyText(containerPort)">
                   <Copy class="h-3.5 w-3.5" />
-                </Button>
+                </button>
               </div>
             </div>
-            <p class="text-xs text-muted-foreground mt-2">PHP 运行环境/容器安装的应用使用此连接地址</p>
+            <p class="text-[11px] mt-2" style="color: var(--text-tertiary)">PHP 运行环境/容器安装的应用使用此连接地址</p>
           </div>
         </div>
 
         <div class="mb-6">
-          <h3 class="text-sm font-semibold text-foreground mb-3">外部连接</h3>
-          <div class="bg-muted/50 border border-border rounded-md p-4">
+          <h3 class="text-[12px] font-semibold mb-3" style="color: var(--text-primary)">外部连接</h3>
+          <div class="rounded-xl p-4" style="background: var(--muted); border: 1px solid var(--border-subtle)">
             <div class="flex items-center mb-3">
-              <span class="w-12 text-sm text-muted-foreground shrink-0">地址</span>
+              <span class="w-12 text-[12px] shrink-0" style="color: var(--text-tertiary)">地址</span>
               <div class="flex-1 flex items-center justify-between">
-                <span class="text-sm font-medium text-foreground">{{ externalAddress }}</span>
-                <Button variant="ghost" size="icon" class="h-7 w-7" @click="copyText(externalAddress)">
+                <span class="text-[13px] font-medium" style="color: var(--text-primary)">{{ externalAddress }}</span>
+                <button class="btn-ghost h-6 w-6 p-0 flex items-center justify-center" @click="copyText(externalAddress)">
                   <Copy class="h-3.5 w-3.5" />
-                </Button>
+                </button>
               </div>
             </div>
             <div class="flex items-center">
-              <span class="w-12 text-sm text-muted-foreground shrink-0">端口</span>
+              <span class="w-12 text-[12px] shrink-0" style="color: var(--text-tertiary)">端口</span>
               <div class="flex-1 flex items-center justify-between">
-                <span class="text-sm font-medium text-foreground">{{ externalPort }}</span>
-                <Button variant="ghost" size="icon" class="h-7 w-7" @click="copyText(externalPort)">
+                <span class="text-[13px] font-medium" style="color: var(--text-primary)">{{ externalPort }}</span>
+                <button class="btn-ghost h-6 w-6 p-0 flex items-center justify-center" @click="copyText(externalPort)">
                   <Copy class="h-3.5 w-3.5" />
-                </Button>
+                </button>
               </div>
             </div>
-            <p class="text-xs text-muted-foreground mt-2">非容器或外部连接使用此地址</p>
+            <p class="text-[11px] mt-2" style="color: var(--text-tertiary)">非容器或外部连接使用此地址</p>
           </div>
         </div>
 
         <div class="mb-6">
           <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-foreground">远程访问</span>
+            <span class="text-[12px] font-medium" style="color: var(--text-primary)">远程访问</span>
             <Switch :checked="remoteAccess" disabled />
           </div>
-          <p class="text-xs text-muted-foreground mt-2">远程访问功能暂不可用</p>
+          <p class="text-[11px] mt-2" style="color: var(--text-tertiary)">远程访问功能暂不可用</p>
         </div>
 
         <div>
-          <label class="text-sm font-medium text-foreground">* root 密码</label>
+          <label class="text-[12px] font-medium" style="color: var(--text-primary)">* root 密码</label>
           <div class="flex gap-2 mt-1.5">
             <Input
               v-model="rootPassword"
               :type="showPwd ? 'text' : 'password'"
               placeholder="root密码"
-              class="flex-1 bg-amber-50/50 dark:bg-amber-950/20"
+              class="flex-1"
+              style="background: var(--warning-soft)"
             />
-            <Button variant="outline" size="icon" @click="showPwd = !showPwd">
+            <button class="btn-secondary h-8 w-8 p-0 flex items-center justify-center" @click="showPwd = !showPwd">
               <Eye v-if="!showPwd" class="h-4 w-4" />
               <EyeOff v-else class="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" @click="copyPassword">复制</Button>
-            <Button variant="outline" size="sm" @click="randomPassword">随机密码</Button>
+            </button>
+            <button class="btn-secondary h-8 text-[11px] px-2" @click="copyPassword">复制</button>
+            <button class="btn-secondary h-8 text-[11px] px-2" @click="randomPassword">随机密码</button>
           </div>
         </div>
       </div>
 
-      <DialogFooter>
-        <Button variant="outline" @click="handleClose">取消</Button>
-        <Button @click="handleConfirm">确认</Button>
-      </DialogFooter>
+      <div class="flex justify-end gap-2 mt-4">
+        <button class="btn-ghost" @click="handleClose">取消</button>
+        <button class="btn-primary" @click="handleConfirm">确认</button>
+      </div>
     </DialogContent>
   </Dialog>
 </template>
